@@ -224,7 +224,7 @@ async def bulk_inscripciones(file: UploadFile = File(...), _: dict = Depends(get
 
 
 @app.get("/api/bulk/template")
-async def bulk_template(_: dict = Depends(get_current_user)):
+async def bulk_template():
     if not os.path.exists(TEMPLATE_PATH):
         raise HTTPException(status_code=404, detail="Plantilla no encontrada en el servidor")
     return FileResponse(
