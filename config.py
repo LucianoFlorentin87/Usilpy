@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     app_secret_key: str = "change_this_in_production"
     debug: bool = False
 
+    # Auth
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 480  # 8 horas
+    # Usuario admin local por defecto (cambiar en .env)
+    admin_username: str = "admin"
+    admin_password_hash: str = ""  # generado con passlib, vacío = sin login local
+    # Azure AD OAuth2 redirect
+    azure_redirect_uri: str = "http://localhost:8000/api/auth/azure/callback"
+
     class Config:
         env_file = ".env"
         case_sensitive = False

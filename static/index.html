@@ -133,9 +133,71 @@
     .hidden { display: none !important; }
     #results-section { margin-top: 20px; }
     .detail-text { font-size: 0.75rem; color: var(--text-muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Login screen ── */
+    #login-screen {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+    }
+    #login-screen.hidden { display: none !important; }
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 36px 32px; width: 100%; max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,.08);
+    }
+    .login-card h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
+    .login-card p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px; }
+    .login-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .login-field label { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+    .login-field input { padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 0.9rem; outline: none; transition: border-color .15s; }
+    .login-field input:focus { border-color: var(--accent); }
+    #login-error { color: var(--error); font-size: 0.8rem; min-height: 18px; margin-bottom: 8px; }
+    .btn-login { width: 100%; padding: 11px; font-size: 0.9rem; font-weight: 600; border-radius: 7px; }
+    .login-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0; color: var(--text-muted); font-size: 0.78rem; }
+    .login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .btn-azure { width: 100%; padding: 10px; font-size: 0.85rem; font-weight: 500; border-radius: 7px; background: #fff; border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background .15s; }
+    .btn-azure:hover { background: var(--bg); }
+    .btn-azure svg { width: 18px; height: 18px; }
+
+    /* ── Topbar user chip ── */
+    #user-chip { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+    #user-chip .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; }
+    #user-chip .user-name { color: var(--text-muted); }
+    #btn-logout { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 0.78rem; cursor: pointer; color: var(--text-muted); }
+    #btn-logout:hover { background: var(--bg); color: var(--error); border-color: var(--error); }
   </style>
 </head>
 <body>
+
+<!-- ═══════════════════════════════ LOGIN ════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <h2>Gestión Académica</h2>
+    <p>Iniciá sesión para continuar</p>
+
+    <div class="login-field">
+      <label>Usuario</label>
+      <input type="text" id="login-username" placeholder="admin" autocomplete="username" />
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter') doLogin()" />
+    </div>
+    <p id="login-error"></p>
+    <button class="btn btn-primary btn-login" onclick="doLogin()">Iniciar sesión</button>
+
+    <div class="login-divider">o</div>
+
+    <button class="btn-azure" onclick="doAzureLogin()">
+      <!-- Microsoft logo SVG -->
+      <svg viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="10" height="10" fill="#F25022"/><rect x="11" width="10" height="10" fill="#7FBA00"/>
+        <rect y="11" width="10" height="10" fill="#00A4EF"/><rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
+      </svg>
+      Continuar con Microsoft
+    </button>
+  </div>
+</div>
 
 <!-- ═══════════════════════════════ SIDEBAR ═══════════════════════════════ -->
 <nav id="sidebar">
@@ -188,7 +250,14 @@
 <div id="main">
   <div id="topbar">
     <h2 id="topbar-title">Carga Masiva</h2>
-    <span class="badge" id="topbar-badge">Excel / CSV</span>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span class="badge" id="topbar-badge">Excel / CSV</span>
+      <div id="user-chip">
+        <div class="avatar" id="user-avatar">?</div>
+        <span class="user-name" id="user-name-label"></span>
+        <button id="btn-logout" onclick="doLogout()">Salir</button>
+      </div>
+    </div>
   </div>
 
   <div id="content">
@@ -377,6 +446,95 @@
 </div><!-- /main -->
 
 <script>
+// ── Auth ─────────────────────────────────────────────────────────────────────
+const TOKEN_KEY = 'ga_token';
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
+function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+
+function authHeaders() {
+  const t = getToken();
+  return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+
+function showApp(user) {
+  document.getElementById('login-screen').classList.add('hidden');
+  const initials = (user.name || user.sub || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('user-name-label').textContent = user.name || user.sub || '';
+}
+
+function showLogin(msg) {
+  clearToken();
+  document.getElementById('login-screen').classList.remove('hidden');
+  if (msg) document.getElementById('login-error').textContent = msg;
+}
+
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  document.getElementById('login-error').textContent = '';
+  if (!username || !password) { document.getElementById('login-error').textContent = 'Completá usuario y contraseña'; return; }
+  try {
+    const resp = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.detail || 'Credenciales incorrectas');
+    }
+    const data = await resp.json();
+    setToken(data.access_token);
+    showApp(data.user);
+  } catch(ex) {
+    document.getElementById('login-error').textContent = ex.message;
+  }
+}
+
+function doAzureLogin() {
+  window.location.href = '/api/auth/azure/login';
+}
+
+function doLogout() {
+  fetch('/api/auth/logout', { method: 'POST' });
+  showLogin('');
+}
+
+// Manejar token desde Azure callback (#token=...)
+(function handleFragment() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#token=')) {
+    const token = hash.slice(7);
+    setToken(token);
+    window.history.replaceState(null, '', '/');
+  }
+  if (hash.startsWith('#') && hash.includes('auth_error=')) {
+    const msg = decodeURIComponent(hash.split('auth_error=')[1] || 'Error de autenticación');
+    window.history.replaceState(null, '', '/');
+    showLogin(msg);
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('auth_error')) showLogin(decodeURIComponent(params.get('auth_error')));
+})();
+
+// Verificar token existente al cargar
+(async function checkAuth() {
+  const token = getToken();
+  if (!token) { showLogin(''); return; }
+  try {
+    const resp = await fetch('/api/auth/me', { headers: authHeaders() });
+    if (!resp.ok) throw new Error();
+    const user = await resp.json();
+    showApp(user);
+  } catch {
+    showLogin('La sesión expiró');
+  }
+})();
+
 // ── Navigation ──────────────────────────────────────────────────────────────
 const panelTitles = {
   'bulk': ['Carga Masiva', 'Excel / CSV'],
@@ -462,7 +620,7 @@ async function processBulk() {
 
   try {
     setProgress(true, 30, 'Procesando en el servidor…');
-    const resp = await fetch(endpoint, { method: 'POST', body: fd });
+    const resp = await fetch(endpoint, { method: 'POST', body: fd, headers: authHeaders() });
     setProgress(true, 80, 'Recibiendo resultados…');
 
     if (!resp.ok) {
@@ -621,9 +779,10 @@ async function loadAzureGroups() {
 
 // ── Util ──────────────────────────────────────────────────────────────────────
 async function apiFetch(url, method = 'GET', body = null) {
-  const opts = { method, headers: {} };
+  const opts = { method, headers: { ...authHeaders() } };
   if (body) { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
   const resp = await fetch(url, opts);
+  if (resp.status === 401) { showLogin('Sesión expirada'); throw new Error('No autenticado'); }
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: resp.statusText }));
     throw new Error(err.detail || resp.statusText);
