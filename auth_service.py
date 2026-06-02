@@ -11,14 +11,12 @@ from typing import Optional
 import secrets
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 import httpx
 
 from config import get_settings
 
 settings = get_settings()
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ---------------------------------------------------------------------------
 # JWT
@@ -43,11 +41,11 @@ def decode_token(token: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
 
 def authenticate_local(username: str, password: str) -> Optional[dict]:
