@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gestión Académica Universitaria</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    /* ── Reset & base ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #f0f2f5;
@@ -26,28 +26,19 @@
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
 
     /* ── Sidebar ── */
-    #sidebar {
-      width: 240px; min-width: 240px; background: var(--sidebar-bg); display: flex; flex-direction: column;
-      padding: 0; overflow-y: auto;
-    }
+    #sidebar { width: 240px; min-width: 240px; background: var(--sidebar-bg); display: flex; flex-direction: column; padding: 0; overflow-y: auto; }
     #sidebar h1 { color: #fff; font-size: 1rem; font-weight: 700; padding: 20px 16px 8px; line-height: 1.3; }
     #sidebar .tagline { color: #8ca0bf; font-size: 0.72rem; padding: 0 16px 20px; }
     .nav-group { padding: 6px 0; }
     .nav-group-label { color: #5a7299; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 6px 16px 2px; }
-    .nav-item {
-      display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer;
-      color: #b0c4de; font-size: 0.85rem; border-left: 3px solid transparent; transition: all .15s;
-    }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer; color: #b0c4de; font-size: 0.85rem; border-left: 3px solid transparent; transition: all .15s; }
     .nav-item:hover { background: var(--sidebar-hover); color: #fff; }
     .nav-item.active { background: var(--sidebar-active); color: #fff; border-left-color: #5b9bd5; }
     .nav-item .icon { font-size: 1rem; width: 18px; text-align: center; flex-shrink: 0; }
 
     /* ── Main content ── */
     #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    #topbar {
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-    }
+    #topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
     #topbar h2 { font-size: 1.1rem; font-weight: 600; }
     #topbar .badge { background: var(--accent); color: #fff; font-size: 0.7rem; padding: 2px 8px; border-radius: 99px; }
     #content { flex: 1; overflow-y: auto; padding: 24px; }
@@ -61,26 +52,24 @@
     .card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 14px; }
 
     /* ── Buttons ── */
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px;
-      border: none; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all .15s;
-    }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all .15s; }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover { background: var(--accent-dark); }
     .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
     .btn-secondary:hover { background: var(--bg); }
     .btn-success { background: #059669; color: #fff; }
     .btn-success:hover { background: #047857; }
+    .btn-warn { background: #d97706; color: #fff; }
+    .btn-warn:hover { background: #b45309; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
 
     /* ── Forms ── */
     .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
     label { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
-    input, select, textarea {
-      padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
-      font-size: 0.85rem; outline: none; transition: border-color .15s;
-    }
+    input, select, textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; outline: none; transition: border-color .15s; }
     input:focus, select:focus { border-color: var(--accent); }
 
     /* ── Tables ── */
@@ -92,20 +81,16 @@
     tr:hover td { background: #f8fafc; }
 
     /* ── Status chips ── */
-    .chip {
-      display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; white-space: nowrap;
-    }
-    .chip-ok       { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
-    .chip-error    { background: var(--error-bg);   color: var(--error);   border: 1px solid var(--error-border); }
-    .chip-warn     { background: var(--warn-bg);    color: var(--warn);    border: 1px solid var(--warn-border); }
-    .chip-skip     { background: var(--skip-bg);    color: var(--skip);    border: 1px solid var(--skip-border); }
+    .chip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+    .chip-ok       { background: var(--success-bg); color: var(--success);  border: 1px solid var(--success-border); }
+    .chip-error    { background: var(--error-bg);   color: var(--error);    border: 1px solid var(--error-border); }
+    .chip-warn     { background: var(--warn-bg);    color: var(--warn);     border: 1px solid var(--warn-border); }
+    .chip-skip     { background: var(--skip-bg);    color: var(--skip);     border: 1px solid var(--skip-border); }
     .chip-existente { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+    .chip-dry      { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 
     /* ── Drag & drop zone ── */
-    #drop-zone {
-      border: 2px dashed var(--border); border-radius: 10px; padding: 36px 20px;
-      text-align: center; transition: all .2s; cursor: pointer; background: #fafbfd;
-    }
+    #drop-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 36px 20px; text-align: center; transition: all .2s; cursor: pointer; background: #fafbfd; }
     #drop-zone.dragging { border-color: var(--accent); background: #eff5ff; }
     #drop-zone .dz-icon { font-size: 2.5rem; margin-bottom: 10px; }
     #drop-zone p { color: var(--text-muted); font-size: 0.9rem; }
@@ -127,23 +112,68 @@
     .stat-total   { background: #eff6ff; color: #1d4ed8; }
     .stat-ok      { background: var(--success-bg); color: var(--success); }
     .stat-error   { background: var(--error-bg);   color: var(--error); }
+    .stat-warn    { background: var(--warn-bg);     color: var(--warn); }
+    .stat-info    { background: #f0fdf4; color: #166534; }
+
+    /* ── KPI Cards ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+    .kpi-card .kpi-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+    .kpi-card .kpi-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .kpi-card .kpi-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+    .kpi-blue  .kpi-value { color: #1d4ed8; }
+    .kpi-green .kpi-value { color: #065f46; }
+    .kpi-amber .kpi-value { color: #92400e; }
+    .kpi-red   .kpi-value { color: #991b1b; }
+
+    /* ── Chart ── */
+    .chart-container { position: relative; height: 220px; }
+
+    /* ── Log output ── */
+    .log-output { background: #0f172a; color: #94a3b8; border-radius: 8px; padding: 16px; font-family: 'Courier New', monospace; font-size: 0.78rem; line-height: 1.6; max-height: 340px; overflow-y: auto; }
+    .log-output .log-ok    { color: #4ade80; }
+    .log-output .log-warn  { color: #fbbf24; }
+    .log-output .log-error { color: #f87171; }
+    .log-output .log-info  { color: #60a5fa; }
+    .log-output .log-dry   { color: #a78bfa; }
+
+    /* ── Execution timeline ── */
+    .exec-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .exec-item:last-child { border-bottom: none; }
+    .exec-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .exec-dot-ok    { background: #10b981; }
+    .exec-dot-error { background: #ef4444; }
+    .exec-dot-warn  { background: #f59e0b; }
+    .exec-meta { flex: 1; min-width: 0; }
+    .exec-meta .exec-title { font-size: 0.82rem; font-weight: 600; }
+    .exec-meta .exec-sub   { font-size: 0.75rem; color: var(--text-muted); }
+    .exec-stats { display: flex; gap: 8px; font-size: 0.75rem; flex-wrap: wrap; }
+    .exec-stat  { background: var(--bg); border-radius: 99px; padding: 2px 8px; color: var(--text-muted); }
+
+    /* ── Matriculacion result accordion ── */
+    .alumno-result { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+    .alumno-result-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; background: #f8fafc; }
+    .alumno-result-header:hover { background: #f0f2f5; }
+    .alumno-result-body { padding: 12px 16px; display: none; background: #fff; }
+    .alumno-result-body.open { display: block; }
+    .materia-tag { display: inline-block; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 99px; padding: 2px 10px; font-size: 0.75rem; margin: 2px; }
+    .materia-tag-error { background: var(--error-bg); color: var(--error); border-color: var(--error-border); }
 
     /* ── Misc ── */
     .actions-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
     .hidden { display: none !important; }
     #results-section { margin-top: 20px; }
     .detail-text { font-size: 0.75rem; color: var(--text-muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .section-title { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .badge-count { background: var(--accent); color: #fff; border-radius: 99px; padding: 1px 7px; font-size: 0.72rem; font-weight: 600; }
+    .info-banner { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; font-size: 0.85rem; color: #1e40af; margin-bottom: 16px; }
+    .warn-banner { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 12px 16px; font-size: 0.85rem; color: var(--warn); margin-bottom: 16px; }
+    .next-run-badge { background: #1a2332; color: #8ca0bf; border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; font-family: monospace; }
 
     /* ── Login screen ── */
-    #login-screen {
-      position: fixed; inset: 0; background: var(--bg);
-      display: flex; align-items: center; justify-content: center; z-index: 1000;
-    }
+    #login-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 1000; }
     #login-screen.hidden { display: none !important; }
-    .login-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-      padding: 36px 32px; width: 100%; max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,.08);
-    }
+    .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 36px 32px; width: 100%; max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,.08); }
     .login-card h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
     .login-card p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px; }
     .login-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
@@ -173,7 +203,6 @@
   <div class="login-card">
     <h2>Gestión Académica</h2>
     <p>Iniciá sesión para continuar</p>
-
     <div class="login-field">
       <label>Usuario</label>
       <input type="text" id="login-username" placeholder="admin" autocomplete="username" />
@@ -185,11 +214,8 @@
     </div>
     <p id="login-error"></p>
     <button class="btn btn-primary btn-login" onclick="doLogin()">Iniciar sesión</button>
-
     <div class="login-divider">o</div>
-
     <button class="btn-azure" onclick="doAzureLogin()">
-      <!-- Microsoft logo SVG -->
       <svg viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect width="10" height="10" fill="#F25022"/><rect x="11" width="10" height="10" fill="#7FBA00"/>
         <rect y="11" width="10" height="10" fill="#00A4EF"/><rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
@@ -204,10 +230,24 @@
   <h1>Gestión Académica</h1>
   <p class="tagline">Canvas LMS · Azure AD · Teams</p>
 
-  <!-- Carga Masiva (PRIMERO) -->
+  <!-- Matriculación -->
+  <div class="nav-group">
+    <div class="nav-group-label">Matriculación</div>
+    <div class="nav-item active" data-panel="dashboard" onclick="showPanel('dashboard', this)">
+      <span class="icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item" data-panel="matriculacion" onclick="showPanel('matriculacion', this)">
+      <span class="icon">🎓</span> Matriculación
+    </div>
+    <div class="nav-item" data-panel="auditoria" onclick="showPanel('auditoria', this)">
+      <span class="icon">📋</span> Auditoría
+    </div>
+  </div>
+
+  <!-- Carga Masiva -->
   <div class="nav-group">
     <div class="nav-group-label">Carga Masiva</div>
-    <div class="nav-item active" data-panel="bulk" onclick="showPanel('bulk', this)">
+    <div class="nav-item" data-panel="bulk" onclick="showPanel('bulk', this)">
       <span class="icon">📤</span> Carga Masiva
     </div>
   </div>
@@ -249,9 +289,9 @@
 <!-- ═══════════════════════════════ MAIN ═══════════════════════════════════ -->
 <div id="main">
   <div id="topbar">
-    <h2 id="topbar-title">Carga Masiva</h2>
+    <h2 id="topbar-title">Dashboard</h2>
     <div style="display:flex; align-items:center; gap:12px;">
-      <span class="badge" id="topbar-badge">Excel / CSV</span>
+      <span class="badge" id="topbar-badge">Matriculación</span>
       <div id="user-chip">
         <div class="avatar" id="user-avatar">?</div>
         <span class="user-name" id="user-name-label"></span>
@@ -262,10 +302,193 @@
 
   <div id="content">
 
-    <!-- ══════════ PANEL: CARGA MASIVA ══════════ -->
-    <div class="panel active" id="panel-bulk">
+    <!-- ══════════ PANEL: DASHBOARD ══════════ -->
+    <div class="panel active" id="panel-dashboard">
 
-      <!-- Selector de tipo -->
+      <!-- KPI row -->
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-label">Procesados hoy</div>
+          <div class="kpi-value" id="kpi-procesados">—</div>
+          <div class="kpi-sub">alumnos</div>
+        </div>
+        <div class="kpi-card kpi-green">
+          <div class="kpi-label">Creados hoy</div>
+          <div class="kpi-value" id="kpi-creados">—</div>
+          <div class="kpi-sub">usuarios nuevos</div>
+        </div>
+        <div class="kpi-card kpi-amber">
+          <div class="kpi-label">Ya existentes</div>
+          <div class="kpi-value" id="kpi-inscritos">—</div>
+          <div class="kpi-sub">inscripciones</div>
+        </div>
+        <div class="kpi-card kpi-red">
+          <div class="kpi-label">Errores hoy</div>
+          <div class="kpi-value" id="kpi-errores">—</div>
+          <div class="kpi-sub">requieren revisión</div>
+        </div>
+        <div class="kpi-card" style="border-top: 3px solid var(--sidebar-bg);">
+          <div class="kpi-label">Próxima ejecución</div>
+          <div id="kpi-proxima" style="font-size:0.82rem;font-weight:600;color:var(--text);margin-top:6px;">—</div>
+          <div class="kpi-sub" id="kpi-semestre">—</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap;">
+        <!-- Chart -->
+        <div class="card">
+          <h3>Alumnos procesados — últimos 7 días</h3>
+          <div class="chart-container">
+            <canvas id="chart-diario"></canvas>
+          </div>
+        </div>
+
+        <!-- Recent executions -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <h3 style="margin:0;">Últimas ejecuciones</h3>
+            <button class="btn btn-secondary" style="font-size:0.75rem;padding:5px 10px;" onclick="loadDashboard()">🔄</button>
+          </div>
+          <div id="exec-timeline"></div>
+        </div>
+      </div>
+
+      <!-- Recent enrollments table -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <h3 style="margin:0;">Últimas matriculaciones</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="dash-semestre-filter" onchange="loadDashboardTable()" style="font-size:0.8rem;padding:5px 8px;">
+              <option value="">Todos los semestres</option>
+            </select>
+            <button class="btn btn-secondary" style="font-size:0.75rem;padding:5px 10px;" onclick="loadDashboardTable()">🔄</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Timestamp</th><th>Cédula</th><th>Nombre</th><th>Acción</th><th>Plataforma</th><th>Curso</th><th>Semestre</th></tr></thead>
+            <tbody id="tbl-dash-enrollments"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /panel-dashboard -->
+
+
+    <!-- ══════════ PANEL: MATRICULACIÓN ══════════ -->
+    <div class="panel" id="panel-matriculacion">
+
+      <!-- Controls card -->
+      <div class="card">
+        <h3>Proceso de Matriculación Automática</h3>
+        <div class="info-banner">
+          📁 El sistema leerá el Excel de matriculación desde OneDrive (configurado en <code>ONEDRIVE_FILE_ID</code>).
+          Cada hoja corresponde a un alumno. Use <strong>DRY RUN</strong> para simular sin ejecutar cambios.
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="max-width:200px;">
+            <label>Semestre (opcional)</label>
+            <input type="text" id="mat-semestre" placeholder="ej: 2025-2" />
+          </div>
+        </div>
+        <div class="actions-row">
+          <button class="btn btn-primary" id="btn-mat-run" onclick="runMatriculacion(false)">
+            ▶ Ejecutar matriculación
+          </button>
+          <button class="btn btn-warn" id="btn-mat-dryrun" onclick="runMatriculacion(true)">
+            🔍 DRY RUN (simular)
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress + log -->
+      <div class="card" id="mat-progress-card" style="display:none;">
+        <h3 id="mat-progress-title">Procesando…</h3>
+        <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:14px;">
+          <div id="mat-progress-fill" style="height:100%;width:0%;background:var(--accent);border-radius:99px;transition:width .4s;"></div>
+        </div>
+        <div class="log-output" id="mat-log"></div>
+      </div>
+
+      <!-- Results summary -->
+      <div id="mat-results" style="display:none;">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 style="margin:0;" id="mat-result-title">Resultado</h3>
+            <span id="mat-dry-badge" style="display:none;" class="chip chip-dry">DRY RUN</span>
+          </div>
+          <div class="stats-row">
+            <div class="stat-box stat-total"><div class="num" id="mat-stat-total">0</div><div class="lbl">Total alumnos</div></div>
+            <div class="stat-box stat-ok"><div class="num" id="mat-stat-creados">0</div><div class="lbl">Creados</div></div>
+            <div class="stat-box stat-info"><div class="num" id="mat-stat-existentes">0</div><div class="lbl">Existentes</div></div>
+            <div class="stat-box stat-warn"><div class="num" id="mat-stat-inscrip">0</div><div class="lbl">Inscripciones</div></div>
+            <div class="stat-box stat-error"><div class="num" id="mat-stat-errores">0</div><div class="lbl">Errores</div></div>
+          </div>
+        </div>
+
+        <!-- Validation errors -->
+        <div class="card" id="mat-val-errors" style="display:none;">
+          <h3 style="color:var(--error);">⚠️ Errores de validación — proceso no ejecutado</h3>
+          <div class="table-wrap" style="margin-top:12px;">
+            <table>
+              <thead><tr><th>Hoja</th><th>Cédula</th><th>Nombre</th><th>Error</th></tr></thead>
+              <tbody id="tbl-val-errors"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Per-student accordion -->
+        <div class="card">
+          <h3>Detalle por alumno <span class="badge-count" id="mat-alumno-count">0</span></h3>
+          <div id="mat-alumnos-list"></div>
+        </div>
+      </div>
+    </div><!-- /panel-matriculacion -->
+
+
+    <!-- ══════════ PANEL: AUDITORÍA ══════════ -->
+    <div class="panel" id="panel-auditoria">
+      <div class="card">
+        <h3>Log de Auditoría</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Filtrar por semestre</label>
+            <input type="text" id="aud-semestre" placeholder="ej: 2025-2" />
+          </div>
+          <div class="form-group">
+            <label>Filtrar por cédula</label>
+            <input type="text" id="aud-cedula" placeholder="3406399" />
+          </div>
+          <div class="form-group" style="justify-content:flex-end;">
+            <label>&nbsp;</label>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary" onclick="loadAuditoria()">🔍 Buscar</button>
+              <button class="btn btn-success" onclick="exportAuditoria()">⬇️ Exportar Excel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="margin:0;">Registros <span class="badge-count" id="aud-count">0</span></h3>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th><th>Cédula</th><th>Nombre</th>
+                <th>Acción</th><th>Plataforma</th><th>Curso</th><th>Semestre</th><th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-auditoria"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /panel-auditoria -->
+
+
+    <!-- ══════════ PANEL: CARGA MASIVA ══════════ -->
+    <div class="panel" id="panel-bulk">
       <div class="card">
         <h3>Tipo de carga</h3>
         <div class="form-row">
@@ -278,39 +501,30 @@
           </div>
           <div class="form-group" style="justify-content: flex-end;">
             <label>&nbsp;</label>
-            <button class="btn btn-secondary" onclick="downloadTemplate()">
-              ⬇️ Descargar plantilla vacía
-            </button>
+            <button class="btn btn-secondary" onclick="downloadTemplate()">⬇️ Descargar plantilla vacía</button>
           </div>
         </div>
       </div>
 
-      <!-- Drop zone -->
       <div class="card">
         <h3>Archivo Excel / CSV</h3>
         <div id="drop-zone" onclick="document.getElementById('file-input').click()">
           <div class="dz-icon">📂</div>
-          <p>Arrastra tu archivo aquí o <strong>haz clic para seleccionar</strong></p>
+          <p>Arrastrá tu archivo aquí o <strong>hacé clic para seleccionar</strong></p>
           <p style="font-size:0.75rem; margin-top:4px;">Formatos: .xlsx · .xls · .csv — máx. 10 MB</p>
           <p class="file-chosen hidden" id="chosen-filename"></p>
         </div>
         <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)" />
-
-        <!-- Progress -->
         <div id="progress-wrap">
           <p id="progress-label">Procesando…</p>
           <div id="progress-bar-track"><div id="progress-bar-fill"></div></div>
         </div>
-
         <div style="margin-top:14px; display:flex; gap:10px;">
-          <button class="btn btn-primary" id="btn-process" onclick="processBulk()" disabled>
-            ▶ Procesar archivo
-          </button>
+          <button class="btn btn-primary" id="btn-process" onclick="processBulk()" disabled>▶ Procesar archivo</button>
           <button class="btn btn-secondary" onclick="resetBulk()">↺ Limpiar</button>
         </div>
       </div>
 
-      <!-- Resultados -->
       <div id="results-section" class="hidden">
         <div class="card">
           <h3>Resumen</h3>
@@ -320,12 +534,9 @@
             <div class="stat-box stat-error"><div class="num" id="stat-errors">0</div><div class="lbl">Errores</div></div>
           </div>
           <div class="actions-row">
-            <button class="btn btn-success" id="btn-download-report" onclick="downloadReportExcel()">
-              ⬇️ Descargar reporte Excel
-            </button>
+            <button class="btn btn-success" id="btn-download-report" onclick="downloadReportExcel()">⬇️ Descargar reporte Excel</button>
           </div>
         </div>
-
         <div class="card">
           <h3>Detalle por fila</h3>
           <div class="table-wrap">
@@ -361,7 +572,7 @@
         <h3>Crear usuario en Canvas</h3>
         <div class="form-row">
           <div class="form-group"><label>Nombre completo</label><input type="text" id="cu-name" placeholder="Juan Pérez" /></div>
-          <div class="form-group"><label>Email</label><input type="email" id="cu-email" placeholder="juan@uni.edu" /></div>
+          <div class="form-group"><label>Email</label><input type="email" id="cu-email" placeholder="juan@usil.edu.py" /></div>
           <div class="form-group"><label>SIS ID (opcional)</label><input type="text" id="cu-sis" placeholder="STU-001" /></div>
         </div>
         <button class="btn btn-primary" onclick="createCanvasUser()">➕ Crear usuario</button>
@@ -384,7 +595,7 @@
         <h3>Inscribir usuario en curso</h3>
         <div class="form-row">
           <div class="form-group"><label>ID del curso</label><input type="text" id="en-course" placeholder="12345" /></div>
-          <div class="form-group"><label>ID o email del usuario</label><input type="text" id="en-user" placeholder="juan@uni.edu" /></div>
+          <div class="form-group"><label>ID o email del usuario</label><input type="text" id="en-user" placeholder="juan@usil.edu.py" /></div>
           <div class="form-group">
             <label>Rol</label>
             <select id="en-role">
@@ -437,7 +648,8 @@
       <div class="card">
         <h3>Microsoft Teams</h3>
         <p style="color:var(--text-muted); font-size:0.9rem;">
-          Las operaciones de Teams se gestionan desde la sección de carga masiva o a través de los grupos de Azure AD.
+          Los equipos de Teams se crean automáticamente durante el proceso de matriculación
+          (un equipo por materia/semestre). Podés gestionar grupos desde Azure AD.
         </p>
       </div>
     </div>
@@ -448,11 +660,9 @@
 <script>
 // ── Auth ─────────────────────────────────────────────────────────────────────
 const TOKEN_KEY = 'ga_token';
-
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
 function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
 function clearToken() { localStorage.removeItem(TOKEN_KEY); }
-
 function authHeaders() {
   const t = getToken();
   return t ? { 'Authorization': 'Bearer ' + t } : {};
@@ -463,6 +673,7 @@ function showApp(user) {
   const initials = (user.name || user.sub || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('user-avatar').textContent = initials;
   document.getElementById('user-name-label').textContent = user.name || user.sub || '';
+  loadDashboard();
 }
 
 function showLogin(msg) {
@@ -478,72 +689,51 @@ async function doLogin() {
   if (!username || !password) { document.getElementById('login-error').textContent = 'Completá usuario y contraseña'; return; }
   try {
     const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username, password}),
     });
-    if (!resp.ok) {
-      const e = await resp.json().catch(() => ({}));
-      throw new Error(e.detail || 'Credenciales incorrectas');
-    }
+    if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.detail || 'Credenciales incorrectas'); }
     const data = await resp.json();
     setToken(data.access_token);
     showApp(data.user);
-  } catch(ex) {
-    document.getElementById('login-error').textContent = ex.message;
-  }
+  } catch(ex) { document.getElementById('login-error').textContent = ex.message; }
 }
 
-function doAzureLogin() {
-  window.location.href = '/api/auth/azure/login';
-}
+function doAzureLogin() { window.location.href = '/api/auth/azure/login'; }
+function doLogout() { fetch('/api/auth/logout', {method:'POST'}); showLogin(''); }
 
-function doLogout() {
-  fetch('/api/auth/logout', { method: 'POST' });
-  showLogin('');
-}
-
-// Manejar token desde Azure callback (#token=...)
 (function handleFragment() {
   const hash = window.location.hash;
-  if (hash.startsWith('#token=')) {
-    const token = hash.slice(7);
-    setToken(token);
-    window.history.replaceState(null, '', '/');
-  }
-  if (hash.startsWith('#') && hash.includes('auth_error=')) {
-    const msg = decodeURIComponent(hash.split('auth_error=')[1] || 'Error de autenticación');
-    window.history.replaceState(null, '', '/');
-    showLogin(msg);
-    return;
+  if (hash.startsWith('#token=')) { setToken(hash.slice(7)); window.history.replaceState(null,'','/'); }
+  if (hash.includes('auth_error=')) {
+    const msg = decodeURIComponent(hash.split('auth_error=')[1] || 'Error');
+    window.history.replaceState(null,'','/'); showLogin(msg); return;
   }
   const params = new URLSearchParams(window.location.search);
   if (params.get('auth_error')) showLogin(decodeURIComponent(params.get('auth_error')));
 })();
 
-// Verificar token existente al cargar
 (async function checkAuth() {
-  const token = getToken();
-  if (!token) { showLogin(''); return; }
+  const token = getToken(); if (!token) { showLogin(''); return; }
   try {
-    const resp = await fetch('/api/auth/me', { headers: authHeaders() });
+    const resp = await fetch('/api/auth/me', {headers: authHeaders()});
     if (!resp.ok) throw new Error();
-    const user = await resp.json();
-    showApp(user);
-  } catch {
-    showLogin('La sesión expiró');
-  }
+    showApp(await resp.json());
+  } catch { showLogin('La sesión expiró'); }
 })();
 
-// ── Navigation ──────────────────────────────────────────────────────────────
+// ── Navigation ───────────────────────────────────────────────────────────────
 const panelTitles = {
-  'bulk': ['Carga Masiva', 'Excel / CSV'],
-  'canvas-courses': ['Cursos Canvas', 'Canvas LMS'],
-  'canvas-users': ['Usuarios Canvas', 'Canvas LMS'],
-  'canvas-enroll': ['Inscripciones', 'Canvas LMS'],
-  'azure-users': ['Usuarios Azure AD', 'Azure AD'],
-  'azure-groups': ['Grupos Azure AD', 'Azure AD'],
-  'teams': ['Equipos Teams', 'Microsoft Teams'],
+  'dashboard':      ['Dashboard',         'Matriculación'],
+  'matriculacion':  ['Matriculación',     'Automática'],
+  'auditoria':      ['Auditoría',         'Log de operaciones'],
+  'bulk':           ['Carga Masiva',      'Excel / CSV'],
+  'canvas-courses': ['Cursos Canvas',     'Canvas LMS'],
+  'canvas-users':   ['Usuarios Canvas',   'Canvas LMS'],
+  'canvas-enroll':  ['Inscripciones',     'Canvas LMS'],
+  'azure-users':    ['Usuarios Azure AD', 'Azure AD'],
+  'azure-groups':   ['Grupos Azure AD',   'Azure AD'],
+  'teams':          ['Equipos Teams',     'Microsoft Teams'],
 };
 
 function showPanel(id, el) {
@@ -556,33 +746,307 @@ function showPanel(id, el) {
   document.getElementById('topbar-badge').textContent = badge;
 }
 
+// ── Dashboard ────────────────────────────────────────────────────────────────
+let _chartDiario = null;
+let _dashboardSemestres = [];
+
+async function loadDashboard() {
+  try {
+    const data = await apiFetch('/api/dashboard');
+    // KPIs
+    document.getElementById('kpi-procesados').textContent = data.hoy?.procesados ?? 0;
+    document.getElementById('kpi-creados').textContent = data.hoy?.creados ?? 0;
+    document.getElementById('kpi-inscritos').textContent = data.hoy?.inscritos ?? 0;
+    document.getElementById('kpi-errores').textContent = data.hoy?.errores ?? 0;
+
+    // Next run
+    if (data.proxima_ejecucion) {
+      const d = new Date(data.proxima_ejecucion);
+      document.getElementById('kpi-proxima').textContent = d.toLocaleString('es-PY', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+    }
+
+    // Chart
+    const labels = (data.ultimos_7_dias || []).map(r => r.day?.slice(5));
+    const values = (data.ultimos_7_dias || []).map(r => r.count);
+    if (_chartDiario) _chartDiario.destroy();
+    const ctx = document.getElementById('chart-diario').getContext('2d');
+    _chartDiario = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Alumnos procesados',
+          data: values,
+          backgroundColor: '#2d6cdf',
+          borderRadius: 5,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f0f2f5' } },
+          x: { grid: { display: false } },
+        }
+      }
+    });
+
+    // Execution timeline
+    const timeline = document.getElementById('exec-timeline');
+    const execs = data.ultimas_ejecuciones || [];
+    if (execs.length === 0) {
+      timeline.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:8px 0;">Sin ejecuciones registradas</p>';
+    } else {
+      timeline.innerHTML = execs.map(e => {
+        const dotClass = e.estado === 'exitoso' ? 'exec-dot-ok' : e.estado === 'con_errores' ? 'exec-dot-warn' : 'exec-dot-error';
+        const ts = (e.timestamp || '').slice(0, 16).replace('T', ' ');
+        return `<div class="exec-item">
+          <div class="exec-dot ${dotClass}"></div>
+          <div class="exec-meta">
+            <div class="exec-title">${e.tipo?.toUpperCase() || 'manual'} — ${e.semestre || '—'}</div>
+            <div class="exec-sub">${ts} UTC · ${e.duracion_seg?.toFixed(1) || 0}s</div>
+          </div>
+          <div class="exec-stats">
+            <span class="exec-stat">👥 ${e.total || 0}</span>
+            <span class="exec-stat">✅ ${e.creados || 0}</span>
+            ${e.errores ? `<span class="exec-stat" style="color:var(--error);">⚠ ${e.errores}</span>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // Collect semestres for filter
+    const semestresSet = new Set(execs.map(e => e.semestre).filter(Boolean));
+    _dashboardSemestres = [...semestresSet];
+    const sel = document.getElementById('dash-semestre-filter');
+    sel.innerHTML = '<option value="">Todos los semestres</option>' +
+      _dashboardSemestres.map(s => `<option value="${s}">${s}</option>`).join('');
+
+    await loadDashboardTable();
+  } catch(e) {
+    console.error('Dashboard error:', e);
+  }
+}
+
+async function loadDashboardTable() {
+  const semestre = document.getElementById('dash-semestre-filter').value;
+  const params = semestre ? `?semestre=${semestre}&limit=50` : '?limit=50';
+  try {
+    const rows = await apiFetch('/api/matriculacion/historial' + params);
+    const tbody = document.getElementById('tbl-dash-enrollments');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:16px;">Sin registros</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td style="font-size:0.75rem;">${(r.timestamp||'').slice(0,16).replace('T',' ')}</td>
+      <td>${r.cedula||''}</td>
+      <td>${r.nombre||''}</td>
+      <td>${chipAccion(r.accion)}</td>
+      <td><span style="font-size:0.75rem;color:var(--text-muted);">${r.plataforma||''}</span></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.curso||''}">${r.curso||''}</td>
+      <td>${r.semestre||''}</td>
+    </tr>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+function chipAccion(accion) {
+  const map = {creado:'chip-ok', inscrito:'chip-dry', error:'chip-error', omitido:'chip-skip'};
+  const lbl = {creado:'✓ Creado', inscrito:'↩ Inscrito', error:'✗ Error', omitido:'— Omitido'};
+  return `<span class="chip ${map[accion]||'chip-skip'}">${lbl[accion]||accion||'—'}</span>`;
+}
+
+// ── Matriculación ────────────────────────────────────────────────────────────
+async function runMatriculacion(dryRun) {
+  const semestre = document.getElementById('mat-semestre').value.trim() || null;
+  const endpoint = dryRun ? '/api/matriculacion/dry-run' : '/api/matriculacion';
+  const url = semestre ? `${endpoint}?semestre=${encodeURIComponent(semestre)}` : endpoint;
+
+  document.getElementById('btn-mat-run').disabled = true;
+  document.getElementById('btn-mat-dryrun').disabled = true;
+  document.getElementById('mat-results').style.display = 'none';
+
+  const progressCard = document.getElementById('mat-progress-card');
+  progressCard.style.display = 'block';
+  document.getElementById('mat-progress-title').textContent = dryRun ? '🔍 Simulando (DRY RUN)…' : '⚙️ Procesando matriculación…';
+  document.getElementById('mat-progress-fill').style.width = '10%';
+
+  const logEl = document.getElementById('mat-log');
+  logEl.innerHTML = '';
+  matLog('info', `[${new Date().toLocaleTimeString()}] Iniciando ${dryRun ? 'DRY RUN' : 'matriculación real'}…`);
+  matLog('info', semestre ? `Semestre: ${semestre}` : 'Semestre: (desde configuración .env)');
+
+  document.getElementById('mat-progress-fill').style.width = '20%';
+  matLog('info', 'Descargando Excel desde OneDrive…');
+
+  try {
+    document.getElementById('mat-progress-fill').style.width = '40%';
+    const result = await apiFetch(url, 'POST');
+    document.getElementById('mat-progress-fill').style.width = '100%';
+
+    if (result.estado === 'error_validacion') {
+      matLog('error', `✗ Validación fallida: ${result.errores} error(es). Proceso no ejecutado.`);
+      (result.errores_validacion || []).forEach(e => matLog('error', `  • [${e.sheet_name || e.cedula}] ${e.error}`));
+    } else if (result.estado === 'fallido') {
+      matLog('error', `✗ Error crítico: ${result.error_global}`);
+    } else {
+      matLog(dryRun ? 'dry' : 'ok', `✓ Completado — ${result.total} alumnos, ${result.creados} creados, ${result.errores} errores`);
+      if (dryRun) matLog('dry', 'MODO SIMULACIÓN: ningún cambio fue aplicado.');
+    }
+
+    setTimeout(() => { progressCard.style.display = 'none'; }, 1500);
+    renderMatriculacionResult(result, dryRun);
+  } catch(ex) {
+    document.getElementById('mat-progress-fill').style.width = '100%';
+    matLog('error', `✗ Error: ${ex.message}`);
+    setTimeout(() => { progressCard.style.display = 'none'; }, 1500);
+  } finally {
+    document.getElementById('btn-mat-run').disabled = false;
+    document.getElementById('btn-mat-dryrun').disabled = false;
+  }
+}
+
+function matLog(type, msg) {
+  const el = document.getElementById('mat-log');
+  const span = document.createElement('div');
+  span.className = `log-${type}`;
+  span.textContent = msg;
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderMatriculacionResult(result, dryRun) {
+  document.getElementById('mat-results').style.display = 'block';
+  document.getElementById('mat-dry-badge').style.display = dryRun ? 'inline-block' : 'none';
+  document.getElementById('mat-result-title').textContent =
+    result.estado === 'error_validacion' ? '⚠️ Error de validación' :
+    result.estado === 'fallido' ? '❌ Proceso fallido' : '✅ Resultado';
+
+  document.getElementById('mat-stat-total').textContent = result.total || 0;
+  document.getElementById('mat-stat-creados').textContent = result.creados || 0;
+  document.getElementById('mat-stat-existentes').textContent = result.existentes || 0;
+  document.getElementById('mat-stat-inscrip').textContent = result.inscripciones || 0;
+  document.getElementById('mat-stat-errores').textContent = result.errores || 0;
+
+  // Validation errors table
+  const valErrors = result.errores_validacion || [];
+  const valCard = document.getElementById('mat-val-errors');
+  if (valErrors.length) {
+    valCard.style.display = 'block';
+    document.getElementById('tbl-val-errors').innerHTML = valErrors.map(e =>
+      `<tr><td>${e.sheet_name||''}</td><td>${e.cedula||''}</td><td>${e.nombre||''}</td><td style="color:var(--error);">${e.error}</td></tr>`
+    ).join('');
+  } else {
+    valCard.style.display = 'none';
+  }
+
+  // Per-student accordion
+  const list = document.getElementById('mat-alumnos-list');
+  const resultados = result.resultados || [];
+  document.getElementById('mat-alumno-count').textContent = resultados.length;
+  list.innerHTML = resultados.map((r, i) => {
+    const hasErrors = r.errores?.length > 0;
+    const isNuevo = r.es_nuevo;
+    const statusIcon = hasErrors ? '⚠️' : isNuevo ? '🆕' : '↩️';
+    const cursos = r.cursos || [];
+    const cursosHtml = cursos.map(c => {
+      const tagClass = (c.errores?.length || 0) > 0 ? 'materia-tag-error' : 'materia-tag';
+      return `<span class="materia-tag ${tagClass}">${c.materia}</span>`;
+    }).join('');
+    const errorsHtml = (r.errores || []).map(e =>
+      `<div style="font-size:0.78rem;color:var(--error);padding:2px 0;">✗ ${e}</div>`
+    ).join('');
+    return `<div class="alumno-result">
+      <div class="alumno-result-header" onclick="toggleAccordion(${i})">
+        <span>${statusIcon}</span>
+        <span style="font-weight:600;font-size:0.88rem;">${r.nombre} <span style="font-weight:400;color:var(--text-muted);">(${r.cedula})</span></span>
+        <span style="font-size:0.78rem;color:var(--text-muted);margin-left:auto;">${r.email}</span>
+        ${hasErrors ? '<span class="chip chip-error" style="margin-left:8px;">⚠ Error</span>' : ''}
+        ${dryRun ? '<span class="chip chip-dry" style="margin-left:4px;">DRY</span>' : ''}
+        <span style="color:var(--text-muted);font-size:0.85rem;margin-left:8px;">▾</span>
+      </div>
+      <div class="alumno-result-body" id="accordion-${i}">
+        <div style="margin-bottom:8px;">
+          <span style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">MATERIAS:</span><br>
+          <div style="margin-top:4px;">${cursosHtml || '<span style="color:var(--text-muted);font-size:0.78rem;">Sin materias</span>'}</div>
+        </div>
+        ${hasErrors ? `<div style="margin-top:8px;padding:8px 12px;background:var(--error-bg);border-radius:6px;">${errorsHtml}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleAccordion(i) {
+  const el = document.getElementById('accordion-' + i);
+  el.classList.toggle('open');
+}
+
+// ── Auditoría ────────────────────────────────────────────────────────────────
+async function loadAuditoria() {
+  const semestre = document.getElementById('aud-semestre').value.trim();
+  const cedula = document.getElementById('aud-cedula').value.trim();
+  let params = [];
+  if (semestre) params.push(`semestre=${encodeURIComponent(semestre)}`);
+  if (cedula) params.push(`cedula=${encodeURIComponent(cedula)}`);
+  const qs = params.length ? '?' + params.join('&') : '';
+  try {
+    const rows = await apiFetch('/api/matriculacion/historial' + qs);
+    document.getElementById('aud-count').textContent = rows.length;
+    const tbody = document.getElementById('tbl-auditoria');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Sin registros</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td style="white-space:nowrap;font-size:0.75rem;">${(r.timestamp||'').slice(0,19).replace('T',' ')}</td>
+      <td>${r.cedula||''}</td>
+      <td>${r.nombre||''}</td>
+      <td>${chipAccion(r.accion)}</td>
+      <td style="font-size:0.78rem;color:var(--text-muted);">${r.plataforma||''}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.curso||''}">${r.curso||''}</td>
+      <td>${r.semestre||''}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.75rem;color:var(--text-muted);" title="${r.detalle||''}">${r.detalle||''}</td>
+    </tr>`).join('');
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function exportAuditoria() {
+  const semestre = document.getElementById('aud-semestre').value.trim();
+  const cedula = document.getElementById('aud-cedula').value.trim();
+  let params = [];
+  if (semestre) params.push(`semestre=${encodeURIComponent(semestre)}`);
+  if (cedula) params.push(`cedula=${encodeURIComponent(cedula)}`);
+  const qs = params.length ? '?' + params.join('&') : '';
+  try {
+    const resp = await fetch('/api/matriculacion/audit/export' + qs, {headers: authHeaders()});
+    if (!resp.ok) throw new Error(await resp.text());
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `auditoria_${semestre||'completa'}.xlsx`; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Error exportando: ' + e.message); }
+}
+
 // ── Bulk / Carga Masiva ──────────────────────────────────────────────────────
-let selectedFile = null;
-let lastReport = null;
+let selectedFile = null, lastReport = null;
 
 const dropZone = document.getElementById('drop-zone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragging');
-  const f = e.dataTransfer.files[0];
-  if (f) setFile(f);
-});
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragging'); const f=e.dataTransfer.files[0]; if(f) setFile(f); });
 
-function handleFileSelect(e) {
-  const f = e.target.files[0];
-  if (f) setFile(f);
-}
+function handleFileSelect(e) { const f=e.target.files[0]; if(f) setFile(f); }
 
 function setFile(f) {
-  const allowed = ['.xlsx', '.xls', '.csv'];
+  const allowed = ['.xlsx','.xls','.csv'];
   const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
   if (!allowed.includes(ext)) { alert('Formato no soportado. Use .xlsx, .xls o .csv'); return; }
-  if (f.size > 10 * 1024 * 1024) { alert('El archivo supera 10 MB'); return; }
+  if (f.size > 10*1024*1024) { alert('El archivo supera 10 MB'); return; }
   selectedFile = f;
   const el = document.getElementById('chosen-filename');
-  el.textContent = `✅ ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+  el.textContent = `✅ ${f.name} (${(f.size/1024).toFixed(1)} KB)`;
   el.classList.remove('hidden');
   document.getElementById('btn-process').disabled = false;
   document.getElementById('results-section').classList.add('hidden');
@@ -590,8 +1054,7 @@ function setFile(f) {
 }
 
 function resetBulk() {
-  selectedFile = null;
-  lastReport = null;
+  selectedFile = null; lastReport = null;
   document.getElementById('file-input').value = '';
   document.getElementById('chosen-filename').classList.add('hidden');
   document.getElementById('btn-process').disabled = true;
@@ -599,9 +1062,8 @@ function resetBulk() {
   setProgress(false);
 }
 
-function setProgress(show, pct = 0, label = 'Procesando…') {
-  const wrap = document.getElementById('progress-wrap');
-  wrap.style.display = show ? 'block' : 'none';
+function setProgress(show, pct=0, label='Procesando…') {
+  document.getElementById('progress-wrap').style.display = show ? 'block' : 'none';
   document.getElementById('progress-bar-fill').style.width = pct + '%';
   document.getElementById('progress-label').textContent = label;
 }
@@ -610,141 +1072,97 @@ async function processBulk() {
   if (!selectedFile) return;
   const type = document.getElementById('bulk-type').value;
   const endpoint = type === 'usuarios' ? '/api/bulk/usuarios' : '/api/bulk/inscripciones';
-
   const btn = document.getElementById('btn-process');
   btn.disabled = true;
   setProgress(true, 10, 'Subiendo archivo…');
-
   const fd = new FormData();
   fd.append('file', selectedFile);
-
   try {
     setProgress(true, 30, 'Procesando en el servidor…');
-    const resp = await fetch(endpoint, { method: 'POST', body: fd, headers: authHeaders() });
+    const resp = await fetch(endpoint, {method:'POST', body:fd, headers:authHeaders()});
     setProgress(true, 80, 'Recibiendo resultados…');
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-      throw new Error(err.detail || 'Error del servidor');
-    }
-
+    if (!resp.ok) { const err=await resp.json().catch(()=>({detail:resp.statusText})); throw new Error(err.detail||'Error del servidor'); }
     const report = await resp.json();
     setProgress(true, 100, '¡Completado!');
     setTimeout(() => setProgress(false), 800);
-
     lastReport = report;
     renderResults(report);
-  } catch (ex) {
-    setProgress(false);
-    alert('Error: ' + ex.message);
-  } finally {
-    btn.disabled = false;
-  }
+  } catch(ex) { setProgress(false); alert('Error: ' + ex.message); }
+  finally { btn.disabled = false; }
 }
 
 function renderResults(report) {
   document.getElementById('stat-total').textContent = report.total;
   document.getElementById('stat-ok').textContent = report.success;
   document.getElementById('stat-errors').textContent = report.errors;
-
-  // Headers
   const thead = document.getElementById('results-thead');
   const isUsers = report.tipo === 'usuarios';
   thead.innerHTML = `<tr>
-    <th>Fila</th>
-    <th>${isUsers ? 'Email' : 'Email usuario'}</th>
-    <th>${isUsers ? 'Nombre' : 'Curso ID'}</th>
-    <th>Canvas</th><th>Detalle Canvas</th>
-    <th>Azure</th><th>Detalle Azure</th>
-    <th>Teams</th><th>Detalle Teams</th>
+    <th>Fila</th><th>${isUsers?'Email':'Email usuario'}</th><th>${isUsers?'Nombre':'Curso ID'}</th>
+    <th>Canvas</th><th>Detalle Canvas</th><th>Azure</th><th>Detalle Azure</th><th>Teams</th><th>Detalle Teams</th>
   </tr>`;
-
   const tbody = document.getElementById('results-tbody');
   tbody.innerHTML = '';
-  (report.rows || []).forEach(row => {
-    if (row.error_global) {
-      tbody.innerHTML += `<tr><td colspan="9" style="color:var(--error)">${row.error_global}</td></tr>`;
-      return;
-    }
+  (report.rows||[]).forEach(row => {
+    if (row.error_global) { tbody.innerHTML += `<tr><td colspan="9" style="color:var(--error)">${row.error_global}</td></tr>`; return; }
     tbody.innerHTML += `<tr>
-      <td>${row.fila || ''}</td>
-      <td>${row.email || ''}</td>
-      <td>${row.nombre || row.curso || ''}</td>
-      <td>${chip(row.canvas?.status)}</td>
-      <td><span class="detail-text" title="${row.canvas?.detalle || ''}">${row.canvas?.detalle || ''}</span></td>
-      <td>${chip(row.azure?.status)}</td>
-      <td><span class="detail-text" title="${row.azure?.detalle || ''}">${row.azure?.detalle || ''}</span></td>
-      <td>${chip(row.teams?.status)}</td>
-      <td><span class="detail-text" title="${row.teams?.detalle || ''}">${row.teams?.detalle || ''}</span></td>
+      <td>${row.fila||''}</td><td>${row.email||''}</td><td>${row.nombre||row.curso||''}</td>
+      <td>${chip(row.canvas?.status)}</td><td><span class="detail-text" title="${row.canvas?.detalle||''}">${row.canvas?.detalle||''}</span></td>
+      <td>${chip(row.azure?.status)}</td><td><span class="detail-text" title="${row.azure?.detalle||''}">${row.azure?.detalle||''}</span></td>
+      <td>${chip(row.teams?.status)}</td><td><span class="detail-text" title="${row.teams?.detalle||''}">${row.teams?.detalle||''}</span></td>
     </tr>`;
   });
-
   document.getElementById('results-section').classList.remove('hidden');
 }
 
 function chip(status) {
-  const map = {
-    ok: 'chip-ok', error: 'chip-error', advertencia: 'chip-warn',
-    omitido: 'chip-skip', existente: 'chip-existente'
-  };
-  const cls = map[status] || 'chip-skip';
-  const labels = { ok: '✓ OK', error: '✗ Error', advertencia: '⚠ Advertencia', omitido: '— Omitido', existente: '↩ Existente' };
-  return `<span class="chip ${cls}">${labels[status] || status || '—'}</span>`;
+  const map = {ok:'chip-ok', error:'chip-error', advertencia:'chip-warn', omitido:'chip-skip', existente:'chip-existente'};
+  const labels = {ok:'✓ OK', error:'✗ Error', advertencia:'⚠ Advertencia', omitido:'— Omitido', existente:'↩ Existente'};
+  return `<span class="chip ${map[status]||'chip-skip'}">${labels[status]||status||'—'}</span>`;
 }
 
 async function downloadReportExcel() {
   if (!lastReport) return;
   try {
     const resp = await fetch('/api/bulk/reporte-excel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(lastReport),
+      method:'POST', headers:{'Content-Type':'application/json',...authHeaders()}, body:JSON.stringify(lastReport),
     });
     if (!resp.ok) throw new Error('Error generando reporte');
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'reporte_carga_masiva.xlsx'; a.click();
+    const a = document.createElement('a'); a.href=url; a.download='reporte_carga_masiva.xlsx'; a.click();
     URL.revokeObjectURL(url);
-  } catch (ex) {
-    alert('Error: ' + ex.message);
-  }
+  } catch(ex) { alert('Error: ' + ex.message); }
 }
 
-function downloadTemplate() {
-  window.open('/api/bulk/template', '_blank');
-}
+function downloadTemplate() { window.open('/api/bulk/template','_blank'); }
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
 async function loadCanvasCourses() {
   try {
     const data = await apiFetch('/api/canvas/courses');
-    const tbody = document.getElementById('tbl-courses');
-    tbody.innerHTML = data.map(c => `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.course_code || ''}</td><td>${c.workflow_state || ''}</td></tr>`).join('');
+    document.getElementById('tbl-courses').innerHTML = data.map(c =>
+      `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.course_code||''}</td><td>${c.workflow_state||''}</td></tr>`
+    ).join('');
   } catch(e) { alert(e.message); }
 }
 
 async function loadCanvasUsers() {
   try {
     const data = await apiFetch('/api/canvas/users');
-    const tbody = document.getElementById('tbl-cusers');
-    tbody.innerHTML = data.map(u => `<tr><td>${u.id}</td><td>${u.name}</td><td>${u.email || ''}</td><td>${u.sis_user_id || ''}</td></tr>`).join('');
+    document.getElementById('tbl-cusers').innerHTML = data.map(u =>
+      `<tr><td>${u.id}</td><td>${u.name}</td><td>${u.email||''}</td><td>${u.sis_user_id||''}</td></tr>`
+    ).join('');
   } catch(e) { alert(e.message); }
 }
 
 async function createCanvasUser() {
-  const payload = {
-    nombre: document.getElementById('cu-name').value.trim(),
-    email: document.getElementById('cu-email').value.trim(),
-    sis_id: document.getElementById('cu-sis').value.trim(),
-  };
+  const payload = {nombre: document.getElementById('cu-name').value.trim(), email: document.getElementById('cu-email').value.trim(), sis_id: document.getElementById('cu-sis').value.trim()};
   if (!payload.nombre || !payload.email) { alert('Nombre y email son obligatorios'); return; }
   try {
-    const r = await apiFetch('/api/canvas/users', 'POST', payload);
+    const r = await apiFetch('/api/canvas/users','POST',payload);
     document.getElementById('cu-msg').textContent = `✅ Usuario creado (ID: ${r.id})`;
-  } catch(e) {
-    document.getElementById('cu-msg').textContent = '❌ ' + e.message;
-  }
+  } catch(e) { document.getElementById('cu-msg').textContent = '❌ ' + e.message; }
 }
 
 async function enrollUser() {
@@ -753,39 +1171,39 @@ async function enrollUser() {
   const role = document.getElementById('en-role').value;
   if (!courseId || !userId) { alert('Completa todos los campos'); return; }
   try {
-    await apiFetch(`/api/canvas/courses/${courseId}/enrollments`, 'POST', { user_id: userId, role });
+    await apiFetch(`/api/canvas/courses/${courseId}/enrollments`,'POST',{user_id:userId,role});
     document.getElementById('en-msg').textContent = '✅ Inscripción creada';
-  } catch(e) {
-    document.getElementById('en-msg').textContent = '❌ ' + e.message;
-  }
+  } catch(e) { document.getElementById('en-msg').textContent = '❌ ' + e.message; }
 }
 
 // ── Azure ─────────────────────────────────────────────────────────────────────
 async function loadAzureUsers() {
   try {
     const data = await apiFetch('/api/azure/users');
-    const tbody = document.getElementById('tbl-ausers');
-    tbody.innerHTML = data.map(u => `<tr><td>${u.id?.slice(0,8)}…</td><td>${u.displayName}</td><td>${u.userPrincipalName}</td><td>${u.mail || ''}</td></tr>`).join('');
+    document.getElementById('tbl-ausers').innerHTML = data.map(u =>
+      `<tr><td>${u.id?.slice(0,8)}…</td><td>${u.displayName}</td><td>${u.userPrincipalName}</td><td>${u.mail||''}</td></tr>`
+    ).join('');
   } catch(e) { alert(e.message); }
 }
 
 async function loadAzureGroups() {
   try {
     const data = await apiFetch('/api/azure/groups');
-    const tbody = document.getElementById('tbl-agroups');
-    tbody.innerHTML = data.map(g => `<tr><td>${g.id?.slice(0,8)}…</td><td>${g.displayName}</td><td>${g.mail || ''}</td></tr>`).join('');
+    document.getElementById('tbl-agroups').innerHTML = data.map(g =>
+      `<tr><td>${g.id?.slice(0,8)}…</td><td>${g.displayName}</td><td>${g.mail||''}</td></tr>`
+    ).join('');
   } catch(e) { alert(e.message); }
 }
 
 // ── Util ──────────────────────────────────────────────────────────────────────
-async function apiFetch(url, method = 'GET', body = null) {
-  const opts = { method, headers: { ...authHeaders() } };
-  if (body) { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
+async function apiFetch(url, method='GET', body=null) {
+  const opts = {method, headers:{...authHeaders()}};
+  if (body) { opts.body=JSON.stringify(body); opts.headers['Content-Type']='application/json'; }
   const resp = await fetch(url, opts);
   if (resp.status === 401) { showLogin('Sesión expirada'); throw new Error('No autenticado'); }
   if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-    throw new Error(err.detail || resp.statusText);
+    const err = await resp.json().catch(()=>({detail:resp.statusText}));
+    throw new Error(err.detail||resp.statusText);
   }
   return resp.json();
 }

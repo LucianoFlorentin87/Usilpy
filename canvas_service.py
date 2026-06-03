@@ -53,6 +53,52 @@ async def create_user(name: str, email: str, sis_id: str = "") -> dict:
         return resp.json()
 
 
+async def find_user_by_sis_id(sis_id: str) -> dict | None:
+    """Look up a Canvas user by SIS user ID. Returns None if not found."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{BASE}/api/v1/users/sis_user_id:{sis_id}",
+            headers=HEADERS,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def get_course_by_sis_id(sis_id: str) -> dict | None:
+    """Look up a Canvas course by SIS course ID. Returns None if not found."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{BASE}/api/v1/courses/sis_course_id:{sis_id}",
+            headers=HEADERS,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def create_course(name: str, sis_id: str, semestre: str = "") -> dict:
+    payload = {
+        "course": {
+            "name": name,
+            "course_code": sis_id,
+            "sis_course_id": sis_id,
+            "term_name": semestre,
+            "is_public": False,
+        }
+    }
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{BASE}/api/v1/accounts/self/courses",
+            headers=HEADERS,
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
 async def enroll_user(course_id: str, user_id: str, role: str = "StudentEnrollment") -> dict:
     payload = {
         "enrollment": {

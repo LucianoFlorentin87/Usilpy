@@ -1,7 +1,7 @@
 import io
 import os
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request, Query
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,8 +13,11 @@ import canvas_service
 import graph_service
 import bulk_service
 import auth_service
+import audit_service
+import matriculacion_service
+from scheduler import lifespan, get_next_run
 
-app = FastAPI(title="Gestión Académica Universitaria", version="1.0.0")
+app = FastAPI(title="Gestión Académica Universitaria", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -64,7 +67,6 @@ class LoginRequest(BaseModel):
 
 @app.post("/api/auth/login")
 async def login(body: LoginRequest):
-    """Login local con usuario/contraseña. Devuelve JWT."""
     user = auth_service.authenticate_local(body.username, body.password)
     if not user:
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
@@ -74,7 +76,6 @@ async def login(body: LoginRequest):
 
 @app.get("/api/auth/azure/login")
 async def azure_login():
-    """Redirige al flujo de login de Azure AD."""
     if not auth_service.settings.azure_client_id:
         raise HTTPException(status_code=503, detail="Azure AD no configurado")
     url = auth_service.build_azure_login_url()
@@ -83,7 +84,6 @@ async def azure_login():
 
 @app.get("/api/auth/azure/callback")
 async def azure_callback(code: str = "", state: str = "", error: str = ""):
-    """Recibe el código OAuth2 de Azure, emite JWT interno y redirige al frontend."""
     if error:
         return RedirectResponse(f"/?auth_error={error}")
     try:
@@ -91,24 +91,21 @@ async def azure_callback(code: str = "", state: str = "", error: str = ""):
     except Exception as exc:
         return RedirectResponse(f"/?auth_error={str(exc)[:60]}")
     token = auth_service.create_access_token(user)
-    # Redirige al frontend con el token en el fragment (nunca llega al servidor)
     return RedirectResponse(f"/#token={token}")
 
 
 @app.get("/api/auth/me")
 async def me(current_user: dict = Depends(get_current_user)):
-    """Devuelve el perfil del usuario autenticado."""
     return current_user
 
 
 @app.post("/api/auth/logout")
 async def logout():
-    """El cliente debe descartar el token; aquí solo confirmamos."""
     return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
-# Canvas  (protegido)
+# Canvas
 # ---------------------------------------------------------------------------
 
 @app.get("/api/canvas/courses")
@@ -152,7 +149,7 @@ async def enroll(course_id: str, payload: dict, _: dict = Depends(get_current_us
 
 
 # ---------------------------------------------------------------------------
-# Azure AD / Microsoft Graph  (protegido)
+# Azure AD / Microsoft Graph
 # ---------------------------------------------------------------------------
 
 @app.get("/api/azure/users")
@@ -185,7 +182,7 @@ async def list_groups(_: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
-# Bulk / Carga Masiva  (protegido)
+# Bulk / Carga Masiva
 # ---------------------------------------------------------------------------
 
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
@@ -245,3 +242,79 @@ async def bulk_reporte_excel(report: dict, _: dict = Depends(get_current_user)):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="reporte_carga_masiva.xlsx"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# Matriculación Automática
+# ---------------------------------------------------------------------------
+
+@app.post("/api/matriculacion")
+async def run_matriculacion(
+    semestre: str | None = None,
+    _: dict = Depends(get_current_user),
+):
+    """Execute the full enrollment process (real mode)."""
+    try:
+        result = await matriculacion_service.run_matriculacion(dry_run=False, semestre=semestre)
+        return JSONResponse(content=result)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/matriculacion/dry-run")
+async def dry_run_matriculacion(
+    semestre: str | None = None,
+    _: dict = Depends(get_current_user),
+):
+    """Simulate the enrollment process without making any changes."""
+    try:
+        result = await matriculacion_service.run_matriculacion(dry_run=True, semestre=semestre)
+        return JSONResponse(content=result)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/matriculacion/historial")
+async def get_historial(
+    semestre: str | None = Query(None),
+    cedula: str | None = Query(None),
+    limit: int = Query(500, le=2000),
+    _: dict = Depends(get_current_user),
+):
+    try:
+        rows = await audit_service.get_historial(semestre=semestre, cedula=cedula, limit=limit)
+        return rows
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/matriculacion/audit/export")
+async def export_audit(
+    semestre: str | None = Query(None),
+    cedula: str | None = Query(None),
+    _: dict = Depends(get_current_user),
+):
+    try:
+        excel_bytes = await audit_service.export_to_excel(semestre=semestre, cedula=cedula)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    fname = f"auditoria_{semestre or 'completa'}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
+
+@app.get("/api/dashboard")
+async def get_dashboard(_: dict = Depends(get_current_user)):
+    try:
+        kpis = await audit_service.get_dashboard_kpis()
+        kpis["proxima_ejecucion"] = get_next_run()
+        return kpis
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
