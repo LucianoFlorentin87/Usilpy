@@ -245,6 +245,9 @@
   <!-- Canvas -->
   <div class="nav-group">
     <div class="nav-group-label">Canvas LMS</div>
+    <div class="nav-item" data-panel="canvas-terms" onclick="showPanel('canvas-terms', this)">
+      <span class="icon">🗓️</span> Períodos
+    </div>
     <div class="nav-item" data-panel="canvas-courses" onclick="showPanel('canvas-courses', this)">
       <span class="icon">📚</span> Cursos
     </div>
@@ -583,6 +586,40 @@
     </div><!-- /panel-bulk -->
 
 
+    <!-- ══════════ PANEL: CANVAS PERÍODOS ══════════ -->
+    <div class="panel" id="panel-canvas-terms">
+      <div class="card">
+        <h3>Períodos de Inscripción (Canvas)</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:14px;">
+          Los períodos se crean <strong>automáticamente</strong> al procesar un Excel de cursos (columna <code>semestre</code>).
+          Aquí podés ver los períodos existentes o crear uno manualmente.
+        </p>
+        <div class="actions-row" style="flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <button class="btn btn-primary" onclick="loadTerms()">🔄 Cargar períodos</button>
+        </div>
+
+        <!-- Create term form -->
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <h4 style="font-size:.88rem;font-weight:600;margin-bottom:10px;">Crear período manualmente</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nombre del período</label>
+              <input id="term-name" type="text" placeholder="ej. 2025-1" />
+            </div>
+          </div>
+          <button class="btn btn-success" onclick="createTerm()">➕ Crear período</button>
+          <span id="term-msg" style="margin-left:12px;font-size:.83rem;"></span>
+        </div>
+
+        <div class="table-wrap">
+          <table id="terms-table">
+            <thead><tr><th>ID</th><th>Nombre</th><th>Inicio</th><th>Fin</th></tr></thead>
+            <tbody id="terms-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Haz clic en "Cargar períodos"</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════════ PANEL: CANVAS CURSOS ══════════ -->
     <div class="panel" id="panel-canvas-courses">
       <div class="card">
@@ -879,6 +916,7 @@ const panelTitles = {
   'matriculacion':  ['Matriculación',     'Automática'],
   'auditoria':      ['Auditoría',         'Log de operaciones'],
   'bulk':           ['Carga Masiva',      'Excel / CSV'],
+  'canvas-terms':   ['Períodos',          'Canvas LMS'],
   'canvas-courses': ['Cursos Canvas',     'Canvas LMS'],
   'canvas-users':   ['Usuarios Canvas',   'Canvas LMS'],
   'canvas-enroll':  ['Inscripciones',     'Canvas LMS'],
@@ -1463,6 +1501,44 @@ function renderBulkResult(tipo, report, tbodyId) {
     }
     return `<tr><td colspan="10">${JSON.stringify(row)}</td></tr>`;
   }).join('');
+}
+
+// ── Canvas Períodos ───────────────────────────────────────────────────────────
+async function loadTerms() {
+  const tbody = document.getElementById('terms-tbody');
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Cargando…</td></tr>';
+  try {
+    const terms = await apiFetch('/api/canvas/terms');
+    if (!terms.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Sin períodos registrados</td></tr>';
+      return;
+    }
+    tbody.innerHTML = terms.map(t => `<tr>
+      <td>${t.id}</td>
+      <td><strong>${t.name || '—'}</strong></td>
+      <td>${t.start_at ? new Date(t.start_at).toLocaleDateString('es') : '—'}</td>
+      <td>${t.end_at   ? new Date(t.end_at).toLocaleDateString('es')   : '—'}</td>
+    </tr>`).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
+}
+
+async function createTerm() {
+  const name = document.getElementById('term-name').value.trim();
+  const msg  = document.getElementById('term-msg');
+  if (!name) { msg.textContent = 'Ingresá el nombre del período'; msg.style.color = 'var(--error)'; return; }
+  msg.textContent = 'Creando…'; msg.style.color = 'var(--text-muted)';
+  try {
+    const t = await apiFetch('/api/canvas/terms', {method:'POST', body: JSON.stringify({name})});
+    msg.textContent = `✓ Período "${t.name || name}" listo (id=${t.id})`;
+    msg.style.color = 'var(--success)';
+    document.getElementById('term-name').value = '';
+    loadTerms();
+  } catch(ex) {
+    msg.textContent = ex.message;
+    msg.style.color = 'var(--error)';
+  }
 }
 
 // ── Canvas ────────────────────────────────────────────────────────────────────

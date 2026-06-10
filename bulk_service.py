@@ -65,14 +65,22 @@ async def _process_course_row(row: dict) -> dict:
 
     crear_canvas = row.get("crear_en_canvas", "si").strip().lower() not in ("no", "false", "0")
 
-    # Canvas
+    # Canvas — auto-create enrollment term if semestre is given
+    term_id: int | None = None
+    if crear_canvas and semestre:
+        try:
+            term = await canvas_service.get_or_create_term(semestre)
+            term_id = term.get("id")
+        except Exception:
+            pass  # term creation failure is non-fatal; course will be created without term
+
     if crear_canvas:
         try:
             existing = await canvas_service.get_course_by_sis_id(sis_id) if sis_id else None
             if existing:
                 result["canvas"] = {"status": "existente", "detalle": f"id={existing.get('id')}"}
             else:
-                course = await canvas_service.create_course(nombre, sis_id or nombre, semestre)
+                course = await canvas_service.create_course(nombre, sis_id or nombre, semestre, term_id=term_id)
                 result["canvas"] = {"status": "ok", "detalle": f"id={course.get('id')}"}
         except Exception as exc:
             result["canvas"] = {"status": "error", "detalle": str(exc)[:120]}

@@ -7,6 +7,52 @@ BASE = settings.canvas_base_url.rstrip("/")
 HEADERS = {"Authorization": f"Bearer {settings.canvas_api_token}"}
 
 
+# ── Enrollment Terms (Períodos) ───────────────────────────────────────────────
+
+async def get_terms(per_page: int = 100) -> list[dict]:
+    """List all enrollment terms in the account."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{BASE}/api/v1/accounts/self/terms",
+            headers=HEADERS,
+            params={"per_page": per_page},
+        )
+        resp.raise_for_status()
+        return resp.json().get("enrollment_terms", [])
+
+
+async def find_term_by_name(name: str) -> dict | None:
+    """Find an enrollment term by exact name. Returns None if not found."""
+    terms = await get_terms()
+    name_lower = name.strip().lower()
+    return next((t for t in terms if t.get("name", "").strip().lower() == name_lower), None)
+
+
+async def create_term(name: str, start_at: str = "", end_at: str = "") -> dict:
+    """Create an enrollment term. start_at/end_at are ISO 8601 strings (optional)."""
+    payload: dict = {"enrollment_term": {"name": name}}
+    if start_at:
+        payload["enrollment_term"]["start_at"] = start_at
+    if end_at:
+        payload["enrollment_term"]["end_at"] = end_at
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{BASE}/api/v1/accounts/self/terms",
+            headers=HEADERS,
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def get_or_create_term(name: str) -> dict:
+    """Find term by name or create it if it doesn't exist."""
+    existing = await find_term_by_name(name)
+    if existing:
+        return existing
+    return await create_term(name)
+
+
 async def get_courses(per_page: int = 50) -> list[dict]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -79,16 +125,19 @@ async def get_course_by_sis_id(sis_id: str) -> dict | None:
         return resp.json()
 
 
-async def create_course(name: str, sis_id: str, semestre: str = "") -> dict:
-    payload = {
-        "course": {
-            "name": name,
-            "course_code": sis_id,
-            "sis_course_id": sis_id,
-            "term_name": semestre,
-            "is_public": False,
-        }
+async def create_course(name: str, sis_id: str, semestre: str = "", term_id: int | None = None) -> dict:
+    course_data: dict = {
+        "name": name,
+        "course_code": sis_id,
+        "sis_course_id": sis_id,
+        "is_public": False,
     }
+    if term_id:
+        course_data["enrollment_term_id"] = term_id
+    elif semestre:
+        course_data["term_name"] = semestre
+
+    payload = {"course": course_data}
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             f"{BASE}/api/v1/accounts/self/courses",

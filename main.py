@@ -108,6 +108,22 @@ async def logout():
 # Canvas
 # ---------------------------------------------------------------------------
 
+@app.get("/api/canvas/terms")
+async def list_terms(_: dict = Depends(get_current_user)):
+    try:
+        return await canvas_service.get_terms()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/canvas/terms")
+async def create_term(payload: dict, _: dict = Depends(get_current_user)):
+    try:
+        return await canvas_service.get_or_create_term(payload["name"])
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
 @app.get("/api/canvas/courses")
 async def list_courses(_: dict = Depends(get_current_user)):
     try:
