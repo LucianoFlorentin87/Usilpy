@@ -296,6 +296,119 @@ async def _process_alumno(
 # Main entry point
 # ──────────────────────────────────────────────
 
+async def run_matriculacion_from_bytes(
+    excel_bytes: bytes,
+    dry_run: bool = False,
+    semestre: str | None = None,
+) -> dict:
+    """Same as run_matriculacion but reads Excel from bytes (file upload) instead of OneDrive."""
+    import openpyxl
+    from onedrive_service import parse_sheet, validate_alumnos
+
+    await audit_service.init_db()
+    semestre = semestre or settings.semestre_actual or "SEM-ACTUAL"
+    ejecucion_id = str(uuid.uuid4())
+    tipo = "dry_run" if dry_run else "manual"
+    start = datetime.now(timezone.utc)
+
+    logger.info("Matriculación desde archivo (dry_run=%s, semestre=%s)", dry_run, semestre)
+
+    try:
+        import io as _io
+        wb = openpyxl.load_workbook(_io.BytesIO(excel_bytes), read_only=False, data_only=True)
+        alumnos = []
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            alumno = parse_sheet(ws, sheet_name)
+            if alumno:
+                alumnos.append(alumno)
+        validation_errors = validate_alumnos(alumnos)
+    except Exception as exc:
+        msg = f"Error procesando Excel: {exc}"
+        summary = {
+            "ejecucion_id": ejecucion_id,
+            "timestamp": start.isoformat(),
+            "tipo": tipo,
+            "semestre": semestre,
+            "estado": "fallido",
+            "error_global": msg,
+            "total": 0, "creados": 0, "existentes": 0, "inscripciones": 0, "errores": 1,
+            "duracion_seg": 0,
+            "resultados": [],
+            "errores_validacion": [],
+        }
+        await audit_service.save_ejecucion(summary)
+        return summary
+
+    if validation_errors:
+        errs = [{"sheet_name": e.sheet_name, "cedula": e.cedula, "nombre": e.nombre, "error": e.error}
+                for e in validation_errors]
+        elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+        return {
+            "ejecucion_id": ejecucion_id,
+            "timestamp": start.isoformat(),
+            "tipo": tipo,
+            "semestre": semestre,
+            "estado": "error_validacion",
+            "total": 0, "creados": 0, "existentes": 0, "inscripciones": 0,
+            "errores": len(errs),
+            "duracion_seg": elapsed,
+            "resultados": [],
+            "errores_validacion": errs,
+        }
+
+    resultados: list[dict] = []
+    for alumno in alumnos:
+        res = await _process_alumno(alumno, semestre, ejecucion_id, dry_run)
+        resultados.append(res)
+
+    elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+    creados = sum(1 for r in resultados if r["es_nuevo"] and not r["errores"])
+    existentes = sum(1 for r in resultados if not r["es_nuevo"])
+    inscripciones = sum(len([c for c in r["cursos"] if not c.get("errores")]) for r in resultados)
+    total_errores = sum(len(r["errores"]) for r in resultados)
+    all_error_details = [e for r in resultados for e in r["errores"]]
+
+    estado = "exitoso" if total_errores == 0 else "con_errores"
+    if not resultados:
+        estado = "sin_datos"
+
+    summary = {
+        "ejecucion_id": ejecucion_id,
+        "timestamp": start.isoformat(),
+        "tipo": tipo,
+        "semestre": semestre,
+        "estado": estado,
+        "total": len(alumnos),
+        "creados": creados,
+        "existentes": existentes,
+        "inscripciones": inscripciones,
+        "errores": total_errores,
+        "duracion_seg": round(elapsed, 2),
+        "resultados": resultados,
+        "errores_validacion": [],
+        "detalles_errores": all_error_details[:20],
+        "dry_run": dry_run,
+    }
+
+    if not dry_run:
+        await audit_service.save_ejecucion(summary)
+        if total_errores > 0 and settings.admin_email:
+            await email_service.send_admin_error_report(
+                to=settings.admin_email,
+                semestre=semestre,
+                errores=[{"error": e} for e in all_error_details],
+                tipo="Errores en proceso de matriculación",
+            )
+        await teams_notify_service.send_matriculacion_summary(summary)
+
+    logger.info(
+        "Matriculación (archivo) finalizada: total=%d creados=%d errores=%d (%.1fs)",
+        len(alumnos), creados, total_errores, elapsed,
+    )
+    return summary
+
+
 async def run_matriculacion(
     dry_run: bool = False,
     semestre: str | None = None,

@@ -253,7 +253,7 @@ async def run_matriculacion(
     semestre: str | None = None,
     _: dict = Depends(get_current_user),
 ):
-    """Execute the full enrollment process (real mode)."""
+    """Execute the full enrollment process (real mode) using OneDrive."""
     try:
         result = await matriculacion_service.run_matriculacion(dry_run=False, semestre=semestre)
         return JSONResponse(content=result)
@@ -266,9 +266,49 @@ async def dry_run_matriculacion(
     semestre: str | None = None,
     _: dict = Depends(get_current_user),
 ):
-    """Simulate the enrollment process without making any changes."""
+    """Simulate the enrollment process without making any changes (OneDrive)."""
     try:
         result = await matriculacion_service.run_matriculacion(dry_run=True, semestre=semestre)
+        return JSONResponse(content=result)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/matriculacion/upload")
+async def matriculacion_upload(
+    file: UploadFile = File(...),
+    semestre: str | None = None,
+    _: dict = Depends(get_current_user),
+):
+    """Execute enrollment using an uploaded Excel file (no OneDrive required)."""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in {".xlsx", ".xls"}:
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
+    file_bytes = await file.read()
+    try:
+        result = await matriculacion_service.run_matriculacion_from_bytes(
+            excel_bytes=file_bytes, dry_run=False, semestre=semestre
+        )
+        return JSONResponse(content=result)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/matriculacion/upload/dry-run")
+async def matriculacion_upload_dry_run(
+    file: UploadFile = File(...),
+    semestre: str | None = None,
+    _: dict = Depends(get_current_user),
+):
+    """Simulate enrollment using an uploaded Excel file."""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in {".xlsx", ".xls"}:
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
+    file_bytes = await file.read()
+    try:
+        result = await matriculacion_service.run_matriculacion_from_bytes(
+            excel_bytes=file_bytes, dry_run=True, semestre=semestre
+        )
         return JSONResponse(content=result)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

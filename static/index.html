@@ -380,23 +380,66 @@
       <!-- Controls card -->
       <div class="card">
         <h3>Proceso de Matriculación Automática</h3>
-        <div class="info-banner">
-          📁 El sistema leerá el Excel de matriculación desde OneDrive (configurado en <code>ONEDRIVE_FILE_ID</code>).
-          Cada hoja corresponde a un alumno. Use <strong>DRY RUN</strong> para simular sin ejecutar cambios.
+
+        <!-- Tabs: OneDrive vs Subir archivo -->
+        <div style="display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid var(--border);">
+          <button id="tab-onedrive" onclick="switchMatTab('onedrive')"
+            style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;">
+            ☁️ Desde OneDrive
+          </button>
+          <button id="tab-upload" onclick="switchMatTab('upload')"
+            style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;">
+            📂 Subir archivo Excel
+          </button>
         </div>
-        <div class="form-row">
-          <div class="form-group" style="max-width:200px;">
-            <label>Semestre (opcional)</label>
-            <input type="text" id="mat-semestre" placeholder="ej: 2025-2" />
+
+        <!-- OneDrive tab -->
+        <div id="matTab-onedrive">
+          <div class="info-banner">
+            ☁️ El sistema leerá el Excel de matriculación desde OneDrive (configurado en <code>ONEDRIVE_FILE_ID</code>).
+            Cada hoja del Excel corresponde a un alumno. Use <strong>DRY RUN</strong> para simular sin aplicar cambios.
+          </div>
+          <div class="form-row" style="margin-top:14px;">
+            <div class="form-group" style="max-width:200px;">
+              <label>Semestre (opcional)</label>
+              <input type="text" id="mat-semestre" placeholder="ej: 2025-2" />
+            </div>
+          </div>
+          <div class="actions-row">
+            <button class="btn btn-primary" id="btn-mat-run" onclick="runMatriculacion(false)">
+              ▶ Ejecutar matriculación
+            </button>
+            <button class="btn btn-warn" id="btn-mat-dryrun" onclick="runMatriculacion(true)">
+              🔍 DRY RUN (simular)
+            </button>
           </div>
         </div>
-        <div class="actions-row">
-          <button class="btn btn-primary" id="btn-mat-run" onclick="runMatriculacion(false)">
-            ▶ Ejecutar matriculación
-          </button>
-          <button class="btn btn-warn" id="btn-mat-dryrun" onclick="runMatriculacion(true)">
-            🔍 DRY RUN (simular)
-          </button>
+
+        <!-- Upload tab -->
+        <div id="matTab-upload" style="display:none;">
+          <div class="info-banner" style="background:#f0f7ff;border-color:#93c5fd;color:#1e40af;">
+            📂 Subí tu archivo Excel directamente desde tu PC. Cada hoja debe corresponder a un alumno.
+            No necesita OneDrive configurado. Podés usar <strong>DRY RUN</strong> para simular antes de ejecutar.
+          </div>
+          <div class="form-row" style="margin-top:14px;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+            <div class="form-group">
+              <label>Archivo Excel (.xlsx)</label>
+              <input type="file" id="mat-file-input" accept=".xlsx,.xls"
+                style="border:2px dashed var(--border);border-radius:6px;padding:10px;width:100%;cursor:pointer;" />
+            </div>
+            <div class="form-group" style="max-width:180px;">
+              <label>Semestre (opcional)</label>
+              <input type="text" id="mat-semestre-upload" placeholder="ej: 2025-2" />
+            </div>
+          </div>
+          <div class="actions-row">
+            <button class="btn btn-primary" id="btn-mat-upload-run" onclick="runMatriculacionUpload(false)">
+              ▶ Ejecutar con archivo
+            </button>
+            <button class="btn btn-warn" id="btn-mat-upload-dryrun" onclick="runMatriculacionUpload(true)">
+              🔍 DRY RUN con archivo
+            </button>
+          </div>
         </div>
       </div>
 
@@ -858,6 +901,87 @@ function chipAccion(accion) {
 }
 
 // ── Matriculación ────────────────────────────────────────────────────────────
+function switchMatTab(tab) {
+  document.getElementById('matTab-onedrive').style.display = tab === 'onedrive' ? 'block' : 'none';
+  document.getElementById('matTab-upload').style.display = tab === 'upload' ? 'block' : 'none';
+  document.getElementById('tab-onedrive').style.cssText += tab === 'onedrive'
+    ? 'color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;'
+    : 'color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;';
+  document.getElementById('tab-upload').style.cssText += tab === 'upload'
+    ? 'color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;'
+    : 'color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;';
+}
+
+async function runMatriculacionUpload(dryRun) {
+  const fileInput = document.getElementById('mat-file-input');
+  const semestre = document.getElementById('mat-semestre-upload').value.trim() || null;
+
+  if (!fileInput.files || !fileInput.files[0]) {
+    alert('Por favor seleccioná un archivo Excel (.xlsx) antes de continuar.');
+    return;
+  }
+
+  const endpoint = dryRun ? '/api/matriculacion/upload/dry-run' : '/api/matriculacion/upload';
+  const url = semestre ? `${endpoint}?semestre=${encodeURIComponent(semestre)}` : endpoint;
+
+  document.getElementById('btn-mat-upload-run').disabled = true;
+  document.getElementById('btn-mat-upload-dryrun').disabled = true;
+  document.getElementById('mat-results').style.display = 'none';
+
+  const progressCard = document.getElementById('mat-progress-card');
+  progressCard.style.display = 'block';
+  document.getElementById('mat-progress-title').textContent = dryRun ? '🔍 Simulando (DRY RUN)…' : '⚙️ Procesando matriculación…';
+  document.getElementById('mat-progress-fill').style.width = '10%';
+
+  const logEl = document.getElementById('mat-log');
+  logEl.innerHTML = '';
+  matLog('info', `[${new Date().toLocaleTimeString()}] Iniciando ${dryRun ? 'DRY RUN' : 'matriculación real'} desde archivo…`);
+  matLog('info', `Archivo: ${fileInput.files[0].name}`);
+  matLog('info', semestre ? `Semestre: ${semestre}` : 'Semestre: (desde configuración .env)');
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+
+  document.getElementById('mat-progress-fill').style.width = '30%';
+
+  try {
+    const token = localStorage.getItem('token');
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData,
+    });
+    document.getElementById('mat-progress-fill').style.width = '80%';
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || 'Error del servidor');
+    }
+    const result = await resp.json();
+    document.getElementById('mat-progress-fill').style.width = '100%';
+
+    if (result.estado === 'error_validacion') {
+      matLog('error', `✗ Validación fallida: ${result.errores} error(es). Proceso no ejecutado.`);
+      (result.errores_validacion || []).forEach(e => matLog('error', `  • [${e.sheet_name || e.cedula}] ${e.error}`));
+    } else if (result.estado === 'fallido') {
+      matLog('error', `✗ Error crítico: ${result.error_global}`);
+    } else {
+      matLog(dryRun ? 'dry' : 'ok', `✓ Completado — ${result.total} alumnos, ${result.creados} creados, ${result.errores} errores`);
+      if (dryRun) matLog('dry', 'MODO SIMULACIÓN: ningún cambio fue aplicado.');
+    }
+
+    setTimeout(() => { progressCard.style.display = 'none'; }, 1500);
+    renderMatriculacionResult(result, dryRun);
+  } catch(ex) {
+    document.getElementById('mat-progress-fill').style.width = '100%';
+    matLog('error', `✗ Error: ${ex.message}`);
+    setTimeout(() => { progressCard.style.display = 'none'; }, 1500);
+  } finally {
+    document.getElementById('btn-mat-upload-run').disabled = false;
+    document.getElementById('btn-mat-upload-dryrun').disabled = false;
+  }
+}
+
 async function runMatriculacion(dryRun) {
   const semestre = document.getElementById('mat-semestre').value.trim() || null;
   const endpoint = dryRun ? '/api/matriculacion/dry-run' : '/api/matriculacion';
