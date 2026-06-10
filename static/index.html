@@ -209,8 +209,14 @@
     </div>
     <div class="login-field">
       <label>Contraseña</label>
-      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"
-             onkeydown="if(event.key==='Enter') doLogin()" />
+      <div style="position:relative;">
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter') doLogin()"
+               style="width:100%;padding-right:42px;" />
+        <button type="button" id="pw-toggle" onclick="togglePassword()"
+          style="position:absolute;right:0;top:0;height:100%;width:40px;background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--text-muted);transition:color .15s;"
+          title="Mostrar/ocultar contraseña">👁</button>
+      </div>
     </div>
     <p id="login-error"></p>
     <button class="btn btn-primary btn-login" onclick="doLogin()">Iniciar sesión</button>
@@ -1069,6 +1075,18 @@ function showLogin(msg) {
   clearToken();
   document.getElementById('login-screen').classList.remove('hidden');
   if (msg) document.getElementById('login-error').textContent = msg;
+}
+
+function togglePassword() {
+  const input = document.getElementById('login-password');
+  const btn   = document.getElementById('pw-toggle');
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.textContent = showing ? '👁' : '🙈';
+  btn.style.color = showing ? 'var(--text-muted)' : 'var(--accent)';
+  // small bounce animation
+  btn.style.transform = 'scale(1.3)';
+  setTimeout(() => btn.style.transform = 'scale(1)', 150);
 }
 
 async function doLogin() {

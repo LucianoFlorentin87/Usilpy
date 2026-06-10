@@ -82,11 +82,32 @@ class LoginRequest(BaseModel):
 
 @app.post("/api/auth/login")
 async def login(body: LoginRequest):
-    user = auth_service.authenticate_local(body.username, body.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-    token = auth_service.create_access_token(user)
-    return {"access_token": token, "token_type": "bearer", "user": user}
+    # Try DB users first (async)
+    db_user = await user_service.get_user_by_username(body.username)
+    if db_user:
+        if not auth_service.verify_password(body.password, db_user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+        await user_service.update_last_login(db_user["id"])
+        payload = {
+            "sub": db_user["id"],
+            "username": db_user["username"],
+            "name": db_user["full_name"] or db_user["username"],
+            "email": db_user["email"],
+            "role": db_user["role"],
+            "provider": "local",
+        }
+    else:
+        # Fallback: env-based admin (initial setup before any DB user)
+        settings = auth_service.settings
+        if (body.username == settings.admin_username
+                and settings.admin_password_hash
+                and auth_service.verify_password(body.password, settings.admin_password_hash)):
+            payload = {"sub": body.username, "username": body.username,
+                       "name": body.username, "role": "admin", "provider": "local"}
+        else:
+            raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    token = auth_service.create_access_token(payload)
+    return {"access_token": token, "token_type": "bearer", "user": payload}
 
 
 @app.get("/api/auth/azure/login")
