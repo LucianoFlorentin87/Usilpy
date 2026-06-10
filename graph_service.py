@@ -144,45 +144,53 @@ async def find_team_by_display_name(name: str) -> dict | None:
 async def create_team(display_name: str, description: str = "") -> dict:
     """
     Create a Microsoft Teams team.
-    Graph returns 202 Accepted for async provisioning; we poll up to ~60s.
+    Strategy: create an M365 group first, then PUT /group/{id}/team to provision it.
+    This uses Group.ReadWrite.All which the app already has.
     """
-    payload = {
-        "template@odata.bind": "https://graph.microsoft.com/v1.0/teamsTemplates('standard')",
+    import asyncio
+
+    # Step 1: create the underlying Microsoft 365 group
+    group_payload = {
         "displayName": display_name,
         "description": description,
+        "groupTypes": ["Unified"],
+        "mailEnabled": True,
+        "mailNickname": re.sub(r"[^a-zA-Z0-9]", "", display_name)[:20] or "team",
+        "securityEnabled": False,
+        "visibility": "Private",
     }
     hdrs = _headers()
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(f"{GRAPH_BASE}/teams", headers=hdrs, json=payload)
+        r = await client.post(f"{GRAPH_BASE}/groups", headers=hdrs, json=group_payload)
+        r.raise_for_status()
+        group = r.json()
+        group_id = group["id"]
 
-        if resp.status_code in (200, 201):
-            return resp.json()
+        # Step 2: wait a few seconds for group replication, then provision as team
+        await asyncio.sleep(5)
+        team_payload = {
+            "memberSettings": {"allowCreateUpdateChannels": True},
+            "messagingSettings": {"allowUserEditMessages": True, "allowUserDeleteMessages": True},
+            "funSettings": {"allowGiphy": True, "giphyContentRating": "moderate"},
+        }
+        for attempt in range(6):
+            tr = await client.put(
+                f"{GRAPH_BASE}/groups/{group_id}/team",
+                headers=hdrs,
+                json=team_payload,
+            )
+            if tr.status_code in (200, 201):
+                data = tr.json()
+                data["id"] = data.get("id") or group_id
+                return data
+            if tr.status_code == 404:
+                await asyncio.sleep(5)
+                continue
+            tr.raise_for_status()
 
-        if resp.status_code == 202:
-            # Poll for completion via Content-Location header
-            location = resp.headers.get("Content-Location", "")
-            for attempt in range(20):
-                await asyncio.sleep(3)
-                # Try to find by name (more reliable than polling location)
-                team = await find_team_by_display_name(display_name)
-                if team:
-                    return team
-                if location:
-                    try:
-                        poll = await client.get(
-                            f"https://graph.microsoft.com{location}",
-                            headers=hdrs,
-                        )
-                        if poll.status_code == 200:
-                            data = poll.json()
-                            if data.get("id"):
-                                return data
-                    except Exception:
-                        pass
-            raise RuntimeError(f"Team '{display_name}' creation timed out after polling")
-
-        resp.raise_for_status()
-        return resp.json()
+        # Fallback: return the group with the id so callers can use it
+        group["id"] = group_id
+        return group
 
 
 async def add_member_to_team(team_id: str, user_id: str) -> bool:
