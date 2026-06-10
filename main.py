@@ -232,7 +232,7 @@ async def bulk_template():
 
 
 @app.get("/api/bulk/template/{tipo}")
-async def bulk_template_tipo(tipo: str, _: dict = Depends(get_current_user)):
+async def bulk_template_tipo(tipo: str):
     """Genera y devuelve una plantilla Excel vacía según el tipo solicitado."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
