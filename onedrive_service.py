@@ -74,13 +74,14 @@ def _normalize_cedula(val: str) -> str:
     return re.sub(r"[^\d]", "", val)
 
 
-_CEDULA_LABELS = {"cédula", "cedula", "ci", "id", "dni", "documento", "nro"}
-_NOMBRE_LABELS = {"nombre", "alumno", "estudiante", "name", "apellido", "nombres"}
+_CEDULA_LABELS = {"cédula", "cedula", "ci", "c.i", "id", "dni", "documento", "nro"}
+_NOMBRE_LABELS = {"nombre", "alumno", "estudiante", "name", "apellido", "nombres", "nombre y apellido"}
 _MATERIA_LABELS = {"materia", "materias", "asignatura", "asignaturas", "curso", "cursos", "subject"}
+_SEMESTRE_RE = re.compile(r"\b(20\d{2}[-/]\d{1,2})\b")
 
 
 def _label_match(cell: str, labels: set) -> bool:
-    c = cell.lower().strip()
+    c = cell.lower().strip().rstrip(":")
     return any(lbl in c for lbl in labels)
 
 
@@ -90,72 +91,108 @@ class AlumnoData:
     nombre: str
     materias: list[str] = field(default_factory=list)
     sheet_name: str = ""
+    semestre: str = ""
 
 
 def parse_sheet(ws, sheet_name: str) -> Optional[AlumnoData]:
-    rows: list[list[str]] = []
-    for row in ws.iter_rows(values_only=True):
-        cleaned = [_clean(c) for c in row]
-        rows.append(cleaned)
+    """
+    Keyword-search parser: scans every cell looking for label keywords
+    (Cédula, Nombre, Curso…) regardless of their position in the sheet.
+    Supports the one-student-per-sheet layout used by the academic team.
+    """
+    # Build a (row, col) -> value map for all non-empty cells
+    cell_map: dict[tuple[int, int], str] = {}
+    for r_idx, row in enumerate(ws.iter_rows(values_only=True)):
+        for c_idx, val in enumerate(row):
+            v = _clean(val)
+            if v:
+                cell_map[(r_idx, c_idx)] = v
 
-    # strip leading/trailing blank rows
-    while rows and all(c == "" for c in rows[0]):
-        rows.pop(0)
-    while rows and all(c == "" for c in rows[-1]):
-        rows.pop()
-
-    if len(rows) < 2:
+    if not cell_map:
         return None
 
-    cedula = nombre = ""
+    def _neighbors(r: int, c: int) -> list[str]:
+        """Return non-empty values from the cells immediately below and to the right."""
+        candidates = []
+        for dr, dc in [(1, 0), (2, 0), (0, 1), (0, 2), (3, 0)]:
+            v = cell_map.get((r + dr, c + dc), "")
+            if v:
+                candidates.append(v)
+        return candidates
+
+    cedula = nombre = semestre = ""
+    curso_col: int | None = None
+    curso_header_row: int | None = None
+
+    for (r, c), val in sorted(cell_map.items()):
+        low = val.lower().strip().rstrip(":")
+
+        # Detect semester pattern directly in cell (e.g. "2026-1")
+        if not semestre:
+            m = _SEMESTRE_RE.search(val)
+            if m:
+                semestre = m.group(1)
+
+        # Cédula label
+        if not cedula and _label_match(val, _CEDULA_LABELS):
+            for neighbor in _neighbors(r, c):
+                if _is_cedula_value(neighbor):
+                    cedula = _normalize_cedula(neighbor)
+                    break
+            continue
+
+        # Nombre label
+        if not nombre and _label_match(val, _NOMBRE_LABELS):
+            for neighbor in _neighbors(r, c):
+                # A name has letters and is not a cedula and is not another label
+                if neighbor and not _is_cedula_value(neighbor) and not _label_match(neighbor, _CEDULA_LABELS):
+                    nombre = neighbor
+                    break
+            continue
+
+        # "Curso" column header — remember the column to read courses below it
+        if _label_match(val, _MATERIA_LABELS) and curso_col is None:
+            curso_col = c
+            curso_header_row = r
+            continue
+
+        # Fallback: bare cedula value with no label (e.g. just a number in a cell)
+        if not cedula and _is_cedula_value(val):
+            cedula = _normalize_cedula(val)
+            continue
+
+    # Extract courses from the detected column
     materias: list[str] = []
+    if curso_col is not None and curso_header_row is not None:
+        max_row = max(r for r, _ in cell_map)
+        for row_i in range(curso_header_row + 1, max_row + 2):
+            v = cell_map.get((row_i, curso_col), "")
+            if v and not _label_match(v, _MATERIA_LABELS):
+                materias.append(v)
 
-    first_a = rows[0][0] if rows[0] else ""
-    second_a = rows[1][0] if len(rows) > 1 else ""
+    # If no dedicated Curso column found, fall back to scanning all values
+    # that look like subject names (not labels, not cedula, not nombre)
+    if not materias:
+        all_vals = sorted(cell_map.items())
+        for (r, c), val in all_vals:
+            low = val.lower().strip().rstrip(":")
+            if (val != nombre and val != cedula and val != semestre
+                    and not _label_match(val, _CEDULA_LABELS)
+                    and not _label_match(val, _NOMBRE_LABELS)
+                    and not _is_cedula_value(val)
+                    and not _SEMESTRE_RE.search(val)
+                    and len(val) > 3
+                    and not any(kw in low for kw in ("programa", "obs", "nota", "área", "area", "facultad", "carrera"))):
+                materias.append(val)
 
-    format_a = _label_match(first_a, _CEDULA_LABELS) and _label_match(second_a, _NOMBRE_LABELS)
-
-    if format_a:
-        cedula = _normalize_cedula(rows[0][1] if len(rows[0]) > 1 else "")
-        nombre = rows[1][1] if len(rows) > 1 and len(rows[1]) > 1 else ""
-        # Materias start after row index 1, skip any "Materias" header row
-        start = 2
-        for i in range(2, len(rows)):
-            cell = rows[i][0]
-            if _label_match(cell, _MATERIA_LABELS):
-                start = i + 1
-                break
-            if cell:
-                start = i
-                break
-        for row in rows[start:]:
-            mat = row[0] or (row[1] if len(row) > 1 else "")
-            if mat and not _label_match(mat, _MATERIA_LABELS):
-                materias.append(mat)
-    else:
-        # Format B: first cedula-looking value, then name, then subjects
-        idx = 0
-        for i, row in enumerate(rows):
-            val = row[0] or (row[1] if len(row) > 1 else "")
-            if _is_cedula_value(val):
-                cedula = _normalize_cedula(val)
-                idx = i + 1
-                break
-
-        for i in range(idx, len(rows)):
-            val = rows[i][0] or (rows[i][1] if len(rows[i]) > 1 else "")
-            if val and not _is_cedula_value(val) and not _label_match(val, _MATERIA_LABELS):
-                nombre = val
-                idx = i + 1
-                break
-
-        for row in rows[idx:]:
-            mat = row[0] or (row[1] if len(row) > 1 else "")
-            if mat and not _label_match(mat, _MATERIA_LABELS):
-                materias.append(mat)
-
-    if not cedula or not nombre:
-        logger.warning("Hoja '%s': no se pudo extraer cédula o nombre", sheet_name)
+    if not cedula and not nombre:
+        logger.debug("Hoja '%s': omitida (sin cédula ni nombre)", sheet_name)
+        return None
+    if not cedula:
+        logger.warning("Hoja '%s': sin cédula", sheet_name)
+        return None
+    if not nombre:
+        logger.warning("Hoja '%s': sin nombre", sheet_name)
         return None
 
     return AlumnoData(
@@ -163,6 +200,7 @@ def parse_sheet(ws, sheet_name: str) -> Optional[AlumnoData]:
         nombre=nombre,
         materias=[m for m in materias if m],
         sheet_name=sheet_name,
+        semestre=semestre,
     )
 
 
@@ -185,9 +223,9 @@ def validate_alumnos(alumnos: list[AlumnoData]) -> list[ValidationError]:
             errors.append(ValidationError(a.sheet_name, a.cedula, a.nombre, f"Cédula no numérica: '{a.cedula}'"))
 
         parts = a.nombre.strip().split()
-        if len(parts) < 2:
+        if len(parts) < 1 or not a.nombre.strip():
             errors.append(ValidationError(a.sheet_name, a.cedula, a.nombre,
-                                          "Nombre incompleto (se requiere al menos nombre y apellido)"))
+                                          "Nombre vacío"))
 
         if not a.materias:
             errors.append(ValidationError(a.sheet_name, a.cedula, a.nombre, "Sin materias asignadas"))

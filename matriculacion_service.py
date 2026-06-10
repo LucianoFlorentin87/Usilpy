@@ -96,8 +96,15 @@ async def _ensure_canvas_course(materia: str, semestre: str) -> dict:
     sis_id = generate_sis_id(materia, semestre)
     course = await canvas_service.get_course_by_sis_id(sis_id)
     if not course:
-        course = await canvas_service.create_course(materia, sis_id, semestre)
-        logger.info("Canvas course created: %s", sis_id)
+        # Auto-create enrollment term for this semester
+        term_id: int | None = None
+        try:
+            term = await canvas_service.get_or_create_term(semestre)
+            term_id = term.get("id")
+        except Exception as exc:
+            logger.warning("No se pudo crear el período '%s': %s", semestre, exc)
+        course = await canvas_service.create_course(materia, sis_id, semestre, term_id=term_id)
+        logger.info("Canvas course created: %s (term_id=%s)", sis_id, term_id)
     return course
 
 
@@ -186,6 +193,8 @@ async def _process_alumno(
     ejecucion_id: str,
     dry_run: bool,
 ) -> dict:
+    # Use semester detected in the student's own sheet if available
+    semestre = alumno.semestre or semestre
     email = generate_email(alumno.nombre)
     password = generate_password(alumno.cedula, alumno.nombre)
 
