@@ -176,24 +176,87 @@ async def get_dashboard_kpis() -> dict:
     }
 
 
-async def export_to_excel(semestre: str | None = None, cedula: str | None = None) -> bytes:
-    rows = await get_historial(semestre=semestre, cedula=cedula, limit=10000)
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Auditoría"
-
-    headers = ["ID", "Timestamp", "Ejecución ID", "Cédula", "Nombre", "Acción",
-               "Plataforma", "Curso", "Semestre", "Detalle"]
-
-    header_fill = PatternFill("solid", fgColor="1E3A5F")
-    header_font = Font(bold=True, color="FFFFFF")
-
+def _header_row(ws, headers: list[str], color: str = "1E3A5F") -> None:
+    fill = PatternFill("solid", fgColor=color)
+    font = Font(bold=True, color="FFFFFF")
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center")
+        cell.fill = fill
+        cell.font = font
+        cell.alignment = Alignment(horizontal="center", wrap_text=True)
+
+
+def _autowidth(ws, max_width: int = 55) -> None:
+    for col in ws.columns:
+        max_len = max((len(str(cell.value or "")) for cell in col), default=10)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 3, max_width)
+
+
+async def export_to_excel(semestre: str | None = None, cedula: str | None = None) -> bytes:
+    detail_rows = await get_historial(semestre=semestre, cedula=cedula, limit=10000)
+    ejecuciones = await get_ejecuciones(limit=200)
+
+    wb = openpyxl.Workbook()
+
+    # ── Hoja 1: Resumen de ejecuciones ──────────────────────────────────────
+    ws_exec = wb.active
+    ws_exec.title = "Ejecuciones"
+
+    exec_headers = [
+        "Fecha", "Hora (UTC)", "ID Ejecución", "Tipo", "Semestre",
+        "Total alumnos", "Creados", "Existentes", "Inscripciones",
+        "Errores", "Duración (seg)", "Estado",
+    ]
+    _header_row(ws_exec, exec_headers, "1E3A5F")
+
+    estado_fills = {
+        "exitoso":          PatternFill("solid", fgColor="D1FAE5"),
+        "con_errores":      PatternFill("solid", fgColor="FEF3C7"),
+        "error_validacion": PatternFill("solid", fgColor="FEE2E2"),
+        "fallido":          PatternFill("solid", fgColor="FEE2E2"),
+        "sin_datos":        PatternFill("solid", fgColor="F3F4F6"),
+    }
+
+    for r_idx, ej in enumerate(ejecuciones, 2):
+        ts = ej.get("timestamp", "")
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            fecha = dt.strftime("%d/%m/%Y")
+            hora = dt.strftime("%H:%M:%S")
+        except Exception:
+            fecha, hora = ts, ""
+        estado = ej.get("estado", "")
+        fill = estado_fills.get(estado, PatternFill("solid", fgColor="FFFFFF"))
+        values = [
+            fecha, hora,
+            ej.get("id", ""),
+            ej.get("tipo", ""),
+            ej.get("semestre", ""),
+            ej.get("total", 0),
+            ej.get("creados", 0),
+            ej.get("existentes", 0),
+            ej.get("inscripciones", 0),
+            ej.get("errores", 0),
+            ej.get("duracion_seg", 0),
+            estado,
+        ]
+        for c_idx, val in enumerate(values, 1):
+            cell = ws_exec.cell(row=r_idx, column=c_idx, value=val)
+            cell.fill = fill
+            if c_idx == 12:  # Estado
+                font_color = "065F46" if estado == "exitoso" else "991B1B" if estado in ("fallido", "error_validacion") else "92400E"
+                cell.font = Font(bold=True, color=font_color)
+
+    _autowidth(ws_exec)
+
+    # ── Hoja 2: Detalle de acciones ──────────────────────────────────────────
+    ws_det = wb.create_sheet("Detalle")
+
+    det_headers = [
+        "Fecha", "Hora (UTC)", "Cédula", "Nombre", "Acción",
+        "Plataforma", "Curso / Materia", "Semestre", "Detalle / Error", "ID Ejecución",
+    ]
+    _header_row(ws_det, det_headers, "374151")
 
     action_fills = {
         "creado":   PatternFill("solid", fgColor="D1FAE5"),
@@ -202,23 +265,40 @@ async def export_to_excel(semestre: str | None = None, cedula: str | None = None
         "omitido":  PatternFill("solid", fgColor="F3F4F6"),
     }
 
-    for r_idx, row in enumerate(rows, 2):
-        values = [
-            row.get("id"), row.get("timestamp"), row.get("ejecucion_id"),
-            row.get("cedula"), row.get("nombre"), row.get("accion"),
-            row.get("plataforma"), row.get("curso"), row.get("semestre"),
-            row.get("detalle"),
-        ]
+    for r_idx, row in enumerate(detail_rows, 2):
+        ts = row.get("timestamp", "")
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            fecha = dt.strftime("%d/%m/%Y")
+            hora = dt.strftime("%H:%M:%S")
+        except Exception:
+            fecha, hora = ts, ""
+
         accion = row.get("accion", "")
         fill = action_fills.get(accion, PatternFill("solid", fgColor="FFFFFF"))
-        for c_idx, val in enumerate(values, 1):
-            cell = ws.cell(row=r_idx, column=c_idx, value=val)
-            cell.fill = fill
+        detalle = row.get("detalle", "")
 
-    # Auto-width
-    for col in ws.columns:
-        max_len = max((len(str(cell.value or "")) for cell in col), default=10)
-        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 50)
+        values = [
+            fecha, hora,
+            row.get("cedula", ""),
+            row.get("nombre", ""),
+            accion,
+            row.get("plataforma", ""),
+            row.get("curso", ""),
+            row.get("semestre", ""),
+            detalle,
+            row.get("ejecucion_id", ""),
+        ]
+        for c_idx, val in enumerate(values, 1):
+            cell = ws_det.cell(row=r_idx, column=c_idx, value=val)
+            cell.fill = fill
+            if c_idx == 5 and accion == "error":
+                cell.font = Font(bold=True, color="991B1B")
+            if c_idx == 9 and detalle:
+                cell.alignment = Alignment(wrap_text=True)
+
+    _autowidth(ws_det)
+    ws_det.row_dimensions[1].height = 30
 
     buf = io.BytesIO()
     wb.save(buf)
