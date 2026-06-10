@@ -1,7 +1,7 @@
 import io
 import os
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request, Query, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -445,64 +445,103 @@ async def bulk_reporte_excel(report: dict, _: dict = Depends(get_current_user)):
 
 @app.post("/api/matriculacion")
 async def run_matriculacion(
+    background_tasks: BackgroundTasks,
     semestre: str | None = None,
     _: dict = Depends(get_current_user),
 ):
-    """Execute the full enrollment process (real mode) using OneDrive."""
-    try:
-        result = await matriculacion_service.run_matriculacion(dry_run=False, semestre=semestre)
-        return JSONResponse(content=result)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    """Start enrollment (OneDrive). Returns ejecucion_id immediately; poll /progress/{id}."""
+    import uuid
+    ejecucion_id = str(uuid.uuid4())
+    matriculacion_service._init_progress_placeholder(ejecucion_id)
+    background_tasks.add_task(
+        matriculacion_service.run_matriculacion, dry_run=False, semestre=semestre, ejecucion_id=ejecucion_id
+    )
+    return JSONResponse(content={"ejecucion_id": ejecucion_id, "estado": "iniciado"})
 
 
 @app.post("/api/matriculacion/dry-run")
 async def dry_run_matriculacion(
+    background_tasks: BackgroundTasks,
     semestre: str | None = None,
     _: dict = Depends(get_current_user),
 ):
-    """Simulate the enrollment process without making any changes (OneDrive)."""
-    try:
-        result = await matriculacion_service.run_matriculacion(dry_run=True, semestre=semestre)
-        return JSONResponse(content=result)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    """Simulate enrollment (OneDrive). Returns ejecucion_id immediately."""
+    import uuid
+    ejecucion_id = str(uuid.uuid4())
+    matriculacion_service._init_progress_placeholder(ejecucion_id)
+    background_tasks.add_task(
+        matriculacion_service.run_matriculacion, dry_run=True, semestre=semestre, ejecucion_id=ejecucion_id
+    )
+    return JSONResponse(content={"ejecucion_id": ejecucion_id, "estado": "iniciado"})
 
 
 @app.post("/api/matriculacion/upload")
 async def matriculacion_upload(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     semestre: str | None = None,
     _: dict = Depends(get_current_user),
 ):
-    """Execute enrollment using an uploaded Excel file (no OneDrive required)."""
+    """Start enrollment from uploaded Excel. Returns ejecucion_id immediately."""
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in {".xlsx", ".xls"}:
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
+    import uuid
     file_bytes = await file.read()
-    try:
-        result = await matriculacion_service.run_matriculacion_from_bytes(
-            excel_bytes=file_bytes, dry_run=False, semestre=semestre
-        )
-        return JSONResponse(content=result)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    ejecucion_id = str(uuid.uuid4())
+    matriculacion_service._init_progress_placeholder(ejecucion_id)
+    background_tasks.add_task(
+        matriculacion_service.run_matriculacion_from_bytes,
+        excel_bytes=file_bytes, dry_run=False, semestre=semestre, ejecucion_id=ejecucion_id
+    )
+    return JSONResponse(content={"ejecucion_id": ejecucion_id, "estado": "iniciado"})
 
 
 @app.post("/api/matriculacion/upload/dry-run")
 async def matriculacion_upload_dry_run(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     semestre: str | None = None,
     _: dict = Depends(get_current_user),
 ):
-    """Simulate enrollment using an uploaded Excel file."""
+    """Simulate enrollment from uploaded Excel. Returns ejecucion_id immediately."""
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in {".xlsx", ".xls"}:
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
+    import uuid
     file_bytes = await file.read()
+    ejecucion_id = str(uuid.uuid4())
+    matriculacion_service._init_progress_placeholder(ejecucion_id)
+    background_tasks.add_task(
+        matriculacion_service.run_matriculacion_from_bytes,
+        excel_bytes=file_bytes, dry_run=True, semestre=semestre, ejecucion_id=ejecucion_id
+    )
+    return JSONResponse(content={"ejecucion_id": ejecucion_id, "estado": "iniciado"})
+
+
+@app.get("/api/matriculacion/progress/{ejecucion_id}")
+async def get_matriculacion_progress(
+    ejecucion_id: str,
+    _: dict = Depends(get_current_user),
+):
+    """Poll real-time progress of a running or completed enrollment batch."""
+    p = matriculacion_service.get_progress(ejecucion_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Ejecución no encontrada")
+    return JSONResponse(content=p)
+
+
+@app.post("/api/matriculacion/retry/{ejecucion_id}")
+async def retry_matriculacion(
+    ejecucion_id: str,
+    semestre: str | None = None,
+    _: dict = Depends(require_role("admin", "academico")),
+):
+    """Re-process only the students that had errors in a previous run."""
     try:
-        result = await matriculacion_service.run_matriculacion_from_bytes(
-            excel_bytes=file_bytes, dry_run=True, semestre=semestre
+        result = await matriculacion_service.retry_failed(
+            ejecucion_id=ejecucion_id,
+            semestre=semestre or settings.semestre_actual or "SEM-ACTUAL",
         )
         return JSONResponse(content=result)
     except Exception as exc:

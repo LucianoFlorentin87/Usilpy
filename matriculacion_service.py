@@ -35,6 +35,66 @@ from config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# ──────────────────────────────────────────────
+# In-memory progress store  (ejecucion_id → dict)
+# ──────────────────────────────────────────────
+_PROGRESS: dict[str, dict] = {}
+BATCH_SIZE = 5  # students processed in parallel
+
+
+def get_progress(ejecucion_id: str) -> dict | None:
+    return _PROGRESS.get(ejecucion_id)
+
+
+def _init_progress_placeholder(ejecucion_id: str) -> None:
+    """Mark ejecucion as queued before background task starts."""
+    _PROGRESS[ejecucion_id] = {
+        "ejecucion_id": ejecucion_id,
+        "total": 0,
+        "procesados": 0,
+        "creados": 0,
+        "existentes": 0,
+        "inscripciones": 0,
+        "errores": 0,
+        "estado": "preparando",
+        "porcentaje": 0,
+        "resultados": [],
+        "alumnos_con_error": [],
+    }
+
+
+def _init_progress(ejecucion_id: str, total: int) -> None:
+    _PROGRESS[ejecucion_id] = {
+        "ejecucion_id": ejecucion_id,
+        "total": total,
+        "procesados": 0,
+        "creados": 0,
+        "existentes": 0,
+        "inscripciones": 0,
+        "errores": 0,
+        "estado": "en_proceso",
+        "porcentaje": 0,
+        "resultados": [],
+        "alumnos_con_error": [],  # cedulas with errors for retry
+    }
+
+
+def _update_progress(ejecucion_id: str, result: dict) -> None:
+    p = _PROGRESS.get(ejecucion_id)
+    if not p:
+        return
+    p["procesados"] += 1
+    if result.get("es_nuevo") and not result.get("errores"):
+        p["creados"] += 1
+    elif not result.get("es_nuevo"):
+        p["existentes"] += 1
+    p["inscripciones"] += len([c for c in result.get("cursos", []) if not c.get("errores")])
+    p["errores"] += len(result.get("errores", []))
+    if result.get("errores"):
+        p["alumnos_con_error"].append(result["cedula"])
+    p["porcentaje"] = round(p["procesados"] / p["total"] * 100) if p["total"] else 100
+    p["resultados"].append(result)
+
 
 # ──────────────────────────────────────────────
 # Credential helpers
@@ -214,6 +274,7 @@ async def _process_alumno(
     semestre: str,
     ejecucion_id: str,
     dry_run: bool,
+    shared_canvas_cache: list[dict] | None = None,
 ) -> dict:
     # Use semester detected in the student's own sheet if available
     semestre = alumno.semestre or semestre
@@ -275,12 +336,13 @@ async def _process_alumno(
                 except Exception as exc:
                     result["errores"].append(f"Teams default team: {exc}")
 
-        # Fetch canvas courses once for fuzzy matching across all materias
-        canvas_courses_cache: list[dict] = []
-        try:
-            canvas_courses_cache = await canvas_service.get_courses(per_page=200)
-        except Exception as exc:
-            logger.warning("No se pudo cargar cursos Canvas para fuzzy matching: %s", exc)
+        # Use shared cache if provided (batched run), else fetch once for this student
+        canvas_courses_cache: list[dict] = shared_canvas_cache or []
+        if not canvas_courses_cache:
+            try:
+                canvas_courses_cache = await canvas_service.get_courses(per_page=200)
+            except Exception as exc:
+                logger.warning("No se pudo cargar cursos Canvas para fuzzy matching: %s", exc)
 
         # Process each subject
         materia_tasks = [
@@ -332,6 +394,114 @@ async def _process_alumno(
 
 
 # ──────────────────────────────────────────────
+# Parallel batch helpers
+# ──────────────────────────────────────────────
+
+async def _run_batched(
+    alumnos: list[AlumnoData],
+    semestre: str,
+    ejecucion_id: str,
+    dry_run: bool,
+) -> list[dict]:
+    """Process students in parallel batches of BATCH_SIZE.
+    Fetches Canvas courses once and shares across all batches."""
+    _init_progress(ejecucion_id, len(alumnos))
+
+    # Fetch shared Canvas courses cache once
+    shared_cache: list[dict] = []
+    if not dry_run:
+        try:
+            shared_cache = await canvas_service.get_courses(per_page=200)
+        except Exception as exc:
+            logger.warning("No se pudo cargar cursos Canvas para batch: %s", exc)
+
+    resultados: list[dict] = []
+    for i in range(0, len(alumnos), BATCH_SIZE):
+        batch = alumnos[i:i + BATCH_SIZE]
+        batch_results = await asyncio.gather(
+            *[_process_alumno(a, semestre, ejecucion_id, dry_run, shared_cache) for a in batch],
+            return_exceptions=True,
+        )
+        for alumno, res in zip(batch, batch_results):
+            if isinstance(res, Exception):
+                res = {
+                    "cedula": alumno.cedula,
+                    "nombre": alumno.nombre,
+                    "es_nuevo": False,
+                    "cursos": [],
+                    "errores": [str(res)],
+                }
+            _update_progress(ejecucion_id, res)
+            resultados.append(res)
+        logger.info("Batch %d/%d completado", min(i + BATCH_SIZE, len(alumnos)), len(alumnos))
+
+    p = _PROGRESS.get(ejecucion_id, {})
+    p["estado"] = "completado"
+    p["porcentaje"] = 100
+    return resultados
+
+
+def _build_summary(
+    ejecucion_id: str,
+    start: datetime,
+    tipo: str,
+    semestre: str,
+    alumnos: list,
+    resultados: list[dict],
+    elapsed: float,
+    dry_run: bool,
+) -> dict:
+    creados = sum(1 for r in resultados if r.get("es_nuevo") and not r.get("errores"))
+    existentes = sum(1 for r in resultados if not r.get("es_nuevo"))
+    inscripciones = sum(len([c for c in r.get("cursos", []) if not c.get("errores")]) for r in resultados)
+    total_errores = sum(len(r.get("errores", [])) for r in resultados)
+    all_error_details = [e for r in resultados for e in r.get("errores", [])]
+
+    estado = "exitoso" if total_errores == 0 else "con_errores"
+    if not resultados:
+        estado = "sin_datos"
+
+    return {
+        "ejecucion_id": ejecucion_id,
+        "timestamp": start.isoformat(),
+        "tipo": tipo,
+        "semestre": semestre,
+        "estado": estado,
+        "total": len(alumnos),
+        "creados": creados,
+        "existentes": existentes,
+        "inscripciones": inscripciones,
+        "errores": total_errores,
+        "duracion_seg": round(elapsed, 2),
+        "resultados": resultados,
+        "errores_validacion": [],
+        "detalles_errores": all_error_details[:20],
+        "dry_run": dry_run,
+    }
+
+
+async def retry_failed(ejecucion_id: str, semestre: str, dry_run: bool = False) -> dict:
+    """Re-process only the students that had errors in a previous run."""
+    p = _PROGRESS.get(ejecucion_id)
+    if not p:
+        return {"error": "Ejecución no encontrada en memoria"}
+    failed_cedulas = set(p.get("alumnos_con_error", []))
+    failed_alumnos = [
+        AlumnoData(**{k: v for k, v in r.items() if k in ("cedula", "nombre", "materias", "semestre", "email")})
+        for r in p.get("resultados", [])
+        if r.get("cedula") in failed_cedulas
+    ]
+    if not failed_alumnos:
+        return {"message": "No hay alumnos con error para reintentar", "total": 0}
+
+    new_ej_id = f"{ejecucion_id}-retry"
+    start = datetime.now(timezone.utc)
+    resultados = await _run_batched(failed_alumnos, semestre, new_ej_id, dry_run)
+    elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+    return _build_summary(new_ej_id, start, "retry", semestre, failed_alumnos, resultados, elapsed, dry_run)
+
+
+# ──────────────────────────────────────────────
 # Main entry point
 # ──────────────────────────────────────────────
 
@@ -339,6 +509,7 @@ async def run_matriculacion_from_bytes(
     excel_bytes: bytes,
     dry_run: bool = False,
     semestre: str | None = None,
+    ejecucion_id: str | None = None,
 ) -> dict:
     """Same as run_matriculacion but reads Excel from bytes (file upload) instead of OneDrive."""
     import openpyxl
@@ -346,7 +517,7 @@ async def run_matriculacion_from_bytes(
 
     await audit_service.init_db()
     semestre = semestre or settings.semestre_actual or "SEM-ACTUAL"
-    ejecucion_id = str(uuid.uuid4())
+    ejecucion_id = ejecucion_id or str(uuid.uuid4())
     tipo = "dry_run" if dry_run else "manual"
     start = datetime.now(timezone.utc)
 
@@ -396,43 +567,15 @@ async def run_matriculacion_from_bytes(
             "errores_validacion": errs,
         }
 
-    resultados: list[dict] = []
-    for alumno in alumnos:
-        res = await _process_alumno(alumno, semestre, ejecucion_id, dry_run)
-        resultados.append(res)
+    resultados = await _run_batched(alumnos, semestre, ejecucion_id, dry_run)
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
-    creados = sum(1 for r in resultados if r["es_nuevo"] and not r["errores"])
-    existentes = sum(1 for r in resultados if not r["es_nuevo"])
-    inscripciones = sum(len([c for c in r["cursos"] if not c.get("errores")]) for r in resultados)
-    total_errores = sum(len(r["errores"]) for r in resultados)
-    all_error_details = [e for r in resultados for e in r["errores"]]
-
-    estado = "exitoso" if total_errores == 0 else "con_errores"
-    if not resultados:
-        estado = "sin_datos"
-
-    summary = {
-        "ejecucion_id": ejecucion_id,
-        "timestamp": start.isoformat(),
-        "tipo": tipo,
-        "semestre": semestre,
-        "estado": estado,
-        "total": len(alumnos),
-        "creados": creados,
-        "existentes": existentes,
-        "inscripciones": inscripciones,
-        "errores": total_errores,
-        "duracion_seg": round(elapsed, 2),
-        "resultados": resultados,
-        "errores_validacion": [],
-        "detalles_errores": all_error_details[:20],
-        "dry_run": dry_run,
-    }
+    summary = _build_summary(ejecucion_id, start, tipo, semestre, alumnos, resultados, elapsed, dry_run)
 
     if not dry_run:
         await audit_service.save_ejecucion(summary)
-        if total_errores > 0 and settings.admin_email:
+        all_error_details = [e for r in resultados for e in r["errores"]]
+        if summary["errores"] > 0 and settings.admin_email:
             await email_service.send_admin_error_report(
                 to=settings.admin_email,
                 semestre=semestre,
@@ -443,7 +586,7 @@ async def run_matriculacion_from_bytes(
 
     logger.info(
         "Matriculación (archivo) finalizada: total=%d creados=%d errores=%d (%.1fs)",
-        len(alumnos), creados, total_errores, elapsed,
+        len(alumnos), summary["creados"], summary["errores"], elapsed,
     )
     return summary
 
@@ -451,6 +594,7 @@ async def run_matriculacion_from_bytes(
 async def run_matriculacion(
     dry_run: bool = False,
     semestre: str | None = None,
+    ejecucion_id: str | None = None,
 ) -> dict:
     """
     Execute the full enrollment workflow.
@@ -459,7 +603,7 @@ async def run_matriculacion(
     await audit_service.init_db()
 
     semestre = semestre or settings.semestre_actual or "SEM-ACTUAL"
-    ejecucion_id = str(uuid.uuid4())
+    ejecucion_id = ejecucion_id or str(uuid.uuid4())
     tipo = "dry_run" if dry_run else "manual"
     start = datetime.now(timezone.utc)
 
@@ -516,58 +660,29 @@ async def run_matriculacion(
             "errores_validacion": errs,
         }
 
-    # 3. Process each student sequentially to avoid Teams rate-limits
-    resultados: list[dict] = []
-    for alumno in alumnos:
-        res = await _process_alumno(alumno, semestre, ejecucion_id, dry_run)
-        resultados.append(res)
+    # 3. Process students in parallel batches
+    resultados = await _run_batched(alumnos, semestre, ejecucion_id, dry_run)
 
     # 4. Build summary
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
-    creados = sum(1 for r in resultados if r["es_nuevo"] and not r["errores"])
-    existentes = sum(1 for r in resultados if not r["es_nuevo"])
-    inscripciones = sum(len([c for c in r["cursos"] if not c.get("errores")]) for r in resultados)
-    total_errores = sum(len(r["errores"]) for r in resultados)
-    all_error_details = [e for r in resultados for e in r["errores"]]
-
-    estado = "exitoso" if total_errores == 0 else "con_errores"
-    if len(resultados) == 0:
-        estado = "sin_datos"
-
-    summary = {
-        "ejecucion_id": ejecucion_id,
-        "timestamp": start.isoformat(),
-        "tipo": tipo,
-        "semestre": semestre,
-        "estado": estado,
-        "total": len(alumnos),
-        "creados": creados,
-        "existentes": existentes,
-        "inscripciones": inscripciones,
-        "errores": total_errores,
-        "duracion_seg": round(elapsed, 2),
-        "resultados": resultados,
-        "errores_validacion": [],
-        "detalles_errores": all_error_details[:20],
-        "dry_run": dry_run,
-    }
+    summary = _build_summary(ejecucion_id, start, tipo, semestre, alumnos, resultados, elapsed, dry_run)
 
     # 5. Persist
     if not dry_run:
         await audit_service.save_ejecucion(summary)
-
-        if total_errores > 0 and settings.admin_email:
+        all_error_details = [e for r in resultados for e in r["errores"]]
+        if summary["errores"] > 0 and settings.admin_email:
             await email_service.send_admin_error_report(
                 to=settings.admin_email,
                 semestre=semestre,
                 errores=[{"error": e} for e in all_error_details],
                 tipo="Errores en proceso de matriculación",
             )
-
         await teams_notify_service.send_matriculacion_summary(summary)
 
     logger.info(
         "Matriculación finalizada: total=%d creados=%d existentes=%d inscripciones=%d errores=%d (%.1fs)",
-        len(alumnos), creados, existentes, inscripciones, total_errores, elapsed,
+        len(alumnos), summary["creados"], summary["existentes"],
+        summary["inscripciones"], summary["errores"], elapsed,
     )
     return summary

@@ -524,8 +524,14 @@
       <!-- Progress + log -->
       <div class="card" id="mat-progress-card" style="display:none;">
         <h3 id="mat-progress-title">Procesando…</h3>
-        <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:14px;">
-          <div id="mat-progress-fill" style="height:100%;width:0%;background:var(--accent);border-radius:99px;transition:width .4s;"></div>
+        <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:10px;">
+          <div id="mat-progress-fill" style="height:100%;width:0%;background:var(--accent);border-radius:99px;transition:width .5s ease;"></div>
+        </div>
+        <div style="display:flex;gap:16px;font-size:12px;color:var(--text-muted);margin-bottom:10px;" id="mat-live-stats">
+          <span id="lstat-procesados">Procesados: 0</span>
+          <span id="lstat-creados" style="color:#16a34a;">Creados: 0</span>
+          <span id="lstat-inscritos" style="color:#2563eb;">Inscritos: 0</span>
+          <span id="lstat-errores" style="color:#dc2626;">Errores: 0</span>
         </div>
         <div class="log-output" id="mat-log"></div>
       </div>
@@ -1296,12 +1302,10 @@ function switchMatTab(tab) {
 async function runMatriculacionUpload(dryRun) {
   const fileInput = document.getElementById('mat-file-input');
   const semestre = document.getElementById('mat-semestre-upload').value.trim() || null;
-
   if (!fileInput.files || !fileInput.files[0]) {
     alert('Por favor seleccioná un archivo Excel (.xlsx) antes de continuar.');
     return;
   }
-
   const endpoint = dryRun ? '/api/matriculacion/upload/dry-run' : '/api/matriculacion/upload';
   const url = semestre ? `${endpoint}?semestre=${encodeURIComponent(semestre)}` : endpoint;
 
@@ -1309,21 +1313,13 @@ async function runMatriculacionUpload(dryRun) {
   document.getElementById('btn-mat-upload-dryrun').disabled = true;
   document.getElementById('mat-results').style.display = 'none';
 
-  const progressCard = document.getElementById('mat-progress-card');
-  progressCard.style.display = 'block';
-  document.getElementById('mat-progress-title').textContent = dryRun ? '🔍 Simulando (DRY RUN)…' : '⚙️ Procesando matriculación…';
-  document.getElementById('mat-progress-fill').style.width = '10%';
-
-  const logEl = document.getElementById('mat-log');
-  logEl.innerHTML = '';
+  _matStartProgress(dryRun ? '🔍 Simulando (DRY RUN)…' : '⚙️ Procesando matriculación…');
   matLog('info', `[${new Date().toLocaleTimeString()}] Iniciando ${dryRun ? 'DRY RUN' : 'matriculación real'} desde archivo…`);
   matLog('info', `Archivo: ${fileInput.files[0].name}`);
-  matLog('info', semestre ? `Semestre: ${semestre}` : 'Semestre: (desde configuración .env)');
+  if (semestre) matLog('info', `Semestre: ${semestre}`);
 
   const formData = new FormData();
   formData.append('file', fileInput.files[0]);
-
-  document.getElementById('mat-progress-fill').style.width = '30%';
 
   try {
     const token = localStorage.getItem('token');
@@ -1332,31 +1328,17 @@ async function runMatriculacionUpload(dryRun) {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       body: formData,
     });
-    document.getElementById('mat-progress-fill').style.width = '80%';
-
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ detail: resp.statusText }));
       throw new Error(err.detail || 'Error del servidor');
     }
-    const result = await resp.json();
-    document.getElementById('mat-progress-fill').style.width = '100%';
-
-    if (result.estado === 'error_validacion') {
-      matLog('error', `✗ Validación fallida: ${result.errores} error(es). Proceso no ejecutado.`);
-      (result.errores_validacion || []).forEach(e => matLog('error', `  • [${e.sheet_name || e.cedula}] ${e.error}`));
-    } else if (result.estado === 'fallido') {
-      matLog('error', `✗ Error crítico: ${result.error_global}`);
-    } else {
-      matLog(dryRun ? 'dry' : 'ok', `✓ Completado — ${result.total} alumnos, ${result.creados} creados, ${result.errores} errores`);
-      if (dryRun) matLog('dry', 'MODO SIMULACIÓN: ningún cambio fue aplicado.');
-    }
-
-    setTimeout(() => { progressCard.style.display = 'none'; }, 1500);
-    renderMatriculacionResult(result, dryRun);
+    const { ejecucion_id } = await resp.json();
+    matLog('info', `ID ejecución: ${ejecucion_id}`);
+    await _pollProgress(ejecucion_id, dryRun);
   } catch(ex) {
-    document.getElementById('mat-progress-fill').style.width = '100%';
     matLog('error', `✗ Error: ${ex.message}`);
-    setTimeout(() => { progressCard.style.display = 'none'; }, 1500);
+    document.getElementById('mat-progress-fill').style.width = '100%';
+    setTimeout(() => { document.getElementById('mat-progress-card').style.display = 'none'; }, 2000);
   } finally {
     document.getElementById('btn-mat-upload-run').disabled = false;
     document.getElementById('btn-mat-upload-dryrun').disabled = false;
@@ -1372,43 +1354,122 @@ async function runMatriculacion(dryRun) {
   document.getElementById('btn-mat-dryrun').disabled = true;
   document.getElementById('mat-results').style.display = 'none';
 
-  const progressCard = document.getElementById('mat-progress-card');
-  progressCard.style.display = 'block';
-  document.getElementById('mat-progress-title').textContent = dryRun ? '🔍 Simulando (DRY RUN)…' : '⚙️ Procesando matriculación…';
-  document.getElementById('mat-progress-fill').style.width = '10%';
-
-  const logEl = document.getElementById('mat-log');
-  logEl.innerHTML = '';
+  _matStartProgress(dryRun ? '🔍 Simulando (DRY RUN)…' : '⚙️ Procesando matriculación…');
   matLog('info', `[${new Date().toLocaleTimeString()}] Iniciando ${dryRun ? 'DRY RUN' : 'matriculación real'}…`);
-  matLog('info', semestre ? `Semestre: ${semestre}` : 'Semestre: (desde configuración .env)');
-
-  document.getElementById('mat-progress-fill').style.width = '20%';
+  if (semestre) matLog('info', `Semestre: ${semestre}`);
   matLog('info', 'Descargando Excel desde OneDrive…');
 
   try {
-    document.getElementById('mat-progress-fill').style.width = '40%';
-    const result = await apiFetch(url, 'POST');
-    document.getElementById('mat-progress-fill').style.width = '100%';
-
-    if (result.estado === 'error_validacion') {
-      matLog('error', `✗ Validación fallida: ${result.errores} error(es). Proceso no ejecutado.`);
-      (result.errores_validacion || []).forEach(e => matLog('error', `  • [${e.sheet_name || e.cedula}] ${e.error}`));
-    } else if (result.estado === 'fallido') {
-      matLog('error', `✗ Error crítico: ${result.error_global}`);
-    } else {
-      matLog(dryRun ? 'dry' : 'ok', `✓ Completado — ${result.total} alumnos, ${result.creados} creados, ${result.errores} errores`);
-      if (dryRun) matLog('dry', 'MODO SIMULACIÓN: ningún cambio fue aplicado.');
-    }
-
-    setTimeout(() => { progressCard.style.display = 'none'; }, 1500);
-    renderMatriculacionResult(result, dryRun);
+    const data = await apiFetch(url, 'POST');
+    const ejecucion_id = data.ejecucion_id;
+    matLog('info', `ID ejecución: ${ejecucion_id}`);
+    await _pollProgress(ejecucion_id, dryRun);
   } catch(ex) {
-    document.getElementById('mat-progress-fill').style.width = '100%';
     matLog('error', `✗ Error: ${ex.message}`);
-    setTimeout(() => { progressCard.style.display = 'none'; }, 1500);
+    document.getElementById('mat-progress-fill').style.width = '100%';
+    setTimeout(() => { document.getElementById('mat-progress-card').style.display = 'none'; }, 2000);
   } finally {
     document.getElementById('btn-mat-run').disabled = false;
     document.getElementById('btn-mat-dryrun').disabled = false;
+  }
+}
+
+function _matStartProgress(title) {
+  const progressCard = document.getElementById('mat-progress-card');
+  progressCard.style.display = 'block';
+  document.getElementById('mat-progress-title').textContent = title;
+  document.getElementById('mat-progress-fill').style.width = '2%';
+  document.getElementById('mat-log').innerHTML = '';
+}
+
+let _lastProcessed = 0;
+async function _pollProgress(ejecucion_id, dryRun) {
+  _lastProcessed = 0;
+  const fill = document.getElementById('mat-progress-fill');
+  const titleEl = document.getElementById('mat-progress-title');
+
+  while (true) {
+    await new Promise(r => setTimeout(r, 1500));
+    let p;
+    try {
+      p = await apiFetch(`/api/matriculacion/progress/${ejecucion_id}`, 'GET');
+    } catch(e) { continue; }
+
+    const pct = p.porcentaje || 0;
+    fill.style.width = Math.max(pct, 2) + '%';
+
+    if (p.total > 0) {
+      titleEl.textContent = `⚙️ Procesando… ${p.procesados}/${p.total} alumnos (${pct}%)`;
+    }
+    document.getElementById('lstat-procesados').textContent = `Procesados: ${p.procesados}/${p.total}`;
+    document.getElementById('lstat-creados').textContent = `Creados: ${p.creados}`;
+    document.getElementById('lstat-inscritos').textContent = `Inscritos: ${p.inscripciones}`;
+    document.getElementById('lstat-errores').textContent = `Errores: ${p.errores}`;
+
+    // Log newly processed students
+    const newResults = (p.resultados || []).slice(_lastProcessed);
+    newResults.forEach(r => {
+      const icon = r.errores && r.errores.length ? '✗' : '✓';
+      const type = r.errores && r.errores.length ? 'error' : (r.es_nuevo ? 'ok' : 'info');
+      matLog(type, `${icon} ${r.nombre} (${r.cedula}) — ${r.es_nuevo ? 'NUEVO' : 'existente'} — ${r.cursos ? r.cursos.length : 0} curso(s)`);
+      if (r.errores && r.errores.length) r.errores.forEach(e => matLog('error', `    ${e}`));
+    });
+    _lastProcessed = (p.resultados || []).length;
+
+    if (p.estado === 'completado' || p.estado === 'fallido') {
+      fill.style.width = '100%';
+      if (p.estado === 'completado') {
+        const hasFailed = p.alumnos_con_error && p.alumnos_con_error.length > 0;
+        matLog(hasFailed ? 'error' : (dryRun ? 'dry' : 'ok'),
+          `${hasFailed ? '⚠' : '✓'} Completado — ${p.total} alumnos, ${p.creados} creados, ${p.errores} errores`);
+        if (dryRun) matLog('dry', 'MODO SIMULACIÓN: ningún cambio fue aplicado.');
+        if (hasFailed) {
+          matLog('error', `Alumnos con error: ${p.alumnos_con_error.join(', ')}`);
+          _showRetryButton(ejecucion_id);
+        }
+      } else {
+        matLog('error', `✗ Proceso fallido`);
+      }
+      setTimeout(() => { document.getElementById('mat-progress-card').style.display = 'none'; }, 2000);
+      // Fetch full result for summary panel
+      try {
+        const full = await apiFetch(`/api/matriculacion/progress/${ejecucion_id}`, 'GET');
+        renderMatriculacionResult({
+          ...full,
+          estado: p.estado === 'completado' ? (p.errores > 0 ? 'con_errores' : 'exitoso') : 'fallido',
+          total: full.total, creados: full.creados, existentes: full.existentes,
+          inscripciones: full.inscripciones, errores: full.errores,
+          resultados: full.resultados || [], errores_validacion: [],
+        }, dryRun);
+      } catch(e) {}
+      break;
+    }
+  }
+}
+
+function _showRetryButton(ejecucion_id) {
+  let btn = document.getElementById('btn-mat-retry');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'btn-mat-retry';
+    btn.className = 'btn btn-warn';
+    btn.style.marginTop = '10px';
+    document.getElementById('mat-results').prepend(btn);
+  }
+  btn.textContent = '↩ Reintentar alumnos con error';
+  btn.onclick = () => retryMatriculacion(ejecucion_id);
+}
+
+async function retryMatriculacion(ejecucion_id) {
+  const btn = document.getElementById('btn-mat-retry');
+  if (btn) btn.disabled = true;
+  try {
+    const result = await apiFetch(`/api/matriculacion/retry/${ejecucion_id}`, 'POST');
+    renderMatriculacionResult(result, false);
+  } catch(e) {
+    alert('Error al reintentar: ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
