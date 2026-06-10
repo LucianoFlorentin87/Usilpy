@@ -50,12 +50,14 @@ CREATE TABLE IF NOT EXISTS ejecuciones (
 async def init_db() -> None:
     import user_service
     import webhook_service
+    import course_matcher
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(_CREATE_AUDIT)
         await db.execute(_CREATE_EJECUCIONES)
         await db.commit()
     await user_service.init_users_table()
     await webhook_service.init_pending_table()
+    await course_matcher.init_matcher_tables()
 
 
 async def log_action(

@@ -239,6 +239,9 @@
     <div class="nav-item" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)">
       <span class="icon">⏳</span> Inscripciones pendientes
     </div>
+    <div class="nav-item" data-panel="course-aliases" onclick="showPanel('course-aliases', this)">
+      <span class="icon">🔗</span> Aliases de materias
+    </div>
   </div>
 
   <!-- Reportes -->
@@ -305,6 +308,58 @@
   </div>
 
   <div id="content">
+
+    <!-- ══════════ PANEL: ALIASES DE MATERIAS ══════════ -->
+    <div class="panel" id="panel-course-aliases">
+      <div class="card">
+        <h3>Aliases de Materias</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:14px;">
+          Cuando el sistema detecta un nombre de materia que no coincide exactamente con Canvas, lo guarda acá.
+          Los matches con confianza &lt;85% quedan como <strong>pendiente</strong> hasta que los confirmés o corrijás.
+          Una vez confirmado, el sistema recuerda la regla para siempre.
+        </p>
+
+        <div class="actions-row" style="gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="btn btn-primary" onclick="loadAliases()">🔄 Cargar aliases</button>
+        </div>
+
+        <!-- Manual alias form -->
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;">
+          <h4 style="font-size:.88rem;font-weight:600;margin-bottom:10px;">Agregar alias manualmente</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Variante (como viene en el Excel)</label>
+              <input id="alias-variant" type="text" placeholder="ej. Diseño Grafico" />
+            </div>
+            <div class="form-group">
+              <label>SIS ID del curso en Canvas</label>
+              <input id="alias-sis-id" type="text" placeholder="ej. USIL-2026-1-diseno-grafico" />
+            </div>
+            <div class="form-group">
+              <label>Nombre en Canvas (opcional)</label>
+              <input id="alias-canvas-name" type="text" placeholder="ej. Diseño Gráfico" />
+            </div>
+          </div>
+          <button class="btn btn-success" onclick="addManualAlias()">➕ Guardar alias</button>
+          <span id="alias-msg" style="margin-left:10px;font-size:.83rem;"></span>
+        </div>
+
+        <!-- Filter tabs -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadAliases('pendiente')">⚠ Pendientes</button>
+          <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadAliases('auto')">🤖 Auto-aceptados</button>
+          <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadAliases('confirmado')">✅ Confirmados</button>
+          <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadAliases()">📋 Todos</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Variante (Excel)</th><th>Canvas nombre</th><th>SIS ID</th><th>Confianza</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="aliases-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Haz clic en "Cargar aliases"</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
     <!-- ══════════ PANEL: DASHBOARD ══════════ -->
     <div class="panel active" id="panel-dashboard">
@@ -927,6 +982,7 @@ const panelTitles = {
   'matriculacion':  ['Matriculación',     'Automática'],
   'auditoria':      ['Auditoría',         'Log de operaciones'],
   'bulk':           ['Carga Masiva',      'Excel / CSV'],
+  'course-aliases':  ['Aliases de materias', 'Fuzzy matching'],
   'canvas-terms':   ['Períodos',          'Canvas LMS'],
   'canvas-courses': ['Cursos Canvas',     'Canvas LMS'],
   'canvas-users':   ['Usuarios Canvas',   'Canvas LMS'],
@@ -1512,6 +1568,77 @@ function renderBulkResult(tipo, report, tbodyId) {
     }
     return `<tr><td colspan="10">${JSON.stringify(row)}</td></tr>`;
   }).join('');
+}
+
+// ── Course Aliases ────────────────────────────────────────────────────────────
+async function loadAliases(estado) {
+  const tbody = document.getElementById('aliases-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">Cargando…</td></tr>';
+  try {
+    const url = '/api/course-aliases' + (estado ? `?estado=${estado}` : '');
+    const rows = await apiFetch(url);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sin aliases registrados</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(a => {
+      const chipClass = a.estado === 'confirmado' ? 'chip-ok' : a.estado === 'pendiente' ? 'chip-warn' : 'chip-skip';
+      const score = a.score != null ? Math.round(a.score) + '%' : '—';
+      const actions = a.estado === 'pendiente'
+        ? `<button class="btn btn-success" style="padding:3px 10px;font-size:.75rem;" onclick="confirmAlias(${a.id},'${a.canvas_sis_id}','${(a.canvas_name||'').replace(/'/g,"\\'")}')">✓ Confirmar</button>
+           <button class="btn btn-danger"  style="padding:3px 10px;font-size:.75rem;margin-left:4px;" onclick="rejectAlias(${a.id})">✗</button>`
+        : '—';
+      return `<tr>
+        <td><code>${a.variant}</code></td>
+        <td>${a.canvas_name || '—'}</td>
+        <td style="font-size:.75rem;color:var(--text-muted)">${a.canvas_sis_id}</td>
+        <td><span class="chip ${score < 85 ? 'chip-warn' : 'chip-ok'}">${score}</span></td>
+        <td><span class="chip ${chipClass}">${a.estado}</span></td>
+        <td>${actions}</td>
+      </tr>`;
+    }).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
+}
+
+async function confirmAlias(id, sisSid, canvasName) {
+  try {
+    await apiFetch(`/api/course-aliases/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({canvas_sis_id: sisSid, canvas_name: canvasName})
+    });
+    loadAliases('pendiente');
+  } catch(ex) { alert(ex.message); }
+}
+
+async function rejectAlias(id) {
+  try {
+    await apiFetch(`/api/course-aliases/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({canvas_sis_id: '', canvas_name: '', estado: 'rechazado'})
+    });
+    loadAliases('pendiente');
+  } catch(ex) { alert(ex.message); }
+}
+
+async function addManualAlias() {
+  const variant = document.getElementById('alias-variant').value.trim();
+  const sisId   = document.getElementById('alias-sis-id').value.trim();
+  const name    = document.getElementById('alias-canvas-name').value.trim();
+  const msg     = document.getElementById('alias-msg');
+  if (!variant || !sisId) { msg.textContent = 'Variant y SIS ID son requeridos'; msg.style.color='var(--error)'; return; }
+  try {
+    await apiFetch('/api/course-aliases/manual', {
+      method: 'POST',
+      body: JSON.stringify({variant, canvas_sis_id: sisId, canvas_name: name})
+    });
+    msg.textContent = '✓ Alias guardado'; msg.style.color = 'var(--success)';
+    document.getElementById('alias-variant').value = '';
+    document.getElementById('alias-sis-id').value = '';
+    document.getElementById('alias-canvas-name').value = '';
+    loadAliases();
+  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
 }
 
 // ── Canvas Períodos ───────────────────────────────────────────────────────────

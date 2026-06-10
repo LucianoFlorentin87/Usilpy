@@ -14,3 +14,4 @@ bcrypt==4.2.1
 aiosmtplib>=3.0.0
 aiosqlite>=0.20.0
 apscheduler>=3.10.4
+rapidfuzz>=3.6.0

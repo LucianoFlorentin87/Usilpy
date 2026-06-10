@@ -28,6 +28,7 @@ import graph_service
 import email_service
 import audit_service
 import teams_notify_service
+import course_matcher
 from onedrive_service import get_alumnos_from_onedrive, AlumnoData
 from config import get_settings
 
@@ -92,19 +93,39 @@ def generate_sis_id(materia: str, semestre: str) -> str:
 # Per-materia processing
 # ──────────────────────────────────────────────
 
-async def _ensure_canvas_course(materia: str, semestre: str) -> dict:
+async def _ensure_canvas_course(materia: str, semestre: str,
+                                canvas_courses_cache: list[dict] | None = None) -> dict:
+    """
+    Find or create a Canvas course for `materia`.
+    Uses fuzzy matching against existing courses before creating a new one.
+    `canvas_courses_cache` should be pre-fetched once per run to avoid repeated API calls.
+    """
+    # 1. Try exact SIS lookup first
     sis_id = generate_sis_id(materia, semestre)
     course = await canvas_service.get_course_by_sis_id(sis_id)
-    if not course:
-        # Auto-create enrollment term for this semester
-        term_id: int | None = None
-        try:
-            term = await canvas_service.get_or_create_term(semestre)
-            term_id = term.get("id")
-        except Exception as exc:
-            logger.warning("No se pudo crear el período '%s': %s", semestre, exc)
-        course = await canvas_service.create_course(materia, sis_id, semestre, term_id=term_id)
-        logger.info("Canvas course created: %s (term_id=%s)", sis_id, term_id)
+    if course:
+        return course
+
+    # 2. Try fuzzy match against existing Canvas courses
+    if canvas_courses_cache is not None:
+        match = await course_matcher.resolve_course_name(materia, canvas_courses_cache, semestre)
+        if match and match["canvas_id"]:
+            logger.info("Fuzzy match: '%s' → '%s' (score=%.0f, source=%s)",
+                        materia, match["canvas_name"], match["score"], match["source"])
+            # Return the matched course; don't create a new one
+            for c in canvas_courses_cache:
+                if c.get("id") == match["canvas_id"]:
+                    return c
+
+    # 3. No match — create new course with auto-period
+    term_id: int | None = None
+    try:
+        term = await canvas_service.get_or_create_term(semestre)
+        term_id = term.get("id")
+    except Exception as exc:
+        logger.warning("No se pudo crear el período '%s': %s", semestre, exc)
+    course = await canvas_service.create_course(materia, sis_id, semestre, term_id=term_id)
+    logger.info("Canvas course created: %s (term_id=%s)", sis_id, term_id)
     return course
 
 
@@ -130,6 +151,7 @@ async def _process_materia(
     cedula: str,
     nombre: str,
     dry_run: bool,
+    canvas_courses_cache: list[dict] | None = None,
 ) -> dict:
     result = {"materia": materia, "sis_id": generate_sis_id(materia, semestre), "errores": []}
 
@@ -149,7 +171,7 @@ async def _process_materia(
             return result
 
         # Real mode
-        course = await _ensure_canvas_course(materia, semestre)
+        course = await _ensure_canvas_course(materia, semestre, canvas_courses_cache)
         result["course_id"] = course.get("id")
 
         team = await _ensure_teams_team(materia, semestre)
@@ -253,6 +275,13 @@ async def _process_alumno(
                 except Exception as exc:
                     result["errores"].append(f"Teams default team: {exc}")
 
+        # Fetch canvas courses once for fuzzy matching across all materias
+        canvas_courses_cache: list[dict] = []
+        try:
+            canvas_courses_cache = await canvas_service.get_courses(per_page=200)
+        except Exception as exc:
+            logger.warning("No se pudo cargar cursos Canvas para fuzzy matching: %s", exc)
+
         # Process each subject
         materia_tasks = [
             _process_materia(
@@ -260,6 +289,7 @@ async def _process_alumno(
                 canvas_user if not dry_run else None,
                 azure_user if not dry_run else None,
                 ejecucion_id, alumno.cedula, alumno.nombre, dry_run,
+                canvas_courses_cache=canvas_courses_cache,
             )
             for materia in alumno.materias
         ]

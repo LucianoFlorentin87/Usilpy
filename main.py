@@ -17,6 +17,7 @@ import audit_service
 import matriculacion_service
 import user_service
 import webhook_service
+import course_matcher
 from scheduler import lifespan, get_next_run
 
 app = FastAPI(title="Gestión Académica Universitaria", version="2.0.0", lifespan=lifespan)
@@ -701,6 +702,56 @@ async def delete_pending_enrollments(payload: dict, _: dict = Depends(_require_a
         raise HTTPException(status_code=400, detail="Enviá la lista de ids")
     await webhook_service.delete_pending(ids)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Course Aliases (fuzzy match management)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/course-aliases")
+async def get_course_aliases(estado: str | None = Query(None), _: dict = Depends(_require_admin)):
+    try:
+        return await course_matcher.list_aliases(estado=estado)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/course-aliases/unresolved")
+async def get_unresolved_courses(_: dict = Depends(_require_admin)):
+    try:
+        return await course_matcher.list_unresolved()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/course-aliases/{alias_id}/resolve")
+async def resolve_course_alias(alias_id: int, payload: dict, current: dict = Depends(_require_admin)):
+    try:
+        await course_matcher.resolve_alias(
+            alias_id=alias_id,
+            canvas_sis_id=payload["canvas_sis_id"],
+            canvas_name=payload.get("canvas_name", ""),
+            resolved_by=current.get("username", "admin"),
+        )
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/course-aliases/manual")
+async def add_manual_alias(payload: dict, current: dict = Depends(_require_admin)):
+    """Manually register: variant → canvas_sis_id."""
+    try:
+        await course_matcher.save_alias(
+            variant=payload["variant"],
+            canvas_sis_id=payload["canvas_sis_id"],
+            canvas_name=payload.get("canvas_name", ""),
+            score=100.0,
+            estado="confirmado",
+        )
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ---------------------------------------------------------------------------
