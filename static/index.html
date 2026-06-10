@@ -652,6 +652,112 @@
     </div><!-- /panel-bulk -->
 
 
+    <!-- ══════════ PANEL: USUARIOS DEL SISTEMA ══════════ -->
+    <div class="panel" id="panel-system-users">
+      <div class="card">
+        <h3>Usuarios del sistema</h3>
+        <div class="actions-row" style="gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="btn btn-primary" onclick="loadSystemUsers()">🔄 Cargar usuarios</button>
+        </div>
+
+        <!-- Create user form -->
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <h4 style="font-size:.88rem;font-weight:600;margin-bottom:10px;">Crear usuario</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Usuario</label>
+              <input id="su-username" type="text" placeholder="ej. maria.gomez" />
+            </div>
+            <div class="form-group">
+              <label>Nombre completo</label>
+              <input id="su-fullname" type="text" placeholder="ej. María Gómez" />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input id="su-email" type="email" placeholder="ej. maria@usil.edu.py" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contraseña</label>
+              <input id="su-password" type="password" placeholder="Contraseña inicial" />
+            </div>
+            <div class="form-group">
+              <label>Rol</label>
+              <select id="su-role">
+                <option value="academico">Académico — solo portal de carga</option>
+                <option value="viewer">Viewer — solo lectura</option>
+                <option value="admin">Admin — acceso total</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-success" onclick="createSystemUser()">➕ Crear usuario</button>
+          <span id="su-msg" style="margin-left:10px;font-size:.83rem;"></span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Usuario</th><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
+            <tbody id="su-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Haz clic en "Cargar usuarios"</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: INSCRIPCIONES PENDIENTES ══════════ -->
+    <div class="panel" id="panel-pending-enrollments">
+      <div class="card">
+        <h3>Inscripciones pendientes</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:14px;">
+          Registros cargados por usuarios académicos (portal o webhook) que aún no fueron procesados en Canvas.
+        </p>
+
+        <div class="actions-row" style="gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="btn btn-primary" onclick="loadPending()">🔄 Cargar pendientes</button>
+          <button class="btn btn-success" onclick="processAllPending()">▶ Procesar todos los pendientes</button>
+          <button class="btn btn-secondary" onclick="loadPending('procesado')">✅ Ver procesados</button>
+        </div>
+
+        <!-- Upload form for academico portal -->
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;">
+          <h4 style="font-size:.88rem;font-weight:600;margin-bottom:10px;">Cargar Excel de inscripciones</h4>
+          <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:10px;">
+            Columnas esperadas: <code>cedula</code>, <code>nombre</code>, <code>email</code>, <code>curso_id</code>, <code>semestre</code>, <code>rol</code> (opcional)
+          </p>
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group">
+              <label>Semestre (si no está en el archivo)</label>
+              <input id="pending-semestre" type="text" placeholder="ej. 2026-1" />
+            </div>
+            <div>
+              <input type="file" id="pending-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="document.getElementById('pending-file-label').textContent=this.files[0]?.name||''" />
+              <button class="btn btn-secondary" onclick="document.getElementById('pending-file').click()">📎 Elegir archivo</button>
+              <span id="pending-file-label" style="margin-left:8px;font-size:.82rem;color:var(--text-muted)"></span>
+            </div>
+            <div>
+              <button class="btn btn-primary" onclick="uploadPending()">⬆ Subir a cola</button>
+            </div>
+          </div>
+          <span id="pending-upload-msg" style="font-size:.83rem;"></span>
+        </div>
+
+        <div id="pending-summary" style="margin-bottom:10px;font-size:.83rem;color:var(--text-muted)"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th><input type="checkbox" id="pending-check-all" onchange="toggleAllPending(this)"></th>
+              <th>Recibido</th><th>Fuente</th><th>Cédula</th><th>Nombre</th><th>Email</th><th>Curso ID</th><th>Semestre</th><th>Estado</th>
+            </tr></thead>
+            <tbody id="pending-tbody"><tr><td colspan="9" style="text-align:center;color:var(--text-muted)">Haz clic en "Cargar pendientes"</td></tr></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;">
+          <button class="btn btn-success" onclick="processSelected()">▶ Procesar seleccionados</button>
+          <button class="btn btn-danger"  onclick="deleteSelected()">🗑 Eliminar seleccionados</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════════ PANEL: CANVAS PERÍODOS ══════════ -->
     <div class="panel" id="panel-canvas-terms">
       <div class="card">
@@ -922,12 +1028,41 @@ function authHeaders() {
   return t ? { 'Authorization': 'Bearer ' + t } : {};
 }
 
+let _currentUser = null;
+
 function showApp(user) {
+  _currentUser = user;
   document.getElementById('login-screen').classList.add('hidden');
   const initials = (user.name || user.sub || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('user-avatar').textContent = initials;
   document.getElementById('user-name-label').textContent = user.name || user.sub || '';
-  loadDashboard();
+  _applyRoleVisibility(user.role || 'viewer');
+  if (user.role === 'academico') {
+    showPanel('pending-enrollments', document.querySelector('[data-panel="pending-enrollments"]'));
+  } else {
+    loadDashboard();
+  }
+}
+
+function _applyRoleVisibility(role) {
+  // Admin-only sections
+  const adminOnly = ['nav-admin-group'];
+  adminOnly.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (role === 'admin') ? '' : 'none';
+  });
+  // Viewer: hide write operations (Canvas LMS, Azure AD, Teams write panels)
+  // For now just hide nav groups; panels themselves still render but buttons won't work
+  const writeGroups = document.querySelectorAll('.nav-group');
+  if (role === 'viewer') {
+    // Show only Reportes group
+    writeGroups.forEach(g => {
+      const label = g.querySelector('.nav-group-label');
+      if (label && !['Reportes'].includes(label.textContent.trim())) {
+        g.style.display = 'none';
+      }
+    });
+  }
 }
 
 function showLogin(msg) {
@@ -982,7 +1117,9 @@ const panelTitles = {
   'matriculacion':  ['Matriculación',     'Automática'],
   'auditoria':      ['Auditoría',         'Log de operaciones'],
   'bulk':           ['Carga Masiva',      'Excel / CSV'],
-  'course-aliases':  ['Aliases de materias', 'Fuzzy matching'],
+  'system-users':       ['Usuarios del sistema', 'Administración'],
+  'pending-enrollments':['Inscripciones pendientes', 'Administración'],
+  'course-aliases':     ['Aliases de materias',   'Fuzzy matching'],
   'canvas-terms':   ['Períodos',          'Canvas LMS'],
   'canvas-courses': ['Cursos Canvas',     'Canvas LMS'],
   'canvas-users':   ['Usuarios Canvas',   'Canvas LMS'],
@@ -1570,6 +1707,169 @@ function renderBulkResult(tipo, report, tbodyId) {
   }).join('');
 }
 
+// ── System Users ─────────────────────────────────────────────────────────────
+async function loadSystemUsers() {
+  const tbody = document.getElementById('su-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">Cargando…</td></tr>';
+  try {
+    const users = await apiFetch('/api/users');
+    if (!users.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Sin usuarios</td></tr>'; return; }
+    const roleLabels = {admin:'🔴 Admin', academico:'🟡 Académico', viewer:'🔵 Viewer'};
+    tbody.innerHTML = users.map(u => {
+      const estado = u.active ? '<span class="chip chip-ok">Activo</span>' : '<span class="chip chip-error">Inactivo</span>';
+      const lastLogin = u.last_login ? new Date(u.last_login).toLocaleString('es') : '—';
+      const roleChip = `<span class="chip ${u.role==='admin'?'chip-error':u.role==='academico'?'chip-warn':'chip-skip'}">${roleLabels[u.role]||u.role}</span>`;
+      return `<tr>
+        <td><strong>${u.username}</strong></td>
+        <td>${u.full_name||'—'}</td>
+        <td style="font-size:.78rem">${u.email}</td>
+        <td>${roleChip}</td>
+        <td>${estado}</td>
+        <td style="font-size:.78rem">${lastLogin}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem" onclick="toggleUserActive('${u.id}',${u.active})">
+            ${u.active?'Desactivar':'Activar'}
+          </button>
+          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="changeUserRole('${u.id}','${u.role}')">
+            Cambiar rol
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
+}
+
+async function createSystemUser() {
+  const msg = document.getElementById('su-msg');
+  const body = {
+    username:  document.getElementById('su-username').value.trim(),
+    full_name: document.getElementById('su-fullname').value.trim(),
+    email:     document.getElementById('su-email').value.trim(),
+    password:  document.getElementById('su-password').value,
+    role:      document.getElementById('su-role').value,
+  };
+  if (!body.username || !body.email || !body.password) {
+    msg.textContent = 'Usuario, email y contraseña son requeridos'; msg.style.color = 'var(--error)'; return;
+  }
+  msg.textContent = 'Creando…'; msg.style.color = 'var(--text-muted)';
+  try {
+    await apiFetch('/api/users', {method:'POST', body: JSON.stringify(body)});
+    msg.textContent = `✓ Usuario "${body.username}" creado`; msg.style.color = 'var(--success)';
+    ['su-username','su-fullname','su-email','su-password'].forEach(id => document.getElementById(id).value = '');
+    loadSystemUsers();
+  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
+}
+
+async function toggleUserActive(id, currentActive) {
+  try {
+    await apiFetch(`/api/users/${id}`, {method:'PATCH', body: JSON.stringify({active: currentActive ? 0 : 1})});
+    loadSystemUsers();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function changeUserRole(id, currentRole) {
+  const roles = ['admin','academico','viewer'];
+  const newRole = prompt(`Rol actual: ${currentRole}\nNuevo rol (admin / academico / viewer):`);
+  if (!newRole || !roles.includes(newRole.trim())) { alert('Rol inválido'); return; }
+  try {
+    await apiFetch(`/api/users/${id}`, {method:'PATCH', body: JSON.stringify({role: newRole.trim()})});
+    loadSystemUsers();
+  } catch(ex) { alert(ex.message); }
+}
+
+// ── Pending Enrollments ───────────────────────────────────────────────────────
+let _pendingRows = [];
+
+async function loadPending(estado = 'pendiente') {
+  const tbody = document.getElementById('pending-tbody');
+  const summary = document.getElementById('pending-summary');
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center">Cargando…</td></tr>';
+  try {
+    const [rows, stats] = await Promise.all([
+      apiFetch(`/api/inscripciones/pendientes?estado=${estado}`),
+      apiFetch('/api/inscripciones/pendientes/stats'),
+    ]);
+    _pendingRows = rows;
+    summary.textContent = `Pendientes: ${stats.pendiente||0} · Procesados: ${stats.procesado||0} · Errores: ${stats.error||0}`;
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">Sin registros en estado "${estado}"</td></tr>`;
+      return;
+    }
+    const stateChip = s => s === 'pendiente' ? 'chip-warn' : s === 'procesado' ? 'chip-ok' : s === 'error' ? 'chip-error' : 'chip-skip';
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td><input type="checkbox" class="pending-check" value="${r.id}"></td>
+      <td style="font-size:.75rem">${new Date(r.received_at).toLocaleString('es')}</td>
+      <td style="font-size:.75rem;color:var(--text-muted)">${r.source||'—'}</td>
+      <td>${r.cedula}</td>
+      <td>${r.nombre||'—'}</td>
+      <td style="font-size:.75rem">${r.email||'—'}</td>
+      <td style="font-size:.75rem">${r.curso_id||'—'}</td>
+      <td>${r.semestre||'—'}</td>
+      <td><span class="chip ${stateChip(r.estado)}">${r.estado}</span>${r.detalle?`<br><small style="color:var(--text-muted)">${r.detalle}</small>`:''}</td>
+    </tr>`).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
+}
+
+function toggleAllPending(cb) {
+  document.querySelectorAll('.pending-check').forEach(c => c.checked = cb.checked);
+}
+
+function _selectedPendingIds() {
+  return [...document.querySelectorAll('.pending-check:checked')].map(c => c.value);
+}
+
+async function processSelected() {
+  const ids = _selectedPendingIds();
+  if (!ids.length) { alert('Seleccioná al menos un registro'); return; }
+  try {
+    const r = await apiFetch('/api/inscripciones/pendientes/procesar', {method:'POST', body: JSON.stringify({ids})});
+    alert(`Procesados: ${r.ok} · Errores: ${r.errors}`);
+    loadPending();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function processAllPending() {
+  const ids = _pendingRows.filter(r => r.estado === 'pendiente').map(r => r.id);
+  if (!ids.length) { alert('No hay pendientes para procesar'); return; }
+  if (!confirm(`¿Procesar ${ids.length} inscripciones pendientes?`)) return;
+  try {
+    const r = await apiFetch('/api/inscripciones/pendientes/procesar', {method:'POST', body: JSON.stringify({ids})});
+    alert(`Procesados: ${r.ok} · Errores: ${r.errors}`);
+    loadPending();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function deleteSelected() {
+  const ids = _selectedPendingIds();
+  if (!ids.length) { alert('Seleccioná al menos un registro'); return; }
+  if (!confirm(`¿Eliminar ${ids.length} registros?`)) return;
+  try {
+    await apiFetch('/api/inscripciones/pendientes', {method:'DELETE', body: JSON.stringify({ids})});
+    loadPending();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function uploadPending() {
+  const file = document.getElementById('pending-file').files[0];
+  const msg  = document.getElementById('pending-upload-msg');
+  if (!file) { msg.textContent = 'Elegí un archivo primero'; msg.style.color = 'var(--error)'; return; }
+  msg.textContent = 'Subiendo…'; msg.style.color = 'var(--text-muted)';
+  const semestre = document.getElementById('pending-semestre').value.trim();
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const url = '/api/inscripciones/pendientes/upload' + (semestre ? `?semestre=${encodeURIComponent(semestre)}` : '');
+    const r = await apiFetch(url, {method:'POST', body: fd, noContentType: true});
+    msg.textContent = `✓ ${r.accepted} registros en cola · ${r.errors?.length||0} errores`;
+    msg.style.color = r.errors?.length ? 'var(--warn)' : 'var(--success)';
+    loadPending();
+  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
+}
+
 // ── Course Aliases ────────────────────────────────────────────────────────────
 async function loadAliases(estado) {
   const tbody = document.getElementById('aliases-tbody');
@@ -1839,9 +2139,23 @@ function copyToClipboard(text) {
 }
 
 // ── Util ──────────────────────────────────────────────────────────────────────
-async function apiFetch(url, method='GET', body=null) {
-  const opts = {method, headers:{...authHeaders()}};
-  if (body) { opts.body=JSON.stringify(body); opts.headers['Content-Type']='application/json'; }
+async function apiFetch(url, optsOrMethod = 'GET', legacyBody = null) {
+  let method, body, noContentType;
+  if (typeof optsOrMethod === 'object') {
+    // Options-object form: apiFetch(url, {method, body, noContentType})
+    method = optsOrMethod.method || 'GET';
+    body   = optsOrMethod.body ?? null;
+    noContentType = optsOrMethod.noContentType || false;
+  } else {
+    // Legacy form: apiFetch(url, 'POST', body)
+    method = optsOrMethod;
+    body   = legacyBody;
+    noContentType = false;
+  }
+  const headers = {...authHeaders()};
+  if (body && !noContentType && !(body instanceof FormData)) headers['Content-Type'] = 'application/json';
+  const opts = {method, headers};
+  if (body) opts.body = (body instanceof FormData) ? body : (typeof body === 'string' ? body : JSON.stringify(body));
   const resp = await fetch(url, opts);
   if (resp.status === 401) { showLogin('Sesión expirada'); throw new Error('No autenticado'); }
   if (!resp.ok) {
