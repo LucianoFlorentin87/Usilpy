@@ -370,6 +370,19 @@
     <!-- ══════════ PANEL: DASHBOARD ══════════ -->
     <div class="panel active" id="panel-dashboard">
 
+      <!-- Kit de matriculación -->
+      <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#1e3a5f 0%,#2d6cdf 100%);border:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="color:#fff;font-size:1rem;font-weight:700;">📦 Kit de Matriculación 2026-2</div>
+            <div style="color:#bfdbfe;font-size:.82rem;margin-top:3px;">Excel completo con períodos, cursos, usuarios e inscripciones listo para completar — GA · GND · CPEL</div>
+          </div>
+          <button class="btn" onclick="downloadKit()" style="background:#fff;color:#1e3a5f;font-weight:700;white-space:nowrap;">
+            ⬇ Descargar kit 2026-2
+          </button>
+        </div>
+      </div>
+
       <!-- KPI row -->
       <div class="kpi-grid" id="kpi-grid">
         <div class="kpi-card kpi-blue">
@@ -1625,6 +1638,13 @@ async function downloadReportExcel() {
     const a = document.createElement('a'); a.href=url; a.download='reporte_carga_masiva.xlsx'; a.click();
     URL.revokeObjectURL(url);
   } catch(ex) { alert('Error: ' + ex.message); }
+}
+
+function downloadKit() {
+  const a = document.createElement('a');
+  a.href = '/static/kit_matriculacion_2026-2.xlsx';
+  a.download = 'kit_matriculacion_2026-2.xlsx';
+  a.click();
 }
 
 function downloadTemplate(tipo) {
