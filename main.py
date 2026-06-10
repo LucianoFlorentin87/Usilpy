@@ -181,6 +181,53 @@ async def list_groups(_: dict = Depends(get_current_user)):
         raise HTTPException(status_code=502, detail=str(exc))
 
 
+@app.post("/api/azure/groups")
+async def create_group(payload: dict, _: dict = Depends(get_current_user)):
+    try:
+        return await graph_service.create_group(
+            display_name=payload["display_name"],
+            description=payload.get("description", ""),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Microsoft Teams
+# ---------------------------------------------------------------------------
+
+@app.get("/api/teams")
+async def list_teams(_: dict = Depends(get_current_user)):
+    try:
+        return await graph_service.get_teams()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/teams")
+async def create_team_endpoint(payload: dict, _: dict = Depends(get_current_user)):
+    try:
+        return await graph_service.create_team(
+            display_name=payload["display_name"],
+            description=payload.get("description", ""),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/teams/members")
+async def add_team_member_endpoint(payload: dict, _: dict = Depends(get_current_user)):
+    try:
+        ok = await graph_service.add_member_to_team(payload["team_id"], payload["user_id"])
+        if not ok:
+            raise HTTPException(status_code=400, detail="No se pudo agregar el miembro")
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
 # ---------------------------------------------------------------------------
 # Bulk / Carga Masiva
 # ---------------------------------------------------------------------------
@@ -241,6 +288,7 @@ async def bulk_template_tipo(tipo: str):
         "cursos": ["nombre", "sis_id", "semestre", "crear_en_canvas", "nombre_equipo_teams", "crear_en_teams"],
         "canvas-usuarios": ["nombre", "email", "sis_id"],
         "azure-usuarios": ["nombre", "upn", "password", "grupo_id"],
+        "teams": ["nombre", "descripcion"],
         "canvas-inscripciones": ["email_usuario", "curso_id", "rol"],
         "usuarios": ["nombre", "email", "sis_id", "rol_canvas", "upn_azure", "grupo_azure", "equipo_teams"],
         "inscripciones": ["email_usuario", "curso_canvas_id", "rol_canvas", "grupo_azure", "equipo_teams"],
@@ -310,6 +358,17 @@ async def bulk_canvas_inscripciones(file: UploadFile = File(...), _: dict = Depe
     file_bytes = await file.read()
     try:
         report = await bulk_service.process_canvas_enrollments_sheet(file_bytes, file.filename)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error procesando archivo: {exc}")
+    return JSONResponse(content=report)
+
+
+@app.post("/api/bulk/teams")
+async def bulk_teams(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+    _validate_file(file)
+    file_bytes = await file.read()
+    try:
+        report = await bulk_service.process_teams_sheet(file_bytes, file.filename)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error procesando archivo: {exc}")
     return JSONResponse(content=report)

@@ -75,6 +75,20 @@ async def create_user(display_name: str, mail_nickname: str, upn: str, password:
 
 # ── Groups ────────────────────────────────────────────────────────────────────
 
+async def create_group(display_name: str, description: str = "") -> dict:
+    payload = {
+        "displayName": display_name,
+        "description": description,
+        "mailEnabled": False,
+        "mailNickname": display_name.replace(" ", "").lower()[:20],
+        "securityEnabled": True,
+    }
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(f"{GRAPH_BASE}/groups", headers=_headers(), json=payload)
+        resp.raise_for_status()
+        return resp.json()
+
+
 async def get_groups(top: int = 50) -> list[dict]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -98,6 +112,20 @@ async def add_member_to_group(group_id: str, user_id: str) -> bool:
 
 
 # ── Teams ─────────────────────────────────────────────────────────────────────
+
+async def get_teams(top: int = 50) -> list[dict]:
+    """List all Teams teams in the tenant."""
+    filter_q = "resourceProvisioningOptions/Any(x:x eq 'Team')"
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.get(
+            f"{GRAPH_BASE}/groups",
+            headers=_headers(),
+            params={"$filter": filter_q, "$select": "id,displayName", "$top": top},
+        )
+        resp.raise_for_status()
+        return resp.json().get("value", [])
+
+
 
 async def find_team_by_display_name(name: str) -> dict | None:
     """Find a Teams team by exact display name. Returns None if not found."""

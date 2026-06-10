@@ -232,25 +232,15 @@
 
   <!-- Matriculación -->
   <div class="nav-group">
-    <div class="nav-group-label">Matriculación</div>
+    <div class="nav-group-label">Reportes</div>
     <div class="nav-item active" data-panel="dashboard" onclick="showPanel('dashboard', this)">
       <span class="icon">📊</span> Dashboard
-    </div>
-    <div class="nav-item" data-panel="matriculacion" onclick="showPanel('matriculacion', this)">
-      <span class="icon">🎓</span> Matriculación
     </div>
     <div class="nav-item" data-panel="auditoria" onclick="showPanel('auditoria', this)">
       <span class="icon">📋</span> Auditoría
     </div>
   </div>
 
-  <!-- Carga Masiva -->
-  <div class="nav-group">
-    <div class="nav-group-label">Carga Masiva</div>
-    <div class="nav-item" data-panel="bulk" onclick="showPanel('bulk', this)">
-      <span class="icon">📤</span> Carga Masiva
-    </div>
-  </div>
 
   <!-- Canvas -->
   <div class="nav-group">
@@ -730,12 +720,28 @@
     <div class="panel" id="panel-azure-groups">
       <div class="card">
         <h3>Grupos Azure AD</h3>
-        <button class="btn btn-primary" onclick="loadAzureGroups()">🔄 Cargar grupos</button>
+        <div class="form-row">
+          <div class="form-group"><label>Nombre del grupo</label><input type="text" id="grp-name" placeholder="Ej: Alumnos-2025-2" /></div>
+          <div class="form-group"><label>Descripción (opcional)</label><input type="text" id="grp-desc" placeholder="Grupo del semestre 2025-2" /></div>
+        </div>
+        <button class="btn btn-primary" onclick="createAzureGroup()">➕ Crear grupo</button>
+        <p id="grp-msg" style="margin-top:10px;font-size:.85rem;"></p>
       </div>
       <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <button class="btn btn-secondary" onclick="loadAzureGroups()">🔄 Cargar grupos</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:.82rem;color:var(--text-muted);">📂 Agregar miembros masivo:</span>
+            <input type="file" id="file-groups" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+            <button class="btn btn-primary btn-sm" onclick="bulkAddGroupMembers()">▶ Procesar</button>
+          </div>
+        </div>
+        <div id="grp-bulk-result" style="display:none;margin-bottom:12px;">
+          <div id="grp-bulk-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+        </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>ID</th><th>Nombre</th><th>Email</th></tr></thead>
+            <thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>Acción</th></tr></thead>
             <tbody id="tbl-agroups"></tbody>
           </table>
         </div>
@@ -744,13 +750,58 @@
 
     <!-- ══════════ PANEL: TEAMS ══════════ -->
     <div class="panel" id="panel-teams">
+      <!-- Crear equipo -->
       <div class="card">
-        <h3>Microsoft Teams</h3>
-        <p style="color:var(--text-muted); font-size:0.9rem;">
-          Los equipos de Teams se crean automáticamente durante el proceso de matriculación
-          (un equipo por materia/semestre). También podés crear cursos con su equipo desde
-          <strong>Canvas LMS → Cursos</strong> usando la carga masiva.
-        </p>
+        <h3>Microsoft Teams — Equipos</h3>
+        <div class="form-row">
+          <div class="form-group"><label>Nombre del equipo</label><input type="text" id="tm-name" placeholder="Ej: 2025-2 - Matemática I" /></div>
+          <div class="form-group"><label>Descripción (opcional)</label><input type="text" id="tm-desc" placeholder="Equipo académico del semestre" /></div>
+        </div>
+        <button class="btn btn-primary" onclick="createTeam()">➕ Crear equipo</button>
+        <p id="tm-msg" style="margin-top:10px;font-size:.85rem;"></p>
+      </div>
+
+      <!-- Agregar miembro -->
+      <div class="card">
+        <h3>Agregar miembro a equipo</h3>
+        <div class="form-row">
+          <div class="form-group"><label>ID del equipo</label><input type="text" id="tm-teamid" placeholder="ID del equipo de Teams" /></div>
+          <div class="form-group"><label>ID del usuario (Azure AD)</label><input type="text" id="tm-userid" placeholder="ID del usuario" /></div>
+        </div>
+        <button class="btn btn-primary" onclick="addTeamMember()">✅ Agregar miembro</button>
+        <p id="tm-member-msg" style="margin-top:10px;font-size:.85rem;"></p>
+      </div>
+
+      <!-- Carga masiva de equipos -->
+      <div class="card">
+        <h3>Carga masiva de equipos</h3>
+        <div class="info-banner" style="background:#f0f7ff;border-color:#93c5fd;color:#1e40af;">
+          📂 Subí un Excel con columnas: <code>nombre</code>, <code>descripcion</code> (opcional).
+          Se crea un equipo de Teams por cada fila.
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;">
+          <input type="file" id="file-teams" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+          <button class="btn btn-secondary btn-sm" onclick="downloadTemplate('teams')">⬇ Plantilla</button>
+          <button class="btn btn-primary btn-sm" onclick="bulkCreateTeams()">▶ Crear equipos</button>
+        </div>
+        <div id="teams-bulk-result" style="display:none;margin-top:12px;">
+          <div id="teams-bulk-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+          <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Nombre</th><th>Teams</th></tr></thead><tbody id="tbl-bulk-teams"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Lista de equipos -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="margin:0;">Equipos existentes</h3>
+          <button class="btn btn-secondary" onclick="loadTeams()">🔄 Cargar equipos</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Nombre</th></tr></thead>
+            <tbody id="tbl-teams"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -1467,9 +1518,110 @@ async function loadAzureGroups() {
   try {
     const data = await apiFetch('/api/azure/groups');
     document.getElementById('tbl-agroups').innerHTML = data.map(g =>
-      `<tr><td>${g.id?.slice(0,8)}…</td><td>${g.displayName}</td><td>${g.mail||''}</td></tr>`
+      `<tr>
+        <td style="font-size:.78rem;">${g.id?.slice(0,8)}…</td>
+        <td>${g.displayName}</td>
+        <td>${g.mail||''}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${g.id}')">📋 Copiar ID</button></td>
+      </tr>`
     ).join('');
   } catch(e) { alert(e.message); }
+}
+
+async function createAzureGroup() {
+  const name = document.getElementById('grp-name').value.trim();
+  const desc = document.getElementById('grp-desc').value.trim();
+  if (!name) { alert('El nombre del grupo es obligatorio'); return; }
+  try {
+    const r = await apiFetch('/api/azure/groups', 'POST', {display_name: name, description: desc});
+    document.getElementById('grp-msg').innerHTML = `<span style="color:var(--success)">✅ Grupo creado: ${r.displayName} (ID: ${r.id?.slice(0,8)}…)</span>`;
+    loadAzureGroups();
+  } catch(e) { document.getElementById('grp-msg').innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`; }
+}
+
+async function bulkAddGroupMembers() {
+  const fileInput = document.getElementById('file-groups');
+  if (!fileInput?.files[0]) { alert('Seleccioná un archivo primero'); return; }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  try {
+    const resp = await fetch('/api/bulk/azure/usuarios', { method:'POST', headers: authHeaders(), body: formData });
+    const report = await resp.json();
+    document.getElementById('grp-bulk-result').style.display = 'block';
+    document.getElementById('grp-bulk-summary').innerHTML =
+      `<span style="font-weight:600">Total: ${report.total} | ✅ OK: ${report.success} | ❌ Errores: ${report.errors}</span>`;
+  } catch(e) { alert(e.message); }
+}
+
+// ── Teams ─────────────────────────────────────────────────────────────────────
+async function createTeam() {
+  const name = document.getElementById('tm-name').value.trim();
+  const desc = document.getElementById('tm-desc').value.trim();
+  if (!name) { alert('El nombre del equipo es obligatorio'); return; }
+  document.getElementById('tm-msg').textContent = '⏳ Creando equipo (puede tardar hasta 60 seg)…';
+  try {
+    const r = await apiFetch('/api/teams', 'POST', {display_name: name, description: desc});
+    document.getElementById('tm-msg').innerHTML = `<span style="color:var(--success)">✅ Equipo creado: ${r.displayName||name} — ID: <code>${r.id||''}</code></span>`;
+    loadTeams();
+  } catch(e) { document.getElementById('tm-msg').innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`; }
+}
+
+async function addTeamMember() {
+  const teamId = document.getElementById('tm-teamid').value.trim();
+  const userId = document.getElementById('tm-userid').value.trim();
+  if (!teamId || !userId) { alert('Completá todos los campos'); return; }
+  try {
+    await apiFetch('/api/teams/members', 'POST', {team_id: teamId, user_id: userId});
+    document.getElementById('tm-member-msg').innerHTML = `<span style="color:var(--success)">✅ Miembro agregado correctamente</span>`;
+  } catch(e) { document.getElementById('tm-member-msg').innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`; }
+}
+
+async function loadTeams() {
+  try {
+    const data = await apiFetch('/api/teams');
+    document.getElementById('tbl-teams').innerHTML = data.map(t =>
+      `<tr>
+        <td style="font-size:.78rem;">${t.id?.slice(0,8)}…
+          <button class="btn btn-secondary btn-sm" style="margin-left:4px;" onclick="copyToClipboard('${t.id}')">📋</button>
+        </td>
+        <td>${t.displayName||''}</td>
+      </tr>`
+    ).join('') || '<tr><td colspan="2" style="color:var(--text-muted);">Sin equipos</td></tr>';
+  } catch(e) { alert(e.message); }
+}
+
+async function bulkCreateTeams() {
+  const fileInput = document.getElementById('file-teams');
+  if (!fileInput?.files[0]) { alert('Seleccioná un archivo primero'); return; }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  try {
+    const resp = await fetch('/api/bulk/teams', { method:'POST', headers: authHeaders(), body: formData });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail); }
+    const report = await resp.json();
+    document.getElementById('teams-bulk-result').style.display = 'block';
+    const color = report.errors > 0 ? 'var(--error)' : 'var(--success)';
+    document.getElementById('teams-bulk-summary').innerHTML =
+      `<span style="color:${color};font-weight:600;">Total: ${report.total} | ✅ OK: ${report.success} | ❌ Errores: ${report.errors}</span>`;
+    document.getElementById('tbl-bulk-teams').innerHTML = (report.rows||[]).map(r =>
+      `<tr>
+        <td>${r.fila||''}</td>
+        <td>${r.nombre||''}</td>
+        <td style="background:${statusColors[r.teams?.status]||'#fff'};font-size:.82rem;">${r.teams?.status||''} ${r.teams?.detalle ? '— '+r.teams.detalle : ''}</td>
+      </tr>`
+    ).join('');
+    loadTeams();
+  } catch(e) { alert(e.message); }
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const el = document.createElement('div');
+    el.textContent = '✅ Copiado: ' + text.slice(0,16) + '…';
+    el.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#1a2332;color:#fff;padding:10px 16px;border-radius:8px;font-size:.85rem;z-index:9999;';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2000);
+  });
 }
 
 // ── Util ──────────────────────────────────────────────────────────────────────

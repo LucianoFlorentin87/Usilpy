@@ -211,6 +211,37 @@ async def process_canvas_enrollments_sheet(file_bytes: bytes, filename: str) -> 
 
 
 # ---------------------------------------------------------------------------
+# Teams (crear equipos masivamente)
+# ---------------------------------------------------------------------------
+
+async def process_teams_sheet(file_bytes: bytes, filename: str) -> dict:
+    df = _normalize_cols(_read_sheet(file_bytes, filename))
+    rows = df.to_dict(orient="records")
+    results = []
+    for i, row in enumerate(rows, start=2):
+        nombre = row.get("nombre", "").strip()
+        desc = row.get("descripcion", row.get("description", "")).strip()
+        r = {"fila": i, "nombre": nombre, "teams": {"status": "omitido", "detalle": ""}}
+        if nombre:
+            try:
+                existing = await graph_service.find_team_by_display_name(nombre)
+                if existing:
+                    r["teams"] = {"status": "existente", "detalle": f"id={existing.get('id','')[:8]}..."}
+                else:
+                    team = await graph_service.create_team(nombre, desc)
+                    r["teams"] = {"status": "ok", "detalle": f"id={team.get('id','')[:8]}..."}
+            except Exception as exc:
+                r["teams"] = {"status": "error", "detalle": str(exc)[:120]}
+        else:
+            r["teams"] = {"status": "error", "detalle": "Columna 'nombre' vacia"}
+        results.append(r)
+
+    ok = sum(1 for r in results if r["teams"]["status"] == "ok")
+    errors = sum(1 for r in results if r["teams"]["status"] == "error")
+    return {"tipo": "teams", "total": len(results), "success": ok, "errors": errors, "rows": results}
+
+
+# ---------------------------------------------------------------------------
 # Usuarios
 # ---------------------------------------------------------------------------
 
