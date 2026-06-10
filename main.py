@@ -231,6 +231,90 @@ async def bulk_template():
     )
 
 
+@app.get("/api/bulk/template/{tipo}")
+async def bulk_template_tipo(tipo: str, _: dict = Depends(get_current_user)):
+    """Genera y devuelve una plantilla Excel vacía según el tipo solicitado."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    templates = {
+        "cursos": ["nombre", "sis_id", "semestre", "crear_en_canvas", "nombre_equipo_teams", "crear_en_teams"],
+        "canvas-usuarios": ["nombre", "email", "sis_id"],
+        "azure-usuarios": ["nombre", "upn", "password", "grupo_id"],
+        "canvas-inscripciones": ["email_usuario", "curso_id", "rol"],
+        "usuarios": ["nombre", "email", "sis_id", "rol_canvas", "upn_azure", "grupo_azure", "equipo_teams"],
+        "inscripciones": ["email_usuario", "curso_canvas_id", "rol_canvas", "grupo_azure", "equipo_teams"],
+    }
+    cols = templates.get(tipo)
+    if not cols:
+        raise HTTPException(status_code=404, detail=f"Tipo '{tipo}' no reconocido")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = tipo
+    fill = PatternFill("solid", fgColor="1F4E79")
+    font = Font(color="FFFFFF", bold=True)
+    for i, col in enumerate(cols, 1):
+        cell = ws.cell(row=1, column=i, value=col)
+        cell.fill = fill
+        cell.font = font
+        cell.alignment = Alignment(horizontal="center")
+        ws.column_dimensions[chr(64 + i)].width = 22
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="plantilla_{tipo}.xlsx"'},
+    )
+
+
+@app.post("/api/bulk/cursos")
+async def bulk_cursos(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+    _validate_file(file)
+    file_bytes = await file.read()
+    try:
+        report = await bulk_service.process_courses_sheet(file_bytes, file.filename)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error procesando archivo: {exc}")
+    return JSONResponse(content=report)
+
+
+@app.post("/api/bulk/canvas/usuarios")
+async def bulk_canvas_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+    _validate_file(file)
+    file_bytes = await file.read()
+    try:
+        report = await bulk_service.process_canvas_users_sheet(file_bytes, file.filename)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error procesando archivo: {exc}")
+    return JSONResponse(content=report)
+
+
+@app.post("/api/bulk/azure/usuarios")
+async def bulk_azure_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+    _validate_file(file)
+    file_bytes = await file.read()
+    try:
+        report = await bulk_service.process_azure_users_sheet(file_bytes, file.filename)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error procesando archivo: {exc}")
+    return JSONResponse(content=report)
+
+
+@app.post("/api/bulk/canvas/inscripciones")
+async def bulk_canvas_inscripciones(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+    _validate_file(file)
+    file_bytes = await file.read()
+    try:
+        report = await bulk_service.process_canvas_enrollments_sheet(file_bytes, file.filename)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error procesando archivo: {exc}")
+    return JSONResponse(content=report)
+
+
 @app.post("/api/bulk/reporte-excel")
 async def bulk_reporte_excel(report: dict, _: dict = Depends(get_current_user)):
     try:

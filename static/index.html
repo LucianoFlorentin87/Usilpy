@@ -597,7 +597,25 @@
     <div class="panel" id="panel-canvas-courses">
       <div class="card">
         <h3>Cursos Canvas</h3>
-        <button class="btn btn-primary" onclick="loadCanvasCourses()">🔄 Cargar cursos</button>
+        <div class="actions-row" style="flex-wrap:wrap;gap:10px;">
+          <button class="btn btn-primary" onclick="loadCanvasCourses()">🔄 Cargar cursos</button>
+          <button class="btn btn-secondary" onclick="downloadTemplate('cursos')">⬇ Descargar plantilla</button>
+        </div>
+        <div id="bulk-cursos-zone" style="margin-top:16px;">
+          <div style="border:2px dashed var(--border);border-radius:8px;padding:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#fafbfc;">
+            <div style="flex:1;min-width:200px;">
+              <div style="font-size:.85rem;font-weight:600;margin-bottom:6px;">📂 Carga masiva de cursos (Canvas + Teams)</div>
+              <input type="file" id="file-cursos" accept=".xlsx,.xls" style="font-size:.82rem;" />
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" onclick="bulkUpload('cursos','file-cursos','/api/bulk/cursos','tbl-bulk-cursos')">▶ Procesar</button>
+            </div>
+          </div>
+          <div id="bulk-cursos-result" style="margin-top:10px;display:none;">
+            <div id="bulk-cursos-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+            <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Nombre</th><th>SIS ID</th><th>Canvas</th><th>Teams</th></tr></thead><tbody id="tbl-bulk-cursos"></tbody></table></div>
+          </div>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrap">
@@ -622,7 +640,19 @@
         <p id="cu-msg" style="margin-top:10px; font-size:0.85rem;"></p>
       </div>
       <div class="card">
-        <button class="btn btn-secondary" onclick="loadCanvasUsers()" style="margin-bottom:12px;">🔄 Cargar usuarios</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <button class="btn btn-secondary" onclick="loadCanvasUsers()">🔄 Cargar usuarios</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:.82rem;color:var(--text-muted);">📂 Carga masiva:</span>
+            <input type="file" id="file-canvas-users" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate('canvas-usuarios')">⬇ Plantilla</button>
+            <button class="btn btn-primary btn-sm" onclick="bulkUpload('canvas-usuarios','file-canvas-users','/api/bulk/canvas/usuarios','tbl-bulk-cusers')">▶ Procesar</button>
+          </div>
+        </div>
+        <div id="bulk-cusers-result" style="display:none;margin-bottom:12px;">
+          <div id="bulk-cusers-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+          <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Nombre</th><th>Email</th><th>Canvas</th></tr></thead><tbody id="tbl-bulk-cusers"></tbody></table></div>
+        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>SIS ID</th></tr></thead>
@@ -652,13 +682,39 @@
         <button class="btn btn-primary" onclick="enrollUser()">✅ Inscribir</button>
         <p id="en-msg" style="margin-top:10px; font-size:0.85rem;"></p>
       </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <span style="font-size:.9rem;font-weight:600;">📂 Inscripciones masivas (Canvas)</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <input type="file" id="file-canvas-enroll" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate('canvas-inscripciones')">⬇ Plantilla</button>
+            <button class="btn btn-primary btn-sm" onclick="bulkUpload('canvas-inscripciones','file-canvas-enroll','/api/bulk/canvas/inscripciones','tbl-bulk-enroll')">▶ Procesar</button>
+          </div>
+        </div>
+        <div id="bulk-enroll-result" style="display:none;">
+          <div id="bulk-enroll-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+          <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Email</th><th>Curso ID</th><th>Canvas</th></tr></thead><tbody id="tbl-bulk-enroll"></tbody></table></div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════ PANEL: AZURE USUARIOS ══════════ -->
     <div class="panel" id="panel-azure-users">
       <div class="card">
         <h3>Usuarios Azure AD</h3>
-        <button class="btn btn-primary" onclick="loadAzureUsers()">🔄 Cargar usuarios</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <button class="btn btn-primary" onclick="loadAzureUsers()">🔄 Cargar usuarios</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:.82rem;color:var(--text-muted);">📂 Carga masiva Azure AD:</span>
+            <input type="file" id="file-azure-users" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate('azure-usuarios')">⬇ Plantilla</button>
+            <button class="btn btn-primary btn-sm" onclick="bulkUpload('azure-usuarios','file-azure-users','/api/bulk/azure/usuarios','tbl-bulk-ausers')">▶ Procesar</button>
+          </div>
+        </div>
+        <div id="bulk-ausers-result" style="display:none;margin-top:12px;">
+          <div id="bulk-ausers-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+          <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Nombre</th><th>UPN</th><th>Azure</th><th>Grupo</th></tr></thead><tbody id="tbl-bulk-ausers"></tbody></table></div>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrap">
@@ -692,7 +748,8 @@
         <h3>Microsoft Teams</h3>
         <p style="color:var(--text-muted); font-size:0.9rem;">
           Los equipos de Teams se crean automáticamente durante el proceso de matriculación
-          (un equipo por materia/semestre). Podés gestionar grupos desde Azure AD.
+          (un equipo por materia/semestre). También podés crear cursos con su equipo desde
+          <strong>Canvas LMS → Cursos</strong> usando la carga masiva.
         </p>
       </div>
     </div>
@@ -1259,7 +1316,103 @@ async function downloadReportExcel() {
   } catch(ex) { alert('Error: ' + ex.message); }
 }
 
-function downloadTemplate() { window.open('/api/bulk/template','_blank'); }
+function downloadTemplate(tipo) {
+  if (tipo) {
+    const a = document.createElement('a');
+    a.href = `/api/bulk/template/${tipo}`;
+    a.click();
+  } else {
+    window.open('/api/bulk/template', '_blank');
+  }
+}
+
+// ── Bulk upload genérico ──────────────────────────────────────────────────────
+const statusColors = { ok:'#c6efce', existente:'#ffeb9c', advertencia:'#ffeb9c', error:'#ffc7ce', omitido:'#f3f4f6' };
+
+async function bulkUpload(tipo, fileInputId, endpoint, tbodyId) {
+  const fileInput = document.getElementById(fileInputId);
+  if (!fileInput || !fileInput.files[0]) { alert('Seleccioná un archivo primero'); return; }
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: formData,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || 'Error del servidor');
+    }
+    const report = await resp.json();
+    renderBulkResult(tipo, report, tbodyId);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function renderBulkResult(tipo, report, tbodyId) {
+  const summaryId = tbodyId.replace('tbl-bulk-', 'bulk-').replace(tbodyId.split('-').pop(), tbodyId.split('-').pop() + '-summary').replace('tbl-bulk-','bulk-') ;
+  const resultDivId = tbodyId.replace('tbl-', '').replace('-', '-').split('-').slice(0,-1).join('-');
+
+  // Find result div
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  const resultDiv = tbody.closest('[id$="-result"]') || tbody.parentElement.parentElement.parentElement;
+
+  // Show summary
+  const summaryEl = resultDiv.querySelector('[id$="-summary"]');
+  if (summaryEl) {
+    const color = report.errors > 0 ? 'var(--error)' : 'var(--success)';
+    summaryEl.innerHTML = `<span style="color:${color};font-weight:600;">
+      Total: ${report.total} | ✅ OK: ${report.success} | ❌ Errores: ${report.errors}
+    </span>`;
+  }
+  resultDiv.style.display = 'block';
+
+  // Render rows
+  tbody.innerHTML = (report.rows || []).map(row => {
+    if (row.error_global) return `<tr><td colspan="10" style="color:red;">${row.error_global}</td></tr>`;
+    const canvasSt = row.canvas?.status || '';
+    const teamsSt = row.teams?.status || '';
+    const azureSt = row.azure?.status || '';
+
+    if (tipo === 'cursos') {
+      return `<tr>
+        <td>${row.fila||''}</td>
+        <td>${row.nombre||''}</td>
+        <td style="font-size:.78rem;">${row.sis_id||''}</td>
+        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${canvasSt} ${row.canvas?.detalle ? '— '+row.canvas.detalle : ''}</td>
+        <td style="background:${statusColors[teamsSt]||'#fff'};font-size:.82rem;">${teamsSt} ${row.teams?.detalle ? '— '+row.teams.detalle : ''}</td>
+      </tr>`;
+    } else if (tipo === 'canvas-usuarios') {
+      return `<tr>
+        <td>${row.fila||''}</td>
+        <td>${row.nombre||''}</td>
+        <td>${row.email||''}</td>
+        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${canvasSt} ${row.canvas?.detalle ? '— '+row.canvas.detalle : ''}</td>
+      </tr>`;
+    } else if (tipo === 'azure-usuarios') {
+      return `<tr>
+        <td>${row.fila||''}</td>
+        <td>${row.nombre||''}</td>
+        <td>${row.upn||''}</td>
+        <td style="background:${statusColors[azureSt]||'#fff'};font-size:.82rem;">${azureSt} ${row.azure?.detalle ? '— '+row.azure.detalle : ''}</td>
+        <td style="background:${statusColors[teamsSt]||'#fff'};font-size:.82rem;">${teamsSt} ${row.teams?.detalle||''}</td>
+      </tr>`;
+    } else if (tipo === 'canvas-inscripciones') {
+      return `<tr>
+        <td>${row.fila||''}</td>
+        <td>${row.email||''}</td>
+        <td>${row.curso||''}</td>
+        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${canvasSt} ${row.canvas?.detalle ? '— '+row.canvas.detalle : ''}</td>
+      </tr>`;
+    }
+    return `<tr><td colspan="10">${JSON.stringify(row)}</td></tr>`;
+  }).join('');
+}
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
 async function loadCanvasCourses() {
