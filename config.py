@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     admin_email: str = ""
 
+    # Webhook (para integración con sistema académico externo)
+    webhook_api_key: str = ""   # key estática que el sistema académico envía en X-API-Key
+
     # App
     app_secret_key: str = "change_this_in_production"
     debug: bool = False

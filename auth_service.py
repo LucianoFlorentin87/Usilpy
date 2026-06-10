@@ -49,14 +49,46 @@ def hash_password(plain: str) -> str:
 
 
 def authenticate_local(username: str, password: str) -> Optional[dict]:
-    """Devuelve el payload del usuario si las credenciales son válidas, None si no."""
-    if username != settings.admin_username:
-        return None
-    if not settings.admin_password_hash:
-        return None
-    if not verify_password(password, settings.admin_password_hash):
-        return None
-    return {"sub": username, "name": username, "provider": "local", "roles": ["admin"]}
+    """Devuelve el payload del usuario si las credenciales son válidas, None si no.
+    Falls back to env-based admin if no DB users exist yet."""
+    import asyncio
+    import user_service
+
+    async def _check_db() -> Optional[dict]:
+        user = await user_service.get_user_by_username(username)
+        if not user:
+            return None
+        if not verify_password(password, user["password_hash"]):
+            return None
+        await user_service.update_last_login(user["id"])
+        return {
+            "sub": user["id"],
+            "username": user["username"],
+            "name": user["full_name"] or user["username"],
+            "email": user["email"],
+            "role": user["role"],
+            "provider": "local",
+        }
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, _check_db())
+                result = future.result(timeout=5)
+        else:
+            result = loop.run_until_complete(_check_db())
+        if result:
+            return result
+    except Exception:
+        pass
+
+    # Fallback: env-based admin (used during initial setup before any DB user exists)
+    if username == settings.admin_username and settings.admin_password_hash:
+        if verify_password(password, settings.admin_password_hash):
+            return {"sub": username, "username": username, "name": username, "role": "admin", "provider": "local"}
+    return None
 
 
 # ---------------------------------------------------------------------------

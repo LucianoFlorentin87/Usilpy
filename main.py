@@ -15,6 +15,8 @@ import bulk_service
 import auth_service
 import audit_service
 import matriculacion_service
+import user_service
+import webhook_service
 from scheduler import lifespan, get_next_run
 
 app = FastAPI(title="Gestión Académica Universitaria", version="2.0.0", lifespan=lifespan)
@@ -45,6 +47,18 @@ async def get_current_user(
         return payload
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
+
+def require_role(*roles: str):
+    async def _dep(current_user: dict = Depends(get_current_user)) -> dict:
+        if current_user.get("role") not in roles:
+            raise HTTPException(status_code=403, detail="Permisos insuficientes")
+        return current_user
+    return _dep
+
+
+_require_admin = require_role("admin")
+_require_admin_or_academico = require_role("admin", "academico")
 
 
 # ---------------------------------------------------------------------------
@@ -503,6 +517,190 @@ async def export_audit(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# User Management (admin only)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/users")
+async def list_system_users(_: dict = Depends(_require_admin)):
+    try:
+        return await user_service.list_users()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/users")
+async def create_system_user(payload: dict, _: dict = Depends(_require_admin)):
+    if not payload.get("username") or not payload.get("email") or not payload.get("password"):
+        raise HTTPException(status_code=400, detail="username, email y password son requeridos")
+    password_hash = auth_service.hash_password(payload["password"])
+    try:
+        return await user_service.create_user(
+            username=payload["username"],
+            email=payload["email"],
+            password_hash=password_hash,
+            role=payload.get("role", "viewer"),
+            full_name=payload.get("full_name", ""),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.patch("/api/users/{user_id}")
+async def update_system_user(user_id: str, payload: dict, _: dict = Depends(_require_admin)):
+    if "password" in payload:
+        payload["password_hash"] = auth_service.hash_password(payload.pop("password"))
+    try:
+        updated = await user_service.update_user(user_id, payload)
+        if not updated:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        return updated
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.delete("/api/users/{user_id}")
+async def delete_system_user(user_id: str, current: dict = Depends(_require_admin)):
+    if current.get("sub") == user_id:
+        raise HTTPException(status_code=400, detail="No podés eliminar tu propio usuario")
+    try:
+        await user_service.delete_user(user_id)
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Webhook — integración con sistema académico externo
+# ---------------------------------------------------------------------------
+
+def _check_webhook_key(request: Request):
+    settings = auth_service.settings
+    if not settings.webhook_api_key:
+        raise HTTPException(status_code=503, detail="Webhook no configurado (falta WEBHOOK_API_KEY en .env)")
+    key = request.headers.get("X-API-Key", "")
+    if key != settings.webhook_api_key:
+        raise HTTPException(status_code=401, detail="API key inválida")
+
+
+@app.post("/api/webhook/inscripciones")
+async def webhook_single(payload: dict, request: Request):
+    """Recibe una inscripción desde el sistema académico externo."""
+    _check_webhook_key(request)
+    try:
+        return await webhook_service.receive_enrollment(payload, source="webhook")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/webhook/inscripciones/bulk")
+async def webhook_bulk(payload: dict, request: Request):
+    """Recibe múltiples inscripciones de una vez."""
+    _check_webhook_key(request)
+    rows = payload.get("inscripciones", [])
+    if not isinstance(rows, list):
+        raise HTTPException(status_code=400, detail="Se esperaba {\"inscripciones\": [...]}")
+    try:
+        return await webhook_service.receive_bulk(rows, source="webhook")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/inscripciones/pendientes")
+async def list_pending_enrollments(
+    semestre: str | None = Query(None),
+    estado: str = Query("pendiente"),
+    _: dict = Depends(_require_admin_or_academico),
+):
+    try:
+        return await webhook_service.list_pending(semestre=semestre, estado=estado)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/inscripciones/pendientes/stats")
+async def pending_stats(_: dict = Depends(_require_admin_or_academico)):
+    try:
+        return await webhook_service.get_stats()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/inscripciones/pendientes/upload")
+async def upload_pending(
+    file: UploadFile = File(...),
+    semestre: str | None = None,
+    current: dict = Depends(_require_admin_or_academico),
+):
+    """Portal académico: carga un Excel con inscripciones a la cola pendiente."""
+    _validate_file(file)
+    file_bytes = await file.read()
+    import io
+    import pandas as pd
+    buf = io.BytesIO(file_bytes)
+    df = pd.read_excel(buf, dtype=str).fillna("")
+    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+    rows = df.to_dict(orient="records")
+    if semestre:
+        for r in rows:
+            if not r.get("semestre"):
+                r["semestre"] = semestre
+    source = f"portal:{current.get('username', 'unknown')}"
+    try:
+        return await webhook_service.receive_bulk(rows, source=source)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/inscripciones/pendientes/procesar")
+async def process_pending(payload: dict, _: dict = Depends(_require_admin)):
+    """Admin procesa inscripciones pendientes pasando sus IDs."""
+    ids = payload.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="Enviá la lista de ids a procesar")
+    rows = await webhook_service.list_pending(estado="pendiente")
+    to_process = [r for r in rows if r["id"] in set(ids)]
+    if not to_process:
+        raise HTTPException(status_code=404, detail="No hay pendientes con esos IDs")
+
+    results = []
+    for row in to_process:
+        try:
+            email = row.get("email", "")
+            curso_id = row.get("curso_id", "")
+            if email and curso_id:
+                enr = await canvas_service.enroll_user(
+                    course_id=curso_id,
+                    user_id=email,
+                    role=row.get("rol", "StudentEnrollment"),
+                )
+                await webhook_service.mark_processed([row["id"]], f"enrollment id={enr.get('id')}")
+                results.append({"id": row["id"], "status": "ok"})
+            else:
+                await webhook_service.mark_error([row["id"]], "Falta email o curso_id")
+                results.append({"id": row["id"], "status": "error", "detalle": "Falta email o curso_id"})
+        except Exception as exc:
+            await webhook_service.mark_error([row["id"]], str(exc)[:200])
+            results.append({"id": row["id"], "status": "error", "detalle": str(exc)[:120]})
+
+    ok = sum(1 for r in results if r["status"] == "ok")
+    errors = sum(1 for r in results if r["status"] == "error")
+    return {"total": len(results), "ok": ok, "errors": errors, "rows": results}
+
+
+@app.delete("/api/inscripciones/pendientes")
+async def delete_pending_enrollments(payload: dict, _: dict = Depends(_require_admin)):
+    ids = payload.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="Enviá la lista de ids")
+    await webhook_service.delete_pending(ids)
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

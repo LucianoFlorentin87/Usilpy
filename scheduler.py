@@ -15,6 +15,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 
 import audit_service
+import user_service
 import matriculacion_service
 import teams_notify_service
 from config import get_settings
@@ -77,8 +78,11 @@ def get_next_run() -> str | None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
-    # Init audit DB
+    # Init audit DB + users table
     await audit_service.init_db()
+    # Seed initial admin from .env if no users exist yet
+    if settings.admin_password_hash:
+        await user_service.seed_admin(settings.admin_username, settings.admin_password_hash)
 
     # Configure and start scheduler
     _setup_jobs()

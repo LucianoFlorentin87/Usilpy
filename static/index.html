@@ -230,7 +230,18 @@
   <h1>Gestión Académica</h1>
   <p class="tagline">Canvas LMS · Azure AD · Teams</p>
 
-  <!-- Matriculación -->
+  <!-- Admin -->
+  <div class="nav-group" id="nav-admin-group">
+    <div class="nav-group-label">Administración</div>
+    <div class="nav-item" data-panel="system-users" onclick="showPanel('system-users', this)">
+      <span class="icon">🔑</span> Usuarios del sistema
+    </div>
+    <div class="nav-item" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)">
+      <span class="icon">⏳</span> Inscripciones pendientes
+    </div>
+  </div>
+
+  <!-- Reportes -->
   <div class="nav-group">
     <div class="nav-group-label">Reportes</div>
     <div class="nav-item active" data-panel="dashboard" onclick="showPanel('dashboard', this)">
