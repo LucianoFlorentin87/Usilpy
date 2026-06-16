@@ -289,6 +289,14 @@
     </div>
   </div>
 
+  <!-- Portal académico (solo visible para rol academico) -->
+  <div class="nav-group" id="nav-portal-group" style="display:none;">
+    <div class="nav-group-label">Mi portal</div>
+    <div class="nav-item active" data-panel="portal-academico" onclick="showPanel('portal-academico', this)">
+      <span class="icon">📥</span> Cargar inscripciones
+    </div>
+  </div>
+
   <!-- Administración del sistema -->
   <div class="nav-group" id="nav-admin-group">
     <div class="nav-group-label">Administración</div>
@@ -370,6 +378,144 @@
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- ══════════ PANEL: PORTAL ACADÉMICO ══════════ -->
+    <div class="panel" id="panel-portal-academico">
+
+      <div class="card">
+        <h3>Cargar inscripciones de alumnos</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:18px;">
+          Subí la planilla de tu programa para agregar alumnos a la cola de inscripción. El equipo administrativo revisará y procesará los datos en Canvas y Teams.
+        </p>
+
+        <!-- Tabs: planilla académica vs carga manual -->
+        <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
+          <button id="ptab-planilla" onclick="switchPortalTab('planilla')"
+            style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;">
+            📄 Subir planilla
+          </button>
+          <button id="ptab-manual" onclick="switchPortalTab('manual')"
+            style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;">
+            ✏️ Carga manual
+          </button>
+        </div>
+
+        <!-- TAB: subir planilla -->
+        <div id="portalTab-planilla">
+          <div style="background:#f0f7ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#1e40af;">
+            Subí el Excel de inscripciones de tu programa. El sistema leerá cada pestaña (un alumno por pestaña) y lo enviará a revisión.
+          </div>
+          <div class="form-row" style="align-items:flex-end;gap:16px;flex-wrap:wrap;">
+            <div class="form-group">
+              <label>Archivo Excel (.xlsx)</label>
+              <input type="file" id="portal-file-input" accept=".xlsx,.xls"
+                style="border:2px dashed var(--border);border-radius:6px;padding:10px;width:100%;cursor:pointer;" />
+            </div>
+            <div class="form-group" style="max-width:150px;">
+              <label>Semestre</label>
+              <input type="text" id="portal-semestre" placeholder="ej. 2026-2" />
+            </div>
+            <div class="form-group" style="max-width:130px;">
+              <label>Programa</label>
+              <select id="portal-programa">
+                <option value="">— Todos —</option>
+                <option value="GA">GA</option>
+                <option value="GND">GND</option>
+                <option value="CPEL">CPEL</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions-row">
+            <button class="btn btn-primary" onclick="portalSubirPlanilla()">📤 Enviar planilla</button>
+            <span id="portal-planilla-msg" style="font-size:.83rem;"></span>
+          </div>
+
+          <!-- Resultado del parseo -->
+          <div id="portal-preview-card" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+              <strong style="font-size:.9rem;">Alumnos detectados</strong>
+              <div style="display:flex;gap:8px;">
+                <span id="portal-stat-ok"   style="font-size:.78rem;padding:3px 9px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">✅ 0</span>
+                <span id="portal-stat-warn" style="font-size:.78rem;padding:3px 9px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);">⚠️ 0</span>
+                <span id="portal-stat-err"  style="font-size:.78rem;padding:3px 9px;border-radius:99px;background:var(--error-bg);color:var(--error);border:1px solid var(--error-border);">❌ 0</span>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>#</th><th>Nombre</th><th>Cédula</th><th>Programa</th><th>Período</th><th>Cursos</th><th>Estado</th></tr></thead>
+                <tbody id="portal-preview-tbody"></tbody>
+              </table>
+            </div>
+            <div style="margin-top:12px;">
+              <button class="btn btn-success" onclick="portalEnviarCola()">✅ Confirmar y enviar a cola</button>
+              <span id="portal-cola-msg" style="margin-left:10px;font-size:.83rem;"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: carga manual -->
+        <div id="portalTab-manual" style="display:none;">
+          <p style="font-size:.83rem;color:var(--text-muted);margin-bottom:14px;">
+            Completá los datos del alumno y sus materias. Se enviará a la cola de inscripciones para revisión.
+          </p>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nombre completo</label>
+              <input id="pm-nombre" type="text" placeholder="ej. Camila Flores Rodas" />
+            </div>
+            <div class="form-group" style="max-width:150px;">
+              <label>Cédula</label>
+              <input id="pm-cedula" type="text" placeholder="ej. 4802252" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Email institucional</label>
+              <input id="pm-email" type="email" placeholder="camila.flores@usil.edu.py" />
+            </div>
+            <div class="form-group" style="max-width:130px;">
+              <label>Programa</label>
+              <select id="pm-programa">
+                <option value="GA">GA — Gestión de Agronegocios</option>
+                <option value="GND">GND</option>
+                <option value="CPEL">CPEL</option>
+              </select>
+            </div>
+            <div class="form-group" style="max-width:130px;">
+              <label>Semestre</label>
+              <input id="pm-semestre" type="text" placeholder="ej. 2026-2" />
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:14px;">
+            <label>Materias / Cursos <span style="font-weight:400;color:var(--text-muted)">(uno por línea)</span></label>
+            <textarea id="pm-cursos" rows="4" placeholder="Microeconomía&#10;Comportamiento del Consumidor&#10;Marketing Global" style="resize:vertical;font-family:monospace;font-size:.82rem;"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:14px;">
+            <label>Observaciones <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
+            <input id="pm-obs" type="text" placeholder="Ej: alumno reincorporado, cambio de carrera..." />
+          </div>
+          <div class="actions-row">
+            <button class="btn btn-success" onclick="portalCargaManual()">➕ Enviar a cola</button>
+            <span id="portal-manual-msg" style="font-size:.83rem;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mis envíos anteriores -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="margin:0;">Mis envíos recientes</h3>
+          <button class="btn btn-secondary" style="font-size:.75rem;padding:5px 10px;" onclick="portalCargarMisEnvios()">🔄 Actualizar</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Alumno</th><th>Cédula</th><th>Programa</th><th>Curso</th><th>Estado</th></tr></thead>
+            <tbody id="portal-envios-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Sin envíos recientes</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
 
     <!-- ══════════ PANEL: PARSEO DE PLANILLA ACADÉMICA ══════════ -->
@@ -1135,29 +1281,29 @@ function showApp(user) {
   document.getElementById('user-name-label').textContent = user.name || user.sub || '';
   _applyRoleVisibility(user.role || 'viewer');
   if (user.role === 'academico') {
-    showPanel('pending-enrollments', document.querySelector('[data-panel="pending-enrollments"]'));
+    showPanel('portal-academico', document.querySelector('[data-panel="portal-academico"]'));
   } else {
     loadDashboard();
   }
 }
 
 function _applyRoleVisibility(role) {
-  // Admin-only sections
-  const adminOnly = ['nav-admin-group'];
-  adminOnly.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = (role === 'admin') ? '' : 'none';
-  });
-  // Viewer: hide write operations (Canvas LMS, Azure AD, Teams write panels)
-  // For now just hide nav groups; panels themselves still render but buttons won't work
-  const writeGroups = document.querySelectorAll('.nav-group');
-  if (role === 'viewer') {
-    // Show only Reportes group
-    writeGroups.forEach(g => {
+  const allGroups = document.querySelectorAll('.nav-group');
+
+  if (role === 'admin') {
+    // Admin ve todo
+    allGroups.forEach(g => g.style.display = '');
+    document.getElementById('panel-portal-academico')?.style && (document.getElementById('panel-portal-academico').style.display = 'none');
+  } else if (role === 'academico') {
+    // Académico: solo su portal
+    allGroups.forEach(g => g.style.display = 'none');
+    const portalGroup = document.getElementById('nav-portal-group');
+    if (portalGroup) portalGroup.style.display = '';
+  } else {
+    // Viewer: solo Reportes
+    allGroups.forEach(g => {
       const label = g.querySelector('.nav-group-label');
-      if (label && !['Reportes'].includes(label.textContent.trim())) {
-        g.style.display = 'none';
-      }
+      if (label && label.textContent.trim() !== 'Reportes') g.style.display = 'none';
     });
   }
 }
@@ -1224,6 +1370,7 @@ function doLogout() { fetch('/api/auth/logout', {method:'POST'}); showLogin('');
 const panelTitles = {
   'dashboard':        ['Dashboard',                 'Matriculación'],
   'parseo-planilla':  ['Parsear planilla académica','Limpieza de datos'],
+  'portal-academico': ['Portal de carga',           'Académico'],
   'matriculacion':    ['Matriculación',             'Automática'],
   'auditoria':      ['Auditoría',         'Log de operaciones'],
   'bulk':           ['Carga Masiva',      'Excel / CSV'],
@@ -1248,6 +1395,7 @@ function showPanel(id, el) {
   document.getElementById('topbar-title').textContent = title;
   document.getElementById('topbar-badge').textContent = badge;
   if (id === 'system-users') loadSystemUsers();
+  if (id === 'portal-academico') portalCargarMisEnvios();
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -1973,6 +2121,140 @@ async function deleteSystemUser(id, username) {
     await apiFetch(`/api/users/${id}`, {method:'DELETE'});
     loadSystemUsers();
   } catch(ex) { alert(ex.message); }
+}
+
+// ── Portal académico ─────────────────────────────────────────────────────────
+let _portalParseo = [];
+
+function switchPortalTab(tab) {
+  document.getElementById('portalTab-planilla').style.display = tab === 'planilla' ? '' : 'none';
+  document.getElementById('portalTab-manual').style.display   = tab === 'manual'   ? '' : 'none';
+  const active = 'color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;';
+  const inactive = 'color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;';
+  document.getElementById('ptab-planilla').style.cssText = `padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.88rem;font-weight:600;${tab==='planilla'?active:inactive}`;
+  document.getElementById('ptab-manual').style.cssText   = `padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.88rem;font-weight:600;${tab==='manual'?active:inactive}`;
+}
+
+async function portalSubirPlanilla() {
+  const fileInput = document.getElementById('portal-file-input');
+  const msg = document.getElementById('portal-planilla-msg');
+  const semestre = document.getElementById('portal-semestre').value.trim();
+
+  if (!fileInput.files.length) {
+    msg.textContent = 'Seleccioná un archivo primero.'; msg.style.color = 'var(--error)'; return;
+  }
+  msg.textContent = 'Analizando…'; msg.style.color = 'var(--text-muted)';
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  if (semestre) formData.append('semestre', semestre);
+
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/parseo/planilla', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.statusText); }
+    const data = await res.json();
+    _portalParseo = data.alumnos;
+    msg.textContent = `${data.alumnos.length} alumnos detectados.`;
+    msg.style.color = 'var(--success)';
+
+    // Render preview
+    const tbody = document.getElementById('portal-preview-tbody');
+    let ok = 0, warn = 0, err = 0;
+    tbody.innerHTML = data.alumnos.map((a, i) => {
+      const issues = a.issues || [];
+      const estado = issues.some(x => x.tipo === 'error') ? 'error' : issues.length ? 'warn' : 'ok';
+      if (estado === 'ok') ok++; else if (estado === 'warn') warn++; else err++;
+      const chip = estado === 'ok' ? '<span class="chip chip-ok">✅ Listo</span>'
+        : estado === 'warn' ? `<span class="chip chip-warn">⚠️ Aviso</span>`
+        : `<span class="chip chip-error">❌ Error</span>`;
+      const cursos = (a.cursos||[]).map(c => `<div style="font-size:.75rem;">${c.nombre_original}</div>`).join('');
+      return `<tr>
+        <td style="color:var(--text-muted);font-size:.75rem;">${i+1}</td>
+        <td><strong>${a.nombre||'—'}</strong></td>
+        <td>${a.cedula||'—'}</td>
+        <td><span class="chip chip-skip">${a.programa||'—'}</span></td>
+        <td style="font-size:.78rem;">${a.periodo||'—'}</td>
+        <td>${cursos||'<span style="color:var(--text-muted);font-size:.75rem;">Sin cursos</span>'}</td>
+        <td>${chip}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('portal-stat-ok').textContent   = `✅ ${ok}`;
+    document.getElementById('portal-stat-warn').textContent = `⚠️ ${warn}`;
+    document.getElementById('portal-stat-err').textContent  = `❌ ${err}`;
+    document.getElementById('portal-preview-card').style.display = '';
+  } catch(ex) {
+    msg.textContent = ex.message; msg.style.color = 'var(--error)';
+  }
+}
+
+async function portalEnviarCola() {
+  const msg = document.getElementById('portal-cola-msg');
+  const listos = _portalParseo.filter(a => !(a.issues||[]).some(x => x.tipo === 'error'));
+  if (!listos.length) { msg.textContent = 'No hay alumnos sin errores para enviar.'; msg.style.color='var(--error)'; return; }
+  msg.textContent = 'Enviando…'; msg.style.color = 'var(--text-muted)';
+  try {
+    const res = await apiFetch('/api/parseo/enviar-cola', { method:'POST', body: JSON.stringify({alumnos: listos}) });
+    msg.textContent = `✅ ${res.enviados} alumno${res.enviados!==1?'s':''} enviado${res.enviados!==1?'s':''} correctamente.`;
+    msg.style.color = 'var(--success)';
+    _portalParseo = [];
+    document.getElementById('portal-preview-card').style.display = 'none';
+    document.getElementById('portal-file-input').value = '';
+    portalCargarMisEnvios();
+  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
+}
+
+async function portalCargaManual() {
+  const msg = document.getElementById('portal-manual-msg');
+  const nombre  = document.getElementById('pm-nombre').value.trim();
+  const cedula  = document.getElementById('pm-cedula').value.trim();
+  const email   = document.getElementById('pm-email').value.trim();
+  const programa= document.getElementById('pm-programa').value;
+  const semestre= document.getElementById('pm-semestre').value.trim();
+  const cursosRaw = document.getElementById('pm-cursos').value.trim();
+  const obs     = document.getElementById('pm-obs').value.trim();
+
+  if (!nombre || !cedula || !semestre || !cursosRaw) {
+    msg.textContent = 'Nombre, cédula, semestre y al menos un curso son requeridos.';
+    msg.style.color = 'var(--error)'; return;
+  }
+  const cursos = cursosRaw.split('\n').map(c => c.trim()).filter(Boolean);
+  const alumnos = [{ nombre, cedula, email, programa, periodo: semestre, cursos: cursos.map(c => ({nombre_original:c,match_ok:true})), obs, issues:[] }];
+  msg.textContent = 'Enviando…'; msg.style.color = 'var(--text-muted)';
+  try {
+    const res = await apiFetch('/api/parseo/enviar-cola', { method:'POST', body: JSON.stringify({alumnos}) });
+    msg.textContent = `✅ ${cursos.length} inscripcion${cursos.length!==1?'es':''} enviadas a la cola.`;
+    msg.style.color = 'var(--success)';
+    ['pm-nombre','pm-cedula','pm-email','pm-semestre','pm-cursos','pm-obs'].forEach(id => document.getElementById(id).value = '');
+    portalCargarMisEnvios();
+  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
+}
+
+async function portalCargarMisEnvios() {
+  const tbody = document.getElementById('portal-envios-tbody');
+  try {
+    const rows = await apiFetch('/api/inscripciones/pendientes?estado=pendiente');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Sin envíos recientes</td></tr>'; return;
+    }
+    const estadoChip = e => e==='procesado' ? '<span class="chip chip-ok">Procesado</span>'
+      : e==='error' ? '<span class="chip chip-error">Error</span>'
+      : '<span class="chip chip-warn">Pendiente</span>';
+    tbody.innerHTML = rows.slice(0,30).map(r => `<tr>
+      <td style="font-size:.75rem;">${new Date(r.created_at||r.recibido||'').toLocaleString('es')}</td>
+      <td>${r.nombre||'—'}</td>
+      <td>${r.cedula||'—'}</td>
+      <td><span class="chip chip-skip">${r.programa||r.semestre||'—'}</span></td>
+      <td style="font-size:.78rem;">${r.curso||r.curso_id||'—'}</td>
+      <td>${estadoChip(r.estado)}</td>
+    </tr>`).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
 }
 
 // ── Parseo de planilla académica ─────────────────────────────────────────────
