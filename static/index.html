@@ -236,20 +236,6 @@
   <h1>Gestión Académica</h1>
   <p class="tagline">Canvas LMS · Azure AD · Teams</p>
 
-  <!-- Admin -->
-  <div class="nav-group" id="nav-admin-group">
-    <div class="nav-group-label">Administración</div>
-    <div class="nav-item" data-panel="system-users" onclick="showPanel('system-users', this)">
-      <span class="icon">🔑</span> Usuarios del sistema
-    </div>
-    <div class="nav-item" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)">
-      <span class="icon">⏳</span> Inscripciones pendientes
-    </div>
-    <div class="nav-item" data-panel="course-aliases" onclick="showPanel('course-aliases', this)">
-      <span class="icon">🔗</span> Aliases de materias
-    </div>
-  </div>
-
   <!-- Reportes -->
   <div class="nav-group">
     <div class="nav-group-label">Reportes</div>
@@ -261,6 +247,16 @@
     </div>
   </div>
 
+  <!-- Matriculación -->
+  <div class="nav-group">
+    <div class="nav-group-label">Matriculación</div>
+    <div class="nav-item" data-panel="parseo-planilla" onclick="showPanel('parseo-planilla', this)">
+      <span class="icon">🧹</span> Parsear planilla académica
+    </div>
+    <div class="nav-item" data-panel="matriculacion" onclick="showPanel('matriculacion', this)">
+      <span class="icon">🎓</span> Ejecutar matriculación
+    </div>
+  </div>
 
   <!-- Canvas -->
   <div class="nav-group">
@@ -279,22 +275,31 @@
     </div>
   </div>
 
-  <!-- Azure -->
+  <!-- Teams -->
   <div class="nav-group">
-    <div class="nav-group-label">Azure AD</div>
+    <div class="nav-group-label">Microsoft Teams</div>
     <div class="nav-item" data-panel="azure-users" onclick="showPanel('azure-users', this)">
-      <span class="icon">🏢</span> Usuarios
+      <span class="icon">🏢</span> Usuarios Azure AD
     </div>
     <div class="nav-item" data-panel="azure-groups" onclick="showPanel('azure-groups', this)">
       <span class="icon">👥</span> Grupos
     </div>
-  </div>
-
-  <!-- Teams -->
-  <div class="nav-group">
-    <div class="nav-group-label">Microsoft Teams</div>
     <div class="nav-item" data-panel="teams" onclick="showPanel('teams', this)">
       <span class="icon">💬</span> Equipos
+    </div>
+  </div>
+
+  <!-- Administración del sistema -->
+  <div class="nav-group" id="nav-admin-group">
+    <div class="nav-group-label">Administración</div>
+    <div class="nav-item" data-panel="system-users" onclick="showPanel('system-users', this)">
+      <span class="icon">🔑</span> Usuarios del sistema
+    </div>
+    <div class="nav-item" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)">
+      <span class="icon">⏳</span> Inscripciones pendientes
+    </div>
+    <div class="nav-item" data-panel="course-aliases" onclick="showPanel('course-aliases', this)">
+      <span class="icon">🔗</span> Aliases de materias
     </div>
   </div>
 </nav>
@@ -363,6 +368,73 @@
             <thead><tr><th>Variante (Excel)</th><th>Canvas nombre</th><th>SIS ID</th><th>Confianza</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody id="aliases-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Haz clic en "Cargar aliases"</td></tr></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: PARSEO DE PLANILLA ACADÉMICA ══════════ -->
+    <div class="panel" id="panel-parseo-planilla">
+      <div class="card">
+        <h3>Parsear planilla académica</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:16px;">
+          Subí el Excel de inscripciones que comparte académico. El sistema lee cada pestaña (un alumno por pestaña),
+          extrae programa, período, nombre, cédula y cursos, y te muestra una vista previa antes de procesar.
+        </p>
+
+        <div style="background:#f0f7ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#1e40af;">
+          <strong>Formato esperado por pestaña:</strong>
+          C4 → Programa &nbsp;·&nbsp; C5 → Período &nbsp;·&nbsp; C9 → Nombre alumno &nbsp;·&nbsp; C12 → Cédula &nbsp;·&nbsp; G5:G20 → Cursos inscriptos
+        </div>
+
+        <div class="form-row" style="align-items:flex-end;gap:16px;flex-wrap:wrap;">
+          <div class="form-group">
+            <label>Archivo Excel de inscripciones (.xlsx)</label>
+            <input type="file" id="parseo-file-input" accept=".xlsx,.xls"
+              style="border:2px dashed var(--border);border-radius:6px;padding:10px;width:100%;cursor:pointer;" />
+          </div>
+          <div class="form-group" style="max-width:160px;">
+            <label>Semestre</label>
+            <input type="text" id="parseo-semestre" placeholder="ej. 2026-2" />
+          </div>
+        </div>
+        <div class="actions-row">
+          <button class="btn btn-primary" onclick="parsearPlanilla()">🔍 Analizar planilla</button>
+          <span id="parseo-msg" style="font-size:.83rem;color:var(--text-muted);"></span>
+        </div>
+      </div>
+
+      <!-- Vista previa resultados -->
+      <div class="card" id="parseo-result-card" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <h3 style="margin:0;">Vista previa — alumnos detectados</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <span id="parseo-stat-ok"   style="font-size:.8rem;padding:4px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">✅ 0 listos</span>
+            <span id="parseo-stat-warn" style="font-size:.8rem;padding:4px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);">⚠️ 0 con advertencias</span>
+            <span id="parseo-stat-err"  style="font-size:.8rem;padding:4px 10px;border-radius:99px;background:var(--error-bg);color:var(--error);border:1px solid var(--error-border);">❌ 0 con errores</span>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Pestaña</th>
+                <th>Nombre</th>
+                <th>Cédula</th>
+                <th>Programa</th>
+                <th>Período</th>
+                <th>Cursos</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="parseo-tbody"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-success" onclick="enviarParseoACola()">➕ Enviar listos a cola de inscripciones</button>
+          <button class="btn btn-secondary" onclick="descargarParseoExcel()">⬇ Descargar resumen Excel</button>
         </div>
       </div>
     </div>
@@ -1150,8 +1222,9 @@ function doLogout() { fetch('/api/auth/logout', {method:'POST'}); showLogin('');
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 const panelTitles = {
-  'dashboard':      ['Dashboard',         'Matriculación'],
-  'matriculacion':  ['Matriculación',     'Automática'],
+  'dashboard':        ['Dashboard',                 'Matriculación'],
+  'parseo-planilla':  ['Parsear planilla académica','Limpieza de datos'],
+  'matriculacion':    ['Matriculación',             'Automática'],
   'auditoria':      ['Auditoría',         'Log de operaciones'],
   'bulk':           ['Carga Masiva',      'Excel / CSV'],
   'system-users':       ['Usuarios del sistema', 'Administración'],
@@ -1899,6 +1972,114 @@ async function deleteSystemUser(id, username) {
   try {
     await apiFetch(`/api/users/${id}`, {method:'DELETE'});
     loadSystemUsers();
+  } catch(ex) { alert(ex.message); }
+}
+
+// ── Parseo de planilla académica ─────────────────────────────────────────────
+let _parseoResultados = [];
+
+async function parsearPlanilla() {
+  const fileInput = document.getElementById('parseo-file-input');
+  const msg = document.getElementById('parseo-msg');
+  const semestre = document.getElementById('parseo-semestre').value.trim();
+
+  if (!fileInput.files.length) {
+    msg.textContent = 'Seleccioná un archivo Excel primero.'; msg.style.color = 'var(--error)'; return;
+  }
+
+  msg.textContent = 'Analizando…'; msg.style.color = 'var(--text-muted)';
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  if (semestre) formData.append('semestre', semestre);
+
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/parseo/planilla', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.statusText); }
+    const data = await res.json();
+    _parseoResultados = data.alumnos;
+    msg.textContent = `Planilla analizada — ${data.alumnos.length} pestañas procesadas.`;
+    msg.style.color = 'var(--success)';
+    _renderParseoResultados(data.alumnos);
+  } catch(ex) {
+    msg.textContent = ex.message; msg.style.color = 'var(--error)';
+  }
+}
+
+function _renderParseoResultados(alumnos) {
+  const tbody = document.getElementById('parseo-tbody');
+  const card = document.getElementById('parseo-result-card');
+  card.style.display = '';
+
+  let ok = 0, warn = 0, err = 0;
+  tbody.innerHTML = alumnos.map((a, i) => {
+    const issues = a.issues || [];
+    const estado = issues.some(x => x.tipo === 'error') ? 'error'
+                 : issues.length ? 'warn' : 'ok';
+    if (estado === 'ok') ok++;
+    else if (estado === 'warn') warn++;
+    else err++;
+
+    const chip = estado === 'ok'
+      ? '<span class="chip chip-ok">✅ Listo</span>'
+      : estado === 'warn'
+      ? `<span class="chip chip-warn">⚠️ ${issues.length} aviso${issues.length>1?'s':''}</span>`
+      : `<span class="chip chip-error">❌ ${issues.filter(x=>x.tipo==='error').length} error${issues.filter(x=>x.tipo==='error').length>1?'es':''}</span>`;
+
+    const cursosHtml = (a.cursos || []).map(c =>
+      `<div style="font-size:.75rem;${c.match_ok?'':'color:var(--warn);'}">${c.nombre_original}${c.match_ok?'':' ⚠️'}</div>`
+    ).join('');
+
+    const issuesHtml = issues.length
+      ? `<div style="margin-top:4px;">${issues.map(x=>`<div style="font-size:.72rem;color:${x.tipo==='error'?'var(--error)':'var(--warn)'};">${x.tipo==='error'?'❌':'⚠️'} ${x.mensaje}</div>`).join('')}</div>`
+      : '';
+
+    return `<tr>
+      <td style="color:var(--text-muted);font-size:.75rem;">${i+1}</td>
+      <td style="font-size:.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${a.pestaña}">${a.pestaña}</td>
+      <td><strong>${a.nombre || '<span style="color:var(--error)">Sin nombre</span>'}</strong>${issuesHtml}</td>
+      <td>${a.cedula || '<span style="color:var(--error)">—</span>'}</td>
+      <td><span class="chip chip-skip">${a.programa || '—'}</span></td>
+      <td style="font-size:.78rem;">${a.periodo || '—'}</td>
+      <td>${cursosHtml || '<span style="color:var(--text-muted);font-size:.75rem;">Sin cursos</span>'}</td>
+      <td>${chip}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('parseo-stat-ok').textContent   = `✅ ${ok} listos`;
+  document.getElementById('parseo-stat-warn').textContent = `⚠️ ${warn} con advertencias`;
+  document.getElementById('parseo-stat-err').textContent  = `❌ ${err} con errores`;
+}
+
+async function enviarParseoACola() {
+  const listos = _parseoResultados.filter(a => !(a.issues||[]).some(x=>x.tipo==='error'));
+  if (!listos.length) { alert('No hay alumnos listos para enviar.'); return; }
+  try {
+    const res = await apiFetch('/api/parseo/enviar-cola', {
+      method: 'POST',
+      body: JSON.stringify({ alumnos: listos }),
+    });
+    alert(`✅ ${res.enviados} alumno${res.enviados!==1?'s':''} enviado${res.enviados!==1?'s':''} a la cola de inscripciones.`);
+  } catch(ex) { alert(ex.message); }
+}
+
+async function descargarParseoExcel() {
+  if (!_parseoResultados.length) { alert('No hay datos para descargar.'); return; }
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/parseo/exportar', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alumnos: _parseoResultados }),
+    });
+    if (!res.ok) throw new Error('Error al exportar');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'parseo_planilla.xlsx'; a.click();
   } catch(ex) { alert(ex.message); }
 }
 

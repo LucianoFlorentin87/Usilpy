@@ -18,6 +18,7 @@ import matriculacion_service
 import user_service
 import webhook_service
 import course_matcher
+import parseo_service
 from scheduler import lifespan, get_next_run
 
 app = FastAPI(title="Gestión Académica Universitaria", version="2.0.0", lifespan=lifespan)
@@ -826,3 +827,63 @@ async def get_dashboard(_: dict = Depends(get_current_user)):
         return kpis
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Parseo de planilla académica
+# ---------------------------------------------------------------------------
+
+@app.post("/api/parseo/planilla")
+async def parsear_planilla(
+    file: UploadFile = File(...),
+    semestre: str | None = None,
+    _: dict = Depends(get_current_user),
+):
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in {".xlsx", ".xls"}:
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
+    file_bytes = await file.read()
+    try:
+        result = parseo_service.parsear_planilla(file_bytes, semestre=semestre)
+        return JSONResponse(content=result)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al parsear: {exc}")
+
+
+@app.post("/api/parseo/enviar-cola")
+async def enviar_parseo_cola(payload: dict, current: dict = Depends(get_current_user)):
+    alumnos = payload.get("alumnos", [])
+    if not alumnos:
+        raise HTTPException(status_code=400, detail="No hay alumnos para enviar")
+    source = f"parseo:{current.get('username', 'unknown')}"
+    enviados = 0
+    for a in alumnos:
+        for curso in a.get("cursos", []):
+            row = {
+                "cedula":   a.get("cedula", ""),
+                "nombre":   a.get("nombre", ""),
+                "programa": a.get("programa", ""),
+                "semestre": a.get("periodo", ""),
+                "curso":    curso.get("nombre_original", ""),
+                "source":   source,
+            }
+            try:
+                await webhook_service.receive_enrollment(row, source=source)
+                enviados += 1
+            except Exception:
+                pass
+    return {"enviados": enviados}
+
+
+@app.post("/api/parseo/exportar")
+async def exportar_parseo(payload: dict, _: dict = Depends(get_current_user)):
+    alumnos = payload.get("alumnos", [])
+    try:
+        excel_bytes = parseo_service.exportar_excel(alumnos)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return StreamingResponse(
+        io.BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="parseo_planilla.xlsx"'},
+    )
