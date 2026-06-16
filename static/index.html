@@ -1174,6 +1174,7 @@ function showPanel(id, el) {
   const [title, badge] = panelTitles[id] || [id, ''];
   document.getElementById('topbar-title').textContent = title;
   document.getElementById('topbar-badge').textContent = badge;
+  if (id === 'system-users') loadSystemUsers();
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -1832,6 +1833,12 @@ async function loadSystemUsers() {
           <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="changeUserRole('${u.id}','${u.role}')">
             Cambiar rol
           </button>
+          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="changeUserPassword('${u.id}','${u.username}')">
+            Contraseña
+          </button>
+          <button class="btn btn-danger" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="deleteSystemUser('${u.id}','${u.username}')">
+            Eliminar
+          </button>
         </td>
       </tr>`;
     }).join('');
@@ -1874,6 +1881,23 @@ async function changeUserRole(id, currentRole) {
   if (!newRole || !roles.includes(newRole.trim())) { alert('Rol inválido'); return; }
   try {
     await apiFetch(`/api/users/${id}`, {method:'PATCH', body: JSON.stringify({role: newRole.trim()})});
+    loadSystemUsers();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function changeUserPassword(id, username) {
+  const newPass = prompt(`Nueva contraseña para "${username}":`);
+  if (!newPass || newPass.length < 6) { alert('La contraseña debe tener al menos 6 caracteres'); return; }
+  try {
+    await apiFetch(`/api/users/${id}`, {method:'PATCH', body: JSON.stringify({password: newPass})});
+    alert(`✓ Contraseña actualizada para "${username}"`);
+  } catch(ex) { alert(ex.message); }
+}
+
+async function deleteSystemUser(id, username) {
+  if (!confirm(`¿Eliminar al usuario "${username}"? Esta acción no se puede deshacer.`)) return;
+  try {
+    await apiFetch(`/api/users/${id}`, {method:'DELETE'});
     loadSystemUsers();
   } catch(ex) { alert(ex.message); }
 }
