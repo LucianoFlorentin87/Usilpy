@@ -43,6 +43,26 @@ async def get_users(top: int = 50) -> list[dict]:
         return resp.json().get("value", [])
 
 
+async def search_users(query: str, top: int = 20) -> list[dict]:
+    """Search Azure AD users by displayName or mail containing the query."""
+    safe = query.replace("'", "''")
+    filter_q = (
+        f"startswith(displayName,'{safe}') or "
+        f"startswith(mail,'{safe}') or "
+        f"startswith(userPrincipalName,'{safe}')"
+    )
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{GRAPH_BASE}/users",
+            headers=_headers(),
+            params={"$filter": filter_q, "$top": top, "$select": "id,displayName,mail,userPrincipalName,accountEnabled"},
+        )
+        if resp.status_code in (400, 404):
+            return []
+        resp.raise_for_status()
+        return resp.json().get("value", [])
+
+
 async def get_user_by_upn(upn: str) -> dict | None:
     """Look up a user by UPN (email). Returns None if not found."""
     async with httpx.AsyncClient() as client:

@@ -383,126 +383,106 @@
     <!-- ══════════ PANEL: PORTAL ACADÉMICO ══════════ -->
     <div class="panel" id="panel-portal-academico">
 
+      <!-- PASO 1: Buscar alumno -->
       <div class="card">
-        <h3>Cargar inscripciones de alumnos</h3>
-        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:18px;">
-          Subí la planilla de tu programa para agregar alumnos a la cola de inscripción. El equipo administrativo revisará y procesará los datos en Canvas y Teams.
+        <h3>Inscribir alumno</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:16px;">
+          Buscá al alumno por cédula o nombre. Si ya existe en Canvas o Azure AD los datos se pre-cargan automáticamente. Si es nuevo, completá el formulario.
         </p>
 
-        <!-- Tabs: planilla académica vs carga manual -->
-        <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
-          <button id="ptab-planilla" onclick="switchPortalTab('planilla')"
-            style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;">
-            📄 Subir planilla
-          </button>
-          <button id="ptab-manual" onclick="switchPortalTab('manual')"
-            style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;">
-            ✏️ Carga manual
-          </button>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="form-group" style="flex:1;min-width:220px;">
+            <label>Buscar por cédula o nombre</label>
+            <input id="portal-buscar-input" type="text" placeholder="ej. 4802252 o Flores Rodas"
+              onkeydown="if(event.key==='Enter') portalBuscar()" />
+          </div>
+          <button class="btn btn-primary" onclick="portalBuscar()">🔍 Buscar</button>
+          <button class="btn btn-secondary" onclick="portalNuevoAlumno()">➕ Alumno nuevo</button>
+          <span id="portal-buscar-msg" style="font-size:.82rem;color:var(--text-muted);align-self:center;"></span>
         </div>
 
-        <!-- TAB: subir planilla -->
-        <div id="portalTab-planilla">
-          <div style="background:#f0f7ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#1e40af;">
-            Subí el Excel de inscripciones de tu programa. El sistema leerá cada pestaña (un alumno por pestaña) y lo enviará a revisión.
-          </div>
-          <div class="form-row" style="align-items:flex-end;gap:16px;flex-wrap:wrap;">
-            <div class="form-group">
-              <label>Archivo Excel (.xlsx)</label>
-              <input type="file" id="portal-file-input" accept=".xlsx,.xls"
-                style="border:2px dashed var(--border);border-radius:6px;padding:10px;width:100%;cursor:pointer;" />
-            </div>
-            <div class="form-group" style="max-width:150px;">
-              <label>Semestre</label>
-              <input type="text" id="portal-semestre" placeholder="ej. 2026-2" />
-            </div>
-            <div class="form-group" style="max-width:130px;">
-              <label>Programa</label>
-              <select id="portal-programa">
-                <option value="">— Todos —</option>
-                <option value="GA">GA</option>
-                <option value="GND">GND</option>
-                <option value="CPEL">CPEL</option>
-              </select>
-            </div>
-          </div>
-          <div class="actions-row">
-            <button class="btn btn-primary" onclick="portalSubirPlanilla()">📤 Enviar planilla</button>
-            <span id="portal-planilla-msg" style="font-size:.83rem;"></span>
-          </div>
-
-          <!-- Resultado del parseo -->
-          <div id="portal-preview-card" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-              <strong style="font-size:.9rem;">Alumnos detectados</strong>
-              <div style="display:flex;gap:8px;">
-                <span id="portal-stat-ok"   style="font-size:.78rem;padding:3px 9px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">✅ 0</span>
-                <span id="portal-stat-warn" style="font-size:.78rem;padding:3px 9px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);">⚠️ 0</span>
-                <span id="portal-stat-err"  style="font-size:.78rem;padding:3px 9px;border-radius:99px;background:var(--error-bg);color:var(--error);border:1px solid var(--error-border);">❌ 0</span>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>#</th><th>Nombre</th><th>Cédula</th><th>Programa</th><th>Período</th><th>Cursos</th><th>Estado</th></tr></thead>
-                <tbody id="portal-preview-tbody"></tbody>
-              </table>
-            </div>
-            <div style="margin-top:12px;">
-              <button class="btn btn-success" onclick="portalEnviarCola()">✅ Confirmar y enviar a cola</button>
-              <span id="portal-cola-msg" style="margin-left:10px;font-size:.83rem;"></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB: carga manual -->
-        <div id="portalTab-manual" style="display:none;">
-          <p style="font-size:.83rem;color:var(--text-muted);margin-bottom:14px;">
-            Completá los datos del alumno y sus materias. Se enviará a la cola de inscripciones para revisión.
-          </p>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Nombre completo</label>
-              <input id="pm-nombre" type="text" placeholder="ej. Camila Flores Rodas" />
-            </div>
-            <div class="form-group" style="max-width:150px;">
-              <label>Cédula</label>
-              <input id="pm-cedula" type="text" placeholder="ej. 4802252" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Email institucional</label>
-              <input id="pm-email" type="email" placeholder="camila.flores@usil.edu.py" />
-            </div>
-            <div class="form-group" style="max-width:130px;">
-              <label>Programa</label>
-              <select id="pm-programa">
-                <option value="GA">GA — Gestión de Agronegocios</option>
-                <option value="GND">GND</option>
-                <option value="CPEL">CPEL</option>
-              </select>
-            </div>
-            <div class="form-group" style="max-width:130px;">
-              <label>Semestre</label>
-              <input id="pm-semestre" type="text" placeholder="ej. 2026-2" />
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:14px;">
-            <label>Materias / Cursos <span style="font-weight:400;color:var(--text-muted)">(uno por línea)</span></label>
-            <textarea id="pm-cursos" rows="4" placeholder="Microeconomía&#10;Comportamiento del Consumidor&#10;Marketing Global" style="resize:vertical;font-family:monospace;font-size:.82rem;"></textarea>
-          </div>
-          <div class="form-group" style="margin-bottom:14px;">
-            <label>Observaciones <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
-            <input id="pm-obs" type="text" placeholder="Ej: alumno reincorporado, cambio de carrera..." />
-          </div>
-          <div class="actions-row">
-            <button class="btn btn-success" onclick="portalCargaManual()">➕ Enviar a cola</button>
-            <span id="portal-manual-msg" style="font-size:.83rem;"></span>
+        <!-- Resultados de búsqueda -->
+        <div id="portal-buscar-resultados" style="display:none;margin-top:14px;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Nombre</th><th>Email</th><th>Cédula</th><th>Canvas</th><th>Azure AD</th><th></th></tr></thead>
+              <tbody id="portal-buscar-tbody"></tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      <!-- Mis envíos anteriores -->
+      <!-- PASO 2: Ficha del alumno + selección de materias -->
+      <div class="card" id="portal-ficha-card" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;" id="portal-ficha-titulo">Datos del alumno</h3>
+          <span id="portal-ficha-badge" style="font-size:.78rem;padding:4px 10px;border-radius:99px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;">Nuevo</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Apellido(s)</label>
+            <input id="pf-apellido" type="text" placeholder="ej. Flores Rodas" />
+          </div>
+          <div class="form-group">
+            <label>Nombre(s)</label>
+            <input id="pf-nombre" type="text" placeholder="ej. Camila Araceli" />
+          </div>
+          <div class="form-group" style="max-width:150px;">
+            <label>Cédula</label>
+            <input id="pf-cedula" type="text" placeholder="ej. 4802252" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email institucional</label>
+            <input id="pf-email" type="email" placeholder="camila.flores@usil.edu.py" />
+          </div>
+          <div class="form-group" style="max-width:130px;">
+            <label>Programa</label>
+            <select id="pf-programa">
+              <option value="GA">GA</option>
+              <option value="GND">GND</option>
+              <option value="CPEL">CPEL</option>
+            </select>
+          </div>
+          <div class="form-group" style="max-width:130px;">
+            <label>Semestre</label>
+            <input id="pf-semestre" type="text" placeholder="ej. 2026-2" />
+          </div>
+        </div>
+
+        <!-- Indicadores de existencia -->
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+          <span id="pf-badge-canvas" style="font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--skip-bg);color:var(--skip);border:1px solid var(--skip-border);">Canvas: —</span>
+          <span id="pf-badge-azure"  style="font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--skip-bg);color:var(--skip);border:1px solid var(--skip-border);">Azure AD: —</span>
+        </div>
+
+        <!-- Selección de materias -->
+        <div style="margin-bottom:6px;font-size:.8rem;font-weight:500;color:var(--text-muted);">Materias a inscribir</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+          <input id="pf-materia-buscar" type="text" placeholder="Buscar materia…" style="flex:1;min-width:200px;"
+            oninput="portalFiltrarMaterias()" />
+          <button class="btn btn-secondary" style="font-size:.78rem;padding:5px 10px;" onclick="portalCargarMaterias()">🔄 Cargar materias</button>
+        </div>
+        <div id="pf-materias-lista" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:#fafbfd;">
+          <p style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:16px 0;">Clic en "Cargar materias" para ver los cursos disponibles</p>
+        </div>
+        <div id="pf-materias-seleccionadas" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+
+        <div class="form-group" style="margin-top:14px;">
+          <label>Observaciones (opcional)</label>
+          <input id="pf-obs" type="text" placeholder="ej. alumno reincorporado, beca, cambio de carrera…" />
+        </div>
+
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-success" onclick="portalEnviarInscripcion()">✅ Enviar inscripción</button>
+          <button class="btn btn-secondary" onclick="portalLimpiarFicha()">✖ Cancelar</button>
+          <span id="pf-msg" style="font-size:.83rem;"></span>
+        </div>
+      </div>
+
+      <!-- Mis envíos recientes -->
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <h3 style="margin:0;">Mis envíos recientes</h3>
@@ -2124,114 +2104,159 @@ async function deleteSystemUser(id, username) {
 }
 
 // ── Portal académico ─────────────────────────────────────────────────────────
-let _portalParseo = [];
+let _portalMaterias = [];
+let _portalMateriasSeleccionadas = [];
 
-function switchPortalTab(tab) {
-  document.getElementById('portalTab-planilla').style.display = tab === 'planilla' ? '' : 'none';
-  document.getElementById('portalTab-manual').style.display   = tab === 'manual'   ? '' : 'none';
-  const active = 'color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;';
-  const inactive = 'color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;';
-  document.getElementById('ptab-planilla').style.cssText = `padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.88rem;font-weight:600;${tab==='planilla'?active:inactive}`;
-  document.getElementById('ptab-manual').style.cssText   = `padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.88rem;font-weight:600;${tab==='manual'?active:inactive}`;
-}
-
-async function portalSubirPlanilla() {
-  const fileInput = document.getElementById('portal-file-input');
-  const msg = document.getElementById('portal-planilla-msg');
-  const semestre = document.getElementById('portal-semestre').value.trim();
-
-  if (!fileInput.files.length) {
-    msg.textContent = 'Seleccioná un archivo primero.'; msg.style.color = 'var(--error)'; return;
-  }
-  msg.textContent = 'Analizando…'; msg.style.color = 'var(--text-muted)';
-
-  const formData = new FormData();
-  formData.append('file', fileInput.files[0]);
-  if (semestre) formData.append('semestre', semestre);
-
+async function portalBuscar() {
+  const q = document.getElementById('portal-buscar-input').value.trim();
+  const msg = document.getElementById('portal-buscar-msg');
+  if (q.length < 2) { msg.textContent = 'Ingresá al menos 2 caracteres.'; return; }
+  msg.textContent = 'Buscando…';
   try {
-    const token = localStorage.getItem('token');
-    const res = await fetch('/api/parseo/planilla', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.statusText); }
-    const data = await res.json();
-    _portalParseo = data.alumnos;
-    msg.textContent = `${data.alumnos.length} alumnos detectados.`;
-    msg.style.color = 'var(--success)';
-
-    // Render preview
-    const tbody = document.getElementById('portal-preview-tbody');
-    let ok = 0, warn = 0, err = 0;
-    tbody.innerHTML = data.alumnos.map((a, i) => {
-      const issues = a.issues || [];
-      const estado = issues.some(x => x.tipo === 'error') ? 'error' : issues.length ? 'warn' : 'ok';
-      if (estado === 'ok') ok++; else if (estado === 'warn') warn++; else err++;
-      const chip = estado === 'ok' ? '<span class="chip chip-ok">✅ Listo</span>'
-        : estado === 'warn' ? `<span class="chip chip-warn">⚠️ Aviso</span>`
-        : `<span class="chip chip-error">❌ Error</span>`;
-      const cursos = (a.cursos||[]).map(c => `<div style="font-size:.75rem;">${c.nombre_original}</div>`).join('');
+    const results = await apiFetch(`/api/alumnos/buscar?q=${encodeURIComponent(q)}`);
+    const tbody = document.getElementById('portal-buscar-tbody');
+    if (!results.length) {
+      msg.textContent = 'No encontrado — podés cargarlo como alumno nuevo.';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Sin resultados</td></tr>';
+      document.getElementById('portal-buscar-resultados').style.display = '';
+      return;
+    }
+    msg.textContent = `${results.length} resultado${results.length!==1?'s':''} encontrado${results.length!==1?'s':''}.`;
+    tbody.innerHTML = results.map(u => {
+      const canvas = u.en_canvas ? '<span class="chip chip-ok">✅ Sí</span>' : '<span class="chip chip-skip">No</span>';
+      const azure  = u.en_azure  ? '<span class="chip chip-ok">✅ Sí</span>' : '<span class="chip chip-skip">No</span>';
       return `<tr>
-        <td style="color:var(--text-muted);font-size:.75rem;">${i+1}</td>
-        <td><strong>${a.nombre||'—'}</strong></td>
-        <td>${a.cedula||'—'}</td>
-        <td><span class="chip chip-skip">${a.programa||'—'}</span></td>
-        <td style="font-size:.78rem;">${a.periodo||'—'}</td>
-        <td>${cursos||'<span style="color:var(--text-muted);font-size:.75rem;">Sin cursos</span>'}</td>
-        <td>${chip}</td>
+        <td><strong>${u.nombre||'—'}</strong></td>
+        <td style="font-size:.78rem;">${u.email||'—'}</td>
+        <td>${u.sis_id||u.cedula||'—'}</td>
+        <td>${canvas}</td>
+        <td>${azure}</td>
+        <td><button class="btn btn-primary" style="padding:4px 10px;font-size:.78rem;"
+          onclick='portalSeleccionarAlumno(${JSON.stringify(u)})'>Seleccionar</button></td>
       </tr>`;
     }).join('');
-    document.getElementById('portal-stat-ok').textContent   = `✅ ${ok}`;
-    document.getElementById('portal-stat-warn').textContent = `⚠️ ${warn}`;
-    document.getElementById('portal-stat-err').textContent  = `❌ ${err}`;
-    document.getElementById('portal-preview-card').style.display = '';
+    document.getElementById('portal-buscar-resultados').style.display = '';
+  } catch(ex) { msg.textContent = ex.message; }
+}
+
+function portalSeleccionarAlumno(u) {
+  const partes = (u.nombre || '').trim().split(' ');
+  const mitad = Math.ceil(partes.length / 2);
+  document.getElementById('pf-apellido').value = partes.slice(mitad).join(' ');
+  document.getElementById('pf-nombre').value   = partes.slice(0, mitad).join(' ');
+  document.getElementById('pf-cedula').value   = u.sis_id || u.cedula || '';
+  document.getElementById('pf-email').value    = u.email || '';
+  document.getElementById('pf-badge-canvas').textContent = u.en_canvas ? 'Canvas: ✅ Existe' : 'Canvas: No existe';
+  document.getElementById('pf-badge-canvas').style.cssText = u.en_canvas
+    ? 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);'
+    : 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--skip-bg);color:var(--skip);border:1px solid var(--skip-border);';
+  document.getElementById('pf-badge-azure').textContent = u.en_azure ? 'Azure AD: ✅ Existe' : 'Azure AD: No existe';
+  document.getElementById('pf-badge-azure').style.cssText = u.en_azure
+    ? 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);'
+    : 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--skip-bg);color:var(--skip);border:1px solid var(--skip-border);';
+  document.getElementById('portal-ficha-badge').textContent = 'Alumno existente';
+  document.getElementById('portal-ficha-badge').style.cssText = 'font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);';
+  document.getElementById('portal-buscar-resultados').style.display = 'none';
+  document.getElementById('portal-ficha-card').style.display = '';
+  _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
+  portalCargarMaterias();
+}
+
+function portalNuevoAlumno() {
+  ['pf-apellido','pf-nombre','pf-cedula','pf-email','pf-semestre','pf-obs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pf-badge-canvas').textContent = 'Canvas: Nuevo';
+  document.getElementById('pf-badge-canvas').style.cssText = 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);';
+  document.getElementById('pf-badge-azure').textContent = 'Azure AD: Nuevo';
+  document.getElementById('pf-badge-azure').style.cssText = 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);';
+  document.getElementById('portal-ficha-badge').textContent = 'Alumno nuevo';
+  document.getElementById('portal-ficha-badge').style.cssText = 'font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);';
+  document.getElementById('portal-buscar-resultados').style.display = 'none';
+  document.getElementById('portal-ficha-card').style.display = '';
+  _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
+  portalCargarMaterias();
+}
+
+async function portalCargarMaterias() {
+  const lista = document.getElementById('pf-materias-lista');
+  lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Cargando…</p>';
+  try {
+    _portalMaterias = await apiFetch('/api/canvas/courses/activos');
+    portalFiltrarMaterias();
   } catch(ex) {
-    msg.textContent = ex.message; msg.style.color = 'var(--error)';
+    lista.innerHTML = `<p style="color:var(--error);font-size:.82rem;padding:8px;">${ex.message}</p>`;
   }
 }
 
-async function portalEnviarCola() {
-  const msg = document.getElementById('portal-cola-msg');
-  const listos = _portalParseo.filter(a => !(a.issues||[]).some(x => x.tipo === 'error'));
-  if (!listos.length) { msg.textContent = 'No hay alumnos sin errores para enviar.'; msg.style.color='var(--error)'; return; }
+function portalFiltrarMaterias() {
+  const q = (document.getElementById('pf-materia-buscar').value || '').toLowerCase();
+  const lista = document.getElementById('pf-materias-lista');
+  const filtradas = q ? _portalMaterias.filter(c => (c.name||'').toLowerCase().includes(q) || (c.code||'').toLowerCase().includes(q)) : _portalMaterias;
+  if (!filtradas.length) {
+    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Sin resultados</p>'; return;
+  }
+  lista.innerHTML = filtradas.map(c => {
+    const sel = _portalMateriasSeleccionadas.some(x => x.id === c.id);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:6px;cursor:pointer;${sel?'background:#eff6ff;':''}"
+      onclick="portalToggleMateria(${c.id},'${(c.name||'').replace(/'/g,"\\'")}','${(c.code||'').replace(/'/g,"\\'")}')">
+      <span style="font-size:1rem;">${sel?'☑':'☐'}</span>
+      <span style="font-size:.82rem;flex:1;">${c.name||c.code}</span>
+      <span style="font-size:.72rem;color:var(--text-muted);">${c.code||''}</span>
+    </div>`;
+  }).join('');
+}
+
+function portalToggleMateria(id, name, code) {
+  const idx = _portalMateriasSeleccionadas.findIndex(x => x.id === id);
+  if (idx >= 0) _portalMateriasSeleccionadas.splice(idx, 1);
+  else _portalMateriasSeleccionadas.push({id, name, code});
+  portalFiltrarMaterias();
+  const chips = document.getElementById('pf-materias-seleccionadas');
+  chips.innerHTML = _portalMateriasSeleccionadas.map(m =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:.78rem;">
+      ${m.name} <span onclick="portalToggleMateria(${m.id},'${m.name}','${m.code}')" style="cursor:pointer;font-weight:700;">✕</span>
+    </span>`).join('');
+}
+
+async function portalEnviarInscripcion() {
+  const msg = document.getElementById('pf-msg');
+  const apellido = document.getElementById('pf-apellido').value.trim();
+  const nombre   = document.getElementById('pf-nombre').value.trim();
+  const cedula   = document.getElementById('pf-cedula').value.trim();
+  const email    = document.getElementById('pf-email').value.trim();
+  const programa = document.getElementById('pf-programa').value;
+  const semestre = document.getElementById('pf-semestre').value.trim();
+  const obs      = document.getElementById('pf-obs').value.trim();
+
+  if (!apellido || !nombre || !cedula || !semestre) {
+    msg.textContent = 'Apellido, nombre, cédula y semestre son requeridos.'; msg.style.color = 'var(--error)'; return;
+  }
+  if (!_portalMateriasSeleccionadas.length) {
+    msg.textContent = 'Seleccioná al menos una materia.'; msg.style.color = 'var(--error)'; return;
+  }
+  const alumno = {
+    nombre: `${nombre} ${apellido}`,
+    cedula, email, programa, periodo: semestre, obs,
+    cursos: _portalMateriasSeleccionadas.map(m => ({nombre_original: m.name, canvas_id: m.id, match_ok: true})),
+    issues: [],
+  };
   msg.textContent = 'Enviando…'; msg.style.color = 'var(--text-muted)';
   try {
-    const res = await apiFetch('/api/parseo/enviar-cola', { method:'POST', body: JSON.stringify({alumnos: listos}) });
-    msg.textContent = `✅ ${res.enviados} alumno${res.enviados!==1?'s':''} enviado${res.enviados!==1?'s':''} correctamente.`;
+    const res = await apiFetch('/api/parseo/enviar-cola', { method:'POST', body: JSON.stringify({alumnos:[alumno]}) });
+    msg.textContent = `✅ ${res.enviados} inscripcion${res.enviados!==1?'es':'ón'} enviada${res.enviados!==1?'s':''} a la cola.`;
     msg.style.color = 'var(--success)';
-    _portalParseo = [];
-    document.getElementById('portal-preview-card').style.display = 'none';
-    document.getElementById('portal-file-input').value = '';
+    setTimeout(() => portalLimpiarFicha(), 1500);
     portalCargarMisEnvios();
   } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
 }
 
-async function portalCargaManual() {
-  const msg = document.getElementById('portal-manual-msg');
-  const nombre  = document.getElementById('pm-nombre').value.trim();
-  const cedula  = document.getElementById('pm-cedula').value.trim();
-  const email   = document.getElementById('pm-email').value.trim();
-  const programa= document.getElementById('pm-programa').value;
-  const semestre= document.getElementById('pm-semestre').value.trim();
-  const cursosRaw = document.getElementById('pm-cursos').value.trim();
-  const obs     = document.getElementById('pm-obs').value.trim();
-
-  if (!nombre || !cedula || !semestre || !cursosRaw) {
-    msg.textContent = 'Nombre, cédula, semestre y al menos un curso son requeridos.';
-    msg.style.color = 'var(--error)'; return;
-  }
-  const cursos = cursosRaw.split('\n').map(c => c.trim()).filter(Boolean);
-  const alumnos = [{ nombre, cedula, email, programa, periodo: semestre, cursos: cursos.map(c => ({nombre_original:c,match_ok:true})), obs, issues:[] }];
-  msg.textContent = 'Enviando…'; msg.style.color = 'var(--text-muted)';
-  try {
-    const res = await apiFetch('/api/parseo/enviar-cola', { method:'POST', body: JSON.stringify({alumnos}) });
-    msg.textContent = `✅ ${cursos.length} inscripcion${cursos.length!==1?'es':''} enviadas a la cola.`;
-    msg.style.color = 'var(--success)';
-    ['pm-nombre','pm-cedula','pm-email','pm-semestre','pm-cursos','pm-obs'].forEach(id => document.getElementById(id).value = '');
-    portalCargarMisEnvios();
-  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
+function portalLimpiarFicha() {
+  document.getElementById('portal-ficha-card').style.display = 'none';
+  document.getElementById('portal-buscar-resultados').style.display = 'none';
+  document.getElementById('portal-buscar-input').value = '';
+  document.getElementById('portal-buscar-msg').textContent = '';
+  _portalMateriasSeleccionadas = [];
 }
 
 async function portalCargarMisEnvios() {

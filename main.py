@@ -830,6 +830,68 @@ async def get_dashboard(_: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# Búsqueda de alumnos (Canvas + Azure AD)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/alumnos/buscar")
+async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get_current_user)):
+    """Busca un alumno por cédula o nombre en Canvas y Azure AD en paralelo."""
+    import asyncio
+
+    async def _canvas():
+        try:
+            # Try cedula as SIS ID first
+            if q.isdigit():
+                u = await canvas_service.find_user_by_sis_id(q)
+                if u:
+                    return [{"fuente": "canvas", "id": u.get("id"), "nombre": u.get("name"),
+                             "email": u.get("email"), "sis_id": q, "canvas_id": u.get("id")}]
+            results = await canvas_service.search_users(q)
+            return [{"fuente": "canvas", "id": u.get("id"), "nombre": u.get("name"),
+                     "email": u.get("email"), "sis_id": u.get("sis_user_id"), "canvas_id": u.get("id")}
+                    for u in results]
+        except Exception:
+            return []
+
+    async def _azure():
+        try:
+            results = await graph_service.search_users(q)
+            return [{"fuente": "azure", "id": u.get("id"), "nombre": u.get("displayName"),
+                     "email": u.get("mail") or u.get("userPrincipalName"),
+                     "upn": u.get("userPrincipalName"), "activo": u.get("accountEnabled", True)}
+                    for u in results]
+        except Exception:
+            return []
+
+    canvas_res, azure_res = await asyncio.gather(_canvas(), _azure())
+
+    # Merge by email
+    merged: dict[str, dict] = {}
+    for u in canvas_res:
+        key = (u.get("email") or "").lower()
+        merged[key] = {**u, "en_canvas": True, "en_azure": False}
+    for u in azure_res:
+        key = (u.get("email") or "").lower()
+        if key in merged:
+            merged[key].update({"en_azure": True, "upn": u.get("upn"), "azure_id": u.get("id"), "activo": u.get("activo")})
+        else:
+            merged[key] = {**u, "en_canvas": False, "en_azure": True}
+
+    return list(merged.values())
+
+
+@app.get("/api/canvas/courses/activos")
+async def list_courses_activos(_: dict = Depends(get_current_user)):
+    """Cursos activos de Canvas para el selector de materias."""
+    try:
+        courses = await canvas_service.get_courses(per_page=200)
+        return [{"id": c.get("id"), "name": c.get("name"), "sis_id": c.get("sis_course_id"),
+                 "code": c.get("course_code")} for c in courses if c.get("workflow_state") != "deleted"]
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
 # Parseo de planilla académica
 # ---------------------------------------------------------------------------
 

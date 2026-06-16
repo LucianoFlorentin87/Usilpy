@@ -175,3 +175,17 @@ async def get_enrollments(course_id: str) -> list[dict]:
         )
         resp.raise_for_status()
         return resp.json()
+
+
+async def search_users(query: str, per_page: int = 20) -> list[dict]:
+    """Search Canvas users by name or email (account-level search)."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{BASE}/api/v1/accounts/self/users",
+            headers=HEADERS,
+            params={"search_term": query, "per_page": per_page},
+        )
+        if resp.status_code in (400, 404):
+            return []
+        resp.raise_for_status()
+        return resp.json()
