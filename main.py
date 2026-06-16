@@ -838,9 +838,13 @@ async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get
     """Busca un alumno por cédula o nombre en Canvas y Azure AD en paralelo."""
     import asyncio
 
+    errores = []
+
     async def _canvas():
         try:
-            # Try cedula as SIS ID first
+            if not canvas_service.settings.canvas_base_url:
+                errores.append("Canvas: CANVAS_BASE_URL no configurado en el servidor")
+                return []
             if q.isdigit():
                 u = await canvas_service.find_user_by_sis_id(q)
                 if u:
@@ -850,25 +854,29 @@ async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get
             return [{"fuente": "canvas", "id": u.get("id"), "nombre": u.get("name"),
                      "email": u.get("email"), "sis_id": u.get("sis_user_id"), "canvas_id": u.get("id")}
                     for u in results]
-        except Exception:
+        except Exception as e:
+            errores.append(f"Canvas: {str(e)[:120]}")
             return []
 
     async def _azure():
         try:
+            if not canvas_service.settings.azure_client_id:
+                errores.append("Azure AD: AZURE_CLIENT_ID no configurado en el servidor")
+                return []
             results = await graph_service.search_users(q)
             return [{"fuente": "azure", "id": u.get("id"), "nombre": u.get("displayName"),
                      "email": u.get("mail") or u.get("userPrincipalName"),
                      "upn": u.get("userPrincipalName"), "activo": u.get("accountEnabled", True)}
                     for u in results]
-        except Exception:
+        except Exception as e:
+            errores.append(f"Azure AD: {str(e)[:120]}")
             return []
 
     canvas_res, azure_res = await asyncio.gather(_canvas(), _azure())
 
-    # Merge by email
     merged: dict[str, dict] = {}
     for u in canvas_res:
-        key = (u.get("email") or "").lower()
+        key = (u.get("email") or u.get("sis_id") or "").lower()
         merged[key] = {**u, "en_canvas": True, "en_azure": False}
     for u in azure_res:
         key = (u.get("email") or "").lower()
@@ -877,18 +885,20 @@ async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get
         else:
             merged[key] = {**u, "en_canvas": False, "en_azure": True}
 
-    return list(merged.values())
+    return {"resultados": list(merged.values()), "errores": errores}
 
 
 @app.get("/api/canvas/courses/activos")
 async def list_courses_activos(_: dict = Depends(get_current_user)):
     """Cursos activos de Canvas para el selector de materias."""
+    if not canvas_service.settings.canvas_base_url:
+        raise HTTPException(status_code=503, detail="Canvas no configurado: falta CANVAS_BASE_URL en las variables de entorno del servidor")
     try:
         courses = await canvas_service.get_courses(per_page=200)
         return [{"id": c.get("id"), "name": c.get("name"), "sis_id": c.get("sis_course_id"),
                  "code": c.get("course_code")} for c in courses if c.get("workflow_state") != "deleted"]
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=f"Error Canvas: {str(exc)}")
 
 
 # ---------------------------------------------------------------------------

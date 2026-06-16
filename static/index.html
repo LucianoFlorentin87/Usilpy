@@ -482,6 +482,15 @@
         </div>
       </div>
 
+      <!-- Log de errores en tiempo real -->
+      <div class="card" id="portal-log-card" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <h3 style="margin:0;font-size:.88rem;">🔎 Log del sistema</h3>
+          <button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="document.getElementById('portal-error-log').innerHTML='';document.getElementById('portal-log-card').style.display='none';">Limpiar</button>
+        </div>
+        <div id="portal-error-log" style="max-height:140px;overflow-y:auto;font-family:monospace;background:#f8fafc;border-radius:6px;padding:8px;border:1px solid var(--border);"></div>
+      </div>
+
       <!-- Mis envíos recientes -->
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -2107,21 +2116,39 @@ async function deleteSystemUser(id, username) {
 let _portalMaterias = [];
 let _portalMateriasSeleccionadas = [];
 
+function _portalLog(msg, tipo = 'info') {
+  const log = document.getElementById('portal-error-log');
+  if (!log) return;
+  const color = tipo === 'error' ? 'var(--error)' : tipo === 'warn' ? 'var(--warn)' : 'var(--text-muted)';
+  const time = new Date().toLocaleTimeString('es');
+  log.innerHTML += `<div style="font-size:.78rem;color:${color};padding:2px 0;border-bottom:1px solid var(--border);">[${time}] ${msg}</div>`;
+  log.scrollTop = log.scrollHeight;
+  log.parentElement.style.display = '';
+}
+
 async function portalBuscar() {
   const q = document.getElementById('portal-buscar-input').value.trim();
   const msg = document.getElementById('portal-buscar-msg');
   if (q.length < 2) { msg.textContent = 'Ingresá al menos 2 caracteres.'; return; }
   msg.textContent = 'Buscando…';
+  _portalLog(`Buscando "${q}" en Canvas y Azure AD…`);
   try {
-    const results = await apiFetch(`/api/alumnos/buscar?q=${encodeURIComponent(q)}`);
+    const data = await apiFetch(`/api/alumnos/buscar?q=${encodeURIComponent(q)}`);
+    const results = data.resultados || [];
+    const errores = data.errores || [];
+    errores.forEach(e => _portalLog(e, 'error'));
+
     const tbody = document.getElementById('portal-buscar-tbody');
     if (!results.length) {
-      msg.textContent = 'No encontrado — podés cargarlo como alumno nuevo.';
+      msg.textContent = errores.length
+        ? `Sin resultados (${errores.length} error${errores.length>1?'es':''} — ver log)`
+        : 'No encontrado — podés cargarlo como alumno nuevo.';
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Sin resultados</td></tr>';
       document.getElementById('portal-buscar-resultados').style.display = '';
       return;
     }
     msg.textContent = `${results.length} resultado${results.length!==1?'s':''} encontrado${results.length!==1?'s':''}.`;
+    _portalLog(`${results.length} alumno${results.length!==1?'s':''} encontrado${results.length!==1?'s':''}.`, 'info');
     tbody.innerHTML = results.map(u => {
       const canvas = u.en_canvas ? '<span class="chip chip-ok">✅ Sí</span>' : '<span class="chip chip-skip">No</span>';
       const azure  = u.en_azure  ? '<span class="chip chip-ok">✅ Sí</span>' : '<span class="chip chip-skip">No</span>';
@@ -2136,7 +2163,7 @@ async function portalBuscar() {
       </tr>`;
     }).join('');
     document.getElementById('portal-buscar-resultados').style.display = '';
-  } catch(ex) { msg.textContent = ex.message; }
+  } catch(ex) { msg.textContent = ex.message; _portalLog(ex.message, 'error'); }
 }
 
 function portalSeleccionarAlumno(u) {
@@ -2180,12 +2207,14 @@ function portalNuevoAlumno() {
 
 async function portalCargarMaterias() {
   const lista = document.getElementById('pf-materias-lista');
-  lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Cargando…</p>';
+  lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Cargando materias de Canvas…</p>';
   try {
     _portalMaterias = await apiFetch('/api/canvas/courses/activos');
+    _portalLog(`${_portalMaterias.length} materias cargadas desde Canvas.`);
     portalFiltrarMaterias();
   } catch(ex) {
-    lista.innerHTML = `<p style="color:var(--error);font-size:.82rem;padding:8px;">${ex.message}</p>`;
+    lista.innerHTML = `<p style="color:var(--error);font-size:.82rem;padding:8px;">⚠️ No se pudieron cargar las materias — ver log abajo</p>`;
+    _portalLog(ex.message, 'error');
   }
 }
 
