@@ -438,10 +438,20 @@
             <label>Email institucional</label>
             <input id="pf-email" type="email" placeholder="camila.flores@usil.edu.py" />
           </div>
-          <div class="form-group" style="max-width:130px;">
+          <div class="form-group" style="max-width:210px;">
+            <label>Carrera</label>
+            <select id="pf-carrera" onchange="portalCarreraChange()">
+              <option value="">— Carrera —</option>
+              <option value="marketing">Marketing</option>
+              <option value="administracion">Administración de Empresas</option>
+              <option value="negocios">Negocios Internacionales</option>
+              <option value="contabilidad">Contabilidad</option>
+            </select>
+          </div>
+          <div class="form-group" style="max-width:110px;">
             <label>Programa</label>
             <select id="pf-programa" onchange="portalCargarMaterias()">
-              <option value="">— Programa —</option>
+              <option value="">— Prog. —</option>
               <option value="GA">GA</option>
               <option value="GND">GND</option>
               <option value="CPEL">CPEL</option>
@@ -2105,6 +2115,78 @@ async function deleteSystemUser(id, username) {
 let _portalMaterias = [];
 let _portalMateriasSeleccionadas = [];
 
+// ── Mallas curriculares ───────────────────────────────────────────────────────
+const MALLAS = {
+  marketing: {
+    label: "Marketing",
+    semestres: {
+      "1er Semestre": ["Lenguaje I","Desarrollo Personal I","Introducción a los Negocios","Matemática I","Inglés I","TIC I"],
+      "2do Semestre": ["Matemática II","Desarrollo Personal II","Historia y Realidad Socio Económica del Paraguay","Lenguaje II","Inglés II","Gestión de Empresas"],
+      "3er Semestre": ["Marketing","Contabilidad I","Economía General","Matemática III","Inglés III"],
+      "4to Semestre": ["Publicidad y Promoción","Sociedad, Estado y Empresa","Estadística I","Comportamiento Organizacional","Gerencia de Marketing","Inglés IV"],
+      "5to Semestre": ["Investigación y Análisis de Mercado Internacionales","Análisis Gerencial de la Información Financiera","Inglés V","Metodología de la Investigación","Microeconomía"],
+      "6to Semestre": ["Desarrollo y Gerencia de Producto","Diseño Digital para Marketing","Comportamiento del Consumidor","Macroeconomía","Investigación y Análisis de M.","Inglés VI"],
+      "7mo Semestre": ["Marketing de Servicios","Política de Precio","Ética y Filosofía","Canales y Distribución en Marketing","Guaraní"],
+      "8vo Semestre": ["Finanzas","Gerencia de Ventas","Marketing Relacional y CRM","E-Marketing","Marketing Estratégico","Portugués"],
+      "9no Semestre": ["Evaluación de Proyectos","Marketing Internacional","Marketing Industrial y B2B","Retailing & Trade Marketing"],
+      "10mo Semestre": ["Trabajo Final de Grado","Pasantías"],
+    }
+  },
+  administracion: {
+    label: "Administración de Empresas",
+    semestres: {
+      "1er Semestre": ["Lenguaje I","Desarrollo Personal I","Introducción a los Negocios","Matemática I","Inglés I","TIC I"],
+      "2do Semestre": ["Matemática II","Desarrollo Personal II","Historia y Realidad Socio Económica del Paraguay","Lenguaje II","Inglés II","Gestión de Empresas"],
+      "3er Semestre": ["Marketing","Contabilidad I","Economía General","Matemática III","Inglés III"],
+      "4to Semestre": ["Contabilidad de Costos","Sociedad, Estado y Empresa","Estadística I","Comportamiento Organizacional","Gerencia de Marketing","Inglés IV"],
+      "5to Semestre": ["Contabilidad II","Estadística II","Inglés V","Matemática Financiera","Metodología de la Investigación","TIC II","Microeconomía"],
+      "6to Semestre": ["Contabilidad de Gestión","Estrategias Gerenciales","Finanzas I","Macroeconomía","Investigación y Análisis de M.","Inglés VI"],
+      "7mo Semestre": ["Derecho Empresarial y Sociedades","Ética y Filosofía","Finanzas II","Gerencia de Capital Humano","Gerencia de Operaciones y Logística"],
+      "8vo Semestre": ["Mercado Financiero","Evaluación de Proyectos","Portugués"],
+      "9no Semestre": ["Guaraní","Planeamiento y Gestión Estratégica","Liderazgo Organizacional"],
+      "10mo Semestre": ["Trabajo Final de Grado","Pasantías"],
+    }
+  },
+  negocios: {
+    label: "Negocios Internacionales",
+    semestres: {
+      "1er Semestre": ["Lenguaje I","Desarrollo Personal I","Introducción a los Negocios","Matemática I","Inglés I","TIC I"],
+      "2do Semestre": ["Matemática II","Desarrollo Personal II","Historia y Realidad Socio Económica del Paraguay","Lenguaje II","Inglés II","Gestión de Empresas"],
+      "3er Semestre": ["Marketing","Contabilidad I","Economía General","Matemática III","Inglés III"],
+      "4to Semestre": ["Publicidad y Promoción","Sociedad, Estado y Empresa","Estadística I","Comportamiento Organizacional","Gerencia de Marketing","Inglés IV"],
+      "5to Semestre": ["Investigación y Análisis de Mercado Internacionales","Análisis Gerencial de la Información Financiera","Inglés V","Metodología de la Investigación","Microeconomía","International Trade I: Imports & Exports","International Human Resources"],
+      "6to Semestre": ["Macroeconomía","Investigación y Análisis de M. Avanzada","Comportamiento del Consumidor","Inglés VI","Marketing de Servicios","International Trade II: Logísticas"],
+      "7mo Semestre": ["Ética y Filosofía","Derecho Internacional","Guaraní","Finanzas","Aduanas","International Operations"],
+      "8vo Semestre": ["Promoción y Gestión de Exportaciones","Global Business Strategy","Portugués"],
+      "9no Semestre": ["Evaluación de Proyectos","Marketing Internacional","International Finance","Valoración Aduanera"],
+      "10mo Semestre": ["Trabajo Final de Grado","Pasantías"],
+    }
+  },
+  contabilidad: {
+    label: "Contabilidad",
+    semestres: {
+      "1er Semestre": ["Lenguaje I","Desarrollo Personal I","Introducción a los Negocios","Matemática I","Inglés I","TIC I"],
+      "2do Semestre": ["Matemática II","Desarrollo Personal II","Historia y Realidad Socio Económica del Paraguay","Lenguaje II","Inglés II","Gestión de Empresas"],
+      "3er Semestre": ["Marketing","Contabilidad I","Economía General","Matemática III","Inglés III"],
+      "4to Semestre": ["Publicidad y Promoción","Sociedad, Estado y Empresa","Estadística I","Comportamiento Organizacional","Gerencia de Marketing","Inglés IV"],
+      "5to Semestre": ["Investigación y Análisis de Mercado Internacionales","Análisis Gerencial de la Información Financiera","Inglés V","Metodología de la Investigación","Microeconomía"],
+      "6to Semestre": ["Desarrollo y Gerencia de Producto","Diseño Digital para Marketing","Comportamiento del Consumidor","Macroeconomía","Investigación y Análisis de M.","Inglés VI"],
+      "7mo Semestre": ["Marketing de Servicios","Política de Precio","Ética y Filosofía","Canales y Distribución en Marketing","Guaraní"],
+      "8vo Semestre": ["Finanzas","Gerencia de Ventas","Marketing Relacional y CRM","E-Marketing","Marketing Estratégico","Portugués"],
+      "9no Semestre": ["Evaluación de Proyectos","Marketing Internacional","Marketing Industrial y B2B","Retailing & Trade Marketing"],
+      "10mo Semestre": ["Trabajo Final de Grado","Pasantías"],
+    }
+  },
+};
+
+function portalCarreraChange() {
+  // Reset materias al cambiar carrera
+  _portalMaterias = [];
+  _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
+  portalCargarMaterias();
+}
+
 function _portalLog(msg, tipo = 'info') {
   const log = document.getElementById('portal-error-log');
   const card = document.getElementById('portal-log-card');
@@ -2184,54 +2266,61 @@ function portalNuevoAlumno() {
   portalCargarMaterias();
 }
 
-async function portalCargarMaterias() {
+function portalCargarMaterias() {
   const lista = document.getElementById('pf-materias-lista');
-  const programa = document.getElementById('pf-programa')?.value || '';
-  if (!programa) {
-    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná un programa para ver las materias disponibles</p>';
+  const carrera = document.getElementById('pf-carrera')?.value || '';
+  if (!carrera || !MALLAS[carrera]) {
+    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná una carrera para ver las materias disponibles</p>';
     return;
   }
-  lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Cargando materias…</p>';
-  try {
-    _portalMaterias = await apiFetch(`/api/canvas/courses/activos?programa=${encodeURIComponent(programa)}`);
-    _portalLog(`${_portalMaterias.length} materias cargadas para ${programa}.`);
-    portalFiltrarMaterias();
-  } catch(ex) {
-    lista.innerHTML = `<p style="color:var(--error);font-size:.82rem;padding:8px;">⚠️ No se pudieron cargar las materias</p>`;
-    _portalLog(ex.message, 'error');
+  // Construye lista plana con id sintético = nombre
+  const malla = MALLAS[carrera];
+  _portalMaterias = [];
+  for (const [sem, materias] of Object.entries(malla.semestres)) {
+    for (const m of materias) {
+      _portalMaterias.push({ id: m, name: m, semestre: sem });
+    }
   }
+  document.getElementById('pf-materia-buscar').value = '';
+  portalFiltrarMaterias();
 }
 
 function portalFiltrarMaterias() {
   const q = (document.getElementById('pf-materia-buscar').value || '').toLowerCase();
   const lista = document.getElementById('pf-materias-lista');
-  const filtradas = q
-    ? _portalMaterias.filter(c => (c.name||'').toLowerCase().includes(q) || (c.code||'').toLowerCase().includes(q))
-    : _portalMaterias;
-  if (!filtradas.length) {
-    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Sin resultados</p>'; return;
+  const carrera = document.getElementById('pf-carrera')?.value || '';
+  if (!carrera || !MALLAS[carrera]) {
+    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná una carrera primero</p>';
+    return;
   }
-  lista.innerHTML = filtradas.map(c => {
-    const sel = _portalMateriasSeleccionadas.some(x => x.id === c.id);
-    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:6px;cursor:pointer;transition:background .15s;${sel?'background:#eff6ff;':''}"
-      onmouseover="if(!${sel})this.style.background='#f5f8ff'" onmouseout="if(!${sel})this.style.background=''"
-      onclick="portalToggleMateria(${c.id},'${(c.name||'').replace(/'/g,"\\'")}','${(c.code||'').replace(/'/g,"\\'")}')">
-      <span style="font-size:1.05rem;width:20px;text-align:center;">${sel?'☑':'☐'}</span>
-      <span style="font-size:.83rem;flex:1;">${c.name||c.code}</span>
-      <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">${c.code||''}</span>
-    </div>`;
-  }).join('');
+  const malla = MALLAS[carrera];
+  let html = '';
+  for (const [sem, materias] of Object.entries(malla.semestres)) {
+    const filtradas = q ? materias.filter(m => m.toLowerCase().includes(q)) : materias;
+    if (!filtradas.length) continue;
+    html += `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;padding:8px 4px 3px;text-transform:uppercase;">${sem}</div>`;
+    html += filtradas.map(m => {
+      const sel = _portalMateriasSeleccionadas.some(x => x.id === m);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;${sel?'background:#eff6ff;border-left:3px solid #3b82f6;':''}"
+        onclick="portalToggleMateria('${m.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}','${sem.replace(/'/g,"\\'")}')">
+        <span style="font-size:1rem;width:18px;text-align:center;">${sel?'☑':'☐'}</span>
+        <span style="font-size:.83rem;flex:1;">${m}</span>
+      </div>`;
+    }).join('');
+  }
+  if (!html) html = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Sin resultados</p>';
+  lista.innerHTML = html;
 }
 
-function portalToggleMateria(id, name, code) {
+function portalToggleMateria(id, name, semestre) {
   const idx = _portalMateriasSeleccionadas.findIndex(x => x.id === id);
   if (idx >= 0) _portalMateriasSeleccionadas.splice(idx, 1);
-  else _portalMateriasSeleccionadas.push({id, name, code});
+  else _portalMateriasSeleccionadas.push({id, name, semestre});
   portalFiltrarMaterias();
   const chips = document.getElementById('pf-materias-seleccionadas');
   chips.innerHTML = _portalMateriasSeleccionadas.map(m =>
     `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:.78rem;">
-      ${m.name} <span onclick="portalToggleMateria(${m.id},'${m.name}','${m.code}')" style="cursor:pointer;font-weight:700;">✕</span>
+      ${m.name} <span onclick="portalToggleMateria('${m.id.replace(/'/g,"\\'")}','${m.name.replace(/'/g,"\\'")}','')" style="cursor:pointer;font-weight:700;margin-left:2px;">✕</span>
     </span>`).join('');
 }
 
@@ -2241,9 +2330,11 @@ async function portalEnviarInscripcion() {
   const nombre   = document.getElementById('pf-nombre').value.trim();
   const cedula   = document.getElementById('pf-cedula').value.trim();
   const email    = document.getElementById('pf-email').value.trim();
+  const carrera  = document.getElementById('pf-carrera').value;
   const programa = document.getElementById('pf-programa').value;
   const semestre = document.getElementById('pf-semestre').value.trim();
   const obs      = document.getElementById('pf-obs').value.trim();
+  const carreraLabel = carrera ? (MALLAS[carrera]?.label || carrera) : '';
 
   if (!apellido || !nombre || !cedula || !semestre) {
     msg.textContent = 'Apellido, nombre, cédula y semestre son requeridos.'; msg.style.color = 'var(--error)'; return;
@@ -2253,8 +2344,11 @@ async function portalEnviarInscripcion() {
   }
   const alumno = {
     nombre: `${nombre} ${apellido}`,
-    cedula, email, programa, periodo: semestre, obs,
-    cursos: _portalMateriasSeleccionadas.map(m => ({nombre_original: m.name, canvas_id: m.id, match_ok: true})),
+    cedula, email,
+    programa: programa || carreraLabel,
+    carrera: carreraLabel,
+    periodo: semestre, obs,
+    cursos: _portalMateriasSeleccionadas.map(m => ({nombre_original: m.name, match_ok: true})),
     issues: [],
   };
   msg.textContent = 'Enviando…'; msg.style.color = 'var(--text-muted)';
