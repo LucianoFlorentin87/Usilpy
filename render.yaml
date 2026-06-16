@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: usilpy
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CANVAS_BASE_URL
+        sync: false
+      - key: CANVAS_API_TOKEN
+        sync: false
+      - key: AZURE_TENANT_ID
+        sync: false
+      - key: AZURE_CLIENT_ID
+        sync: false
+      - key: AZURE_CLIENT_SECRET
+        sync: false
+      - key: TEAMS_DEFAULT_TEAM_ID
+        sync: false
+      - key: TEAMS_WEBHOOK_URL
+        sync: false
+      - key: ONEDRIVE_FILE_ID
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: WEBHOOK_API_KEY
+        sync: false
+      - key: APP_SECRET_KEY
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: SEMESTRE_ACTUAL
+        sync: false
+      - key: CRON_HORA
+        sync: false
+      - key: AZURE_REDIRECT_URI
+        sync: false
