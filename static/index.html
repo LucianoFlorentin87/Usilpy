@@ -405,7 +405,7 @@
         <div id="portal-buscar-resultados" style="display:none;margin-top:14px;">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Nombre</th><th>Email</th><th>Cédula</th><th>Canvas</th><th>Azure AD</th><th></th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Email</th><th>Cédula</th><th></th></tr></thead>
               <tbody id="portal-buscar-tbody"></tbody>
             </table>
           </div>
@@ -2358,14 +2358,10 @@ async function portalBuscar() {
     msg.textContent = `${results.length} resultado${results.length!==1?'s':''} encontrado${results.length!==1?'s':''}.`;
     _portalLog(`${results.length} alumno${results.length!==1?'s':''} encontrado${results.length!==1?'s':''}.`, 'info');
     tbody.innerHTML = results.map(u => {
-      const canvas = u.en_canvas ? '<span class="chip chip-ok">✅ Sí</span>' : '<span class="chip chip-skip">No</span>';
-      const azure  = u.en_azure  ? '<span class="chip chip-ok">✅ Sí</span>' : '<span class="chip chip-skip">No</span>';
       return `<tr>
         <td><strong>${u.nombre||'—'}</strong></td>
         <td style="font-size:.78rem;">${u.email||'—'}</td>
         <td>${u.sis_id||u.cedula||'—'}</td>
-        <td>${canvas}</td>
-        <td>${azure}</td>
         <td><button class="btn btn-primary" style="padding:4px 10px;font-size:.78rem;"
           onclick='portalSeleccionarAlumno(${JSON.stringify(u)})'>Seleccionar</button></td>
       </tr>`;
