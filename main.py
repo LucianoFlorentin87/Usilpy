@@ -72,6 +72,22 @@ async def root():
     return FileResponse("static/index.html")
 
 
+@app.get("/api/diagnostico")
+async def diagnostico(_: dict = Depends(get_current_user)):
+    """Diagnóstico de variables de entorno (sin exponer valores sensibles)."""
+    from config import get_settings
+    s = get_settings()
+    return {
+        "canvas_base_url":    s.canvas_base_url or "(vacío)",
+        "canvas_api_token":   "✓ configurado" if s.canvas_api_token else "(vacío)",
+        "azure_tenant_id":    "✓ configurado" if s.azure_tenant_id else "(vacío)",
+        "azure_client_id":    "✓ configurado" if s.azure_client_id else "(vacío)",
+        "azure_client_secret":"✓ configurado" if s.azure_client_secret else "(vacío)",
+        "admin_username":     s.admin_username or "(vacío)",
+        "semestre_actual":    s.semestre_actual,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Auth endpoints
 # ---------------------------------------------------------------------------
