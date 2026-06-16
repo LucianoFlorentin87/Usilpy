@@ -905,14 +905,26 @@ async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get
 
 
 @app.get("/api/canvas/courses/activos")
-async def list_courses_activos(_: dict = Depends(get_current_user)):
-    """Cursos activos de Canvas para el selector de materias."""
-    if not canvas_service.settings.canvas_base_url:
-        raise HTTPException(status_code=503, detail="Canvas no configurado: falta CANVAS_BASE_URL en las variables de entorno del servidor")
+async def list_courses_activos(programa: str | None = None, _: dict = Depends(get_current_user)):
+    """Cursos activos de Canvas, opcionalmente filtrados por programa."""
+    if not get_settings().canvas_base_url:
+        raise HTTPException(status_code=503, detail="Canvas no configurado")
     try:
         courses = await canvas_service.get_courses(per_page=200)
-        return [{"id": c.get("id"), "name": c.get("name"), "sis_id": c.get("sis_course_id"),
-                 "code": c.get("course_code")} for c in courses if c.get("workflow_state") != "deleted"]
+        result = []
+        for c in courses:
+            if c.get("workflow_state") == "deleted":
+                continue
+            name = c.get("name", "")
+            sis_id = c.get("sis_course_id", "") or ""
+            code = c.get("course_code", "") or ""
+            # Filtrar por programa si se especificó
+            if programa:
+                searchable = (name + sis_id + code).upper()
+                if programa.upper() not in searchable:
+                    continue
+            result.append({"id": c.get("id"), "name": name, "sis_id": sis_id, "code": code})
+        return sorted(result, key=lambda x: x["name"])
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Error Canvas: {str(exc)}")
 

@@ -440,7 +440,8 @@
           </div>
           <div class="form-group" style="max-width:130px;">
             <label>Programa</label>
-            <select id="pf-programa">
+            <select id="pf-programa" onchange="portalCargarMaterias()">
+              <option value="">— Programa —</option>
               <option value="GA">GA</option>
               <option value="GND">GND</option>
               <option value="CPEL">CPEL</option>
@@ -452,21 +453,14 @@
           </div>
         </div>
 
-        <!-- Indicadores de existencia -->
-        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-          <span id="pf-badge-canvas" style="font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--skip-bg);color:var(--skip);border:1px solid var(--skip-border);">Canvas: —</span>
-          <span id="pf-badge-azure"  style="font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--skip-bg);color:var(--skip);border:1px solid var(--skip-border);">Azure AD: —</span>
-        </div>
-
-        <!-- Selección de materias -->
-        <div style="margin-bottom:6px;font-size:.8rem;font-weight:500;color:var(--text-muted);">Materias a inscribir</div>
+        <!-- Selección de materias por programa -->
+        <div style="margin-bottom:8px;font-size:.8rem;font-weight:600;color:var(--text);">Materias a inscribir</div>
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
-          <input id="pf-materia-buscar" type="text" placeholder="Buscar materia…" style="flex:1;min-width:200px;"
+          <input id="pf-materia-buscar" type="text" placeholder="Buscar materia…" style="flex:1;min-width:180px;"
             oninput="portalFiltrarMaterias()" />
-          <button class="btn btn-secondary" style="font-size:.78rem;padding:5px 10px;" onclick="portalCargarMaterias()">🔄 Cargar materias</button>
         </div>
-        <div id="pf-materias-lista" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:#fafbfd;">
-          <p style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:16px 0;">Clic en "Cargar materias" para ver los cursos disponibles</p>
+        <div id="pf-materias-lista" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:#fafbfd;">
+          <p style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:16px 0;">Seleccioná un programa para ver las materias disponibles</p>
         </div>
         <div id="pf-materias-seleccionadas" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
 
@@ -2170,14 +2164,6 @@ function portalSeleccionarAlumno(u) {
   document.getElementById('pf-nombre').value   = partes.slice(0, mitad).join(' ');
   document.getElementById('pf-cedula').value   = u.sis_id || u.cedula || '';
   document.getElementById('pf-email').value    = u.email || '';
-  document.getElementById('pf-badge-canvas').textContent = u.en_canvas ? 'Canvas: ✅ Existe' : 'Canvas: No existe';
-  document.getElementById('pf-badge-canvas').style.cssText = u.en_canvas
-    ? 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);'
-    : 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--skip-bg);color:var(--skip);border:1px solid var(--skip-border);';
-  document.getElementById('pf-badge-azure').textContent = u.en_azure ? 'Azure AD: ✅ Existe' : 'Azure AD: No existe';
-  document.getElementById('pf-badge-azure').style.cssText = u.en_azure
-    ? 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);'
-    : 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--skip-bg);color:var(--skip);border:1px solid var(--skip-border);';
   document.getElementById('portal-ficha-badge').textContent = 'Alumno existente';
   document.getElementById('portal-ficha-badge').style.cssText = 'font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);';
   document.getElementById('portal-buscar-resultados').style.display = 'none';
@@ -2189,10 +2175,6 @@ function portalSeleccionarAlumno(u) {
 
 function portalNuevoAlumno() {
   ['pf-apellido','pf-nombre','pf-cedula','pf-email','pf-semestre','pf-obs'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('pf-badge-canvas').textContent = 'Canvas: Nuevo';
-  document.getElementById('pf-badge-canvas').style.cssText = 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);';
-  document.getElementById('pf-badge-azure').textContent = 'Azure AD: Nuevo';
-  document.getElementById('pf-badge-azure').style.cssText = 'font-size:.78rem;padding:3px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);';
   document.getElementById('portal-ficha-badge').textContent = 'Alumno nuevo';
   document.getElementById('portal-ficha-badge').style.cssText = 'font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);';
   document.getElementById('portal-buscar-resultados').style.display = 'none';
@@ -2204,13 +2186,18 @@ function portalNuevoAlumno() {
 
 async function portalCargarMaterias() {
   const lista = document.getElementById('pf-materias-lista');
-  lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Cargando materias de Canvas…</p>';
+  const programa = document.getElementById('pf-programa')?.value || '';
+  if (!programa) {
+    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná un programa para ver las materias disponibles</p>';
+    return;
+  }
+  lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Cargando materias…</p>';
   try {
-    _portalMaterias = await apiFetch('/api/canvas/courses/activos');
-    _portalLog(`${_portalMaterias.length} materias cargadas desde Canvas.`);
+    _portalMaterias = await apiFetch(`/api/canvas/courses/activos?programa=${encodeURIComponent(programa)}`);
+    _portalLog(`${_portalMaterias.length} materias cargadas para ${programa}.`);
     portalFiltrarMaterias();
   } catch(ex) {
-    lista.innerHTML = `<p style="color:var(--error);font-size:.82rem;padding:8px;">⚠️ No se pudieron cargar las materias — ver log abajo</p>`;
+    lista.innerHTML = `<p style="color:var(--error);font-size:.82rem;padding:8px;">⚠️ No se pudieron cargar las materias</p>`;
     _portalLog(ex.message, 'error');
   }
 }
@@ -2218,17 +2205,20 @@ async function portalCargarMaterias() {
 function portalFiltrarMaterias() {
   const q = (document.getElementById('pf-materia-buscar').value || '').toLowerCase();
   const lista = document.getElementById('pf-materias-lista');
-  const filtradas = q ? _portalMaterias.filter(c => (c.name||'').toLowerCase().includes(q) || (c.code||'').toLowerCase().includes(q)) : _portalMaterias;
+  const filtradas = q
+    ? _portalMaterias.filter(c => (c.name||'').toLowerCase().includes(q) || (c.code||'').toLowerCase().includes(q))
+    : _portalMaterias;
   if (!filtradas.length) {
     lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Sin resultados</p>'; return;
   }
   lista.innerHTML = filtradas.map(c => {
     const sel = _portalMateriasSeleccionadas.some(x => x.id === c.id);
-    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:6px;cursor:pointer;${sel?'background:#eff6ff;':''}"
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:6px;cursor:pointer;transition:background .15s;${sel?'background:#eff6ff;':''}"
+      onmouseover="if(!${sel})this.style.background='#f5f8ff'" onmouseout="if(!${sel})this.style.background=''"
       onclick="portalToggleMateria(${c.id},'${(c.name||'').replace(/'/g,"\\'")}','${(c.code||'').replace(/'/g,"\\'")}')">
-      <span style="font-size:1rem;">${sel?'☑':'☐'}</span>
-      <span style="font-size:.82rem;flex:1;">${c.name||c.code}</span>
-      <span style="font-size:.72rem;color:var(--text-muted);">${c.code||''}</span>
+      <span style="font-size:1.05rem;width:20px;text-align:center;">${sel?'☑':'☐'}</span>
+      <span style="font-size:.83rem;flex:1;">${c.name||c.code}</span>
+      <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">${c.code||''}</span>
     </div>`;
   }).join('');
 }
