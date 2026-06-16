@@ -936,7 +936,7 @@ async def enviar_parseo_cola(payload: dict, current: dict = Depends(get_current_
                 "nombre":   a.get("nombre", ""),
                 "programa": a.get("programa", ""),
                 "semestre": a.get("periodo", ""),
-                "curso":    curso.get("nombre_original", ""),
+                "curso_nombre": curso.get("nombre_original", ""),
                 "source":   source,
             }
             try:
@@ -959,3 +959,163 @@ async def exportar_parseo(payload: dict, _: dict = Depends(get_current_user)):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="parseo_planilla.xlsx"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# Portal académico — mis inscripciones y formulario de inscripción
+# ---------------------------------------------------------------------------
+
+@app.get("/api/portal/mis-inscripciones")
+async def mis_inscripciones(
+    semestre: str | None = None,
+    estado: str | None = None,
+    current: dict = Depends(_require_admin_or_academico),
+):
+    """Devuelve los registros de pending_enrollments generados por el usuario actual."""
+    import aiosqlite
+    from audit_service import DB_PATH
+
+    username = current.get("username", "")
+    # admin puede ver todos; academico solo los suyos
+    if current.get("role") == "admin":
+        source_filter = "%parseo:%"
+    else:
+        source_filter = f"parseo:{username}"
+
+    conditions = ["source LIKE ?"]
+    params: list = [source_filter]
+    if semestre:
+        conditions.append("semestre = ?")
+        params.append(semestre)
+    if estado:
+        conditions.append("estado = ?")
+        params.append(estado)
+
+    where = "WHERE " + " AND ".join(conditions)
+    query = f"SELECT * FROM pending_enrollments {where} ORDER BY received_at DESC LIMIT 2000"
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(query, params) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+
+    # Agrupa por alumno (cedula + semestre)
+    agrupado: dict = {}
+    for r in rows:
+        key = (r.get("cedula", ""), r.get("semestre", ""))
+        if key not in agrupado:
+            agrupado[key] = {
+                "cedula":      r.get("cedula", ""),
+                "nombre":      r.get("nombre", ""),
+                "email":       r.get("email", ""),
+                "semestre":    r.get("semestre", ""),
+                "source":      r.get("source", ""),
+                "received_at": r.get("received_at", ""),
+                "cursos":      [],
+                "estados":     [],
+            }
+        agrupado[key]["cursos"].append(r.get("curso_nombre") or r.get("detalle") or "")
+        agrupado[key]["estados"].append(r.get("estado", ""))
+
+    alumnos = list(agrupado.values())
+    for a in alumnos:
+        estados = set(a["estados"])
+        if "error" in estados:
+            a["estado_general"] = "error"
+        elif "pendiente" in estados:
+            a["estado_general"] = "pendiente"
+        else:
+            a["estado_general"] = "procesado"
+
+    return {"alumnos": alumnos, "total": len(alumnos)}
+
+
+@app.get("/api/portal/formulario/{cedula}")
+async def formulario_inscripcion(
+    cedula: str,
+    semestre: str | None = None,
+    _: dict = Depends(_require_admin_or_academico),
+):
+    """Genera HTML imprimible con el formulario de inscripción de un alumno."""
+    import aiosqlite
+    from webhook_service import DB_PATH
+
+    conditions = ["cedula = ?"]
+    params: list = [cedula]
+    if semestre:
+        conditions.append("semestre = ?")
+        params.append(semestre)
+    where = "WHERE " + " AND ".join(conditions)
+    query = f"SELECT * FROM pending_enrollments {where} ORDER BY received_at DESC"
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(query, params) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="No se encontraron inscripciones para esta cédula")
+
+    first = rows[0]
+    nombre   = first.get("nombre", "")
+    email    = first.get("email", "")
+    sem      = first.get("semestre", semestre or "")
+    source   = first.get("source", "")
+    academico = source.replace("parseo:", "") if "parseo:" in source else source
+    fecha    = (first.get("received_at") or "")[:10]
+
+    cursos_html = "".join(
+        f"<tr><td>{i+1}</td><td>{r.get('curso_nombre') or ''}</td><td>{r.get('rol','StudentEnrollment').replace('Enrollment','')}</td><td>{r.get('estado','')}</td></tr>"
+        for i, r in enumerate(rows)
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Formulario de Inscripción — {nombre}</title>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 40px; color: #333; }}
+  h1 {{ color: #1a3c6b; border-bottom: 2px solid #1a3c6b; padding-bottom: 8px; }}
+  .logo {{ font-size: 22px; font-weight: bold; color: #1a3c6b; }}
+  .subtitulo {{ font-size: 13px; color: #555; margin-bottom: 20px; }}
+  table.info {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
+  table.info td {{ padding: 6px 10px; border: 1px solid #ccc; }}
+  table.info td:first-child {{ font-weight: bold; width: 180px; background: #f0f4fa; }}
+  table.cursos {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+  table.cursos th {{ background: #1a3c6b; color: #fff; padding: 8px; text-align: left; }}
+  table.cursos td {{ padding: 7px 10px; border: 1px solid #ddd; }}
+  table.cursos tr:nth-child(even) {{ background: #f7f9fc; }}
+  .firma {{ margin-top: 60px; display: flex; gap: 80px; }}
+  .firma div {{ border-top: 1px solid #333; padding-top: 6px; text-align: center; min-width: 200px; }}
+  @media print {{ .no-print {{ display: none; }} }}
+  .btn-print {{ margin: 20px 0; padding: 10px 24px; background: #1a3c6b; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; }}
+</style>
+</head>
+<body>
+<div class="logo">USIL Paraguay</div>
+<div class="subtitulo">Universidad San Ignacio de Loyola</div>
+<h1>Formulario de Inscripción</h1>
+<button class="btn-print no-print" onclick="window.print()">🖨️ Imprimir</button>
+<table class="info">
+  <tr><td>Nombre completo</td><td>{nombre}</td></tr>
+  <tr><td>Cédula de identidad</td><td>{cedula}</td></tr>
+  <tr><td>Correo electrónico</td><td>{email or '—'}</td></tr>
+  <tr><td>Período / Semestre</td><td>{sem}</td></tr>
+  <tr><td>Fecha de inscripción</td><td>{fecha}</td></tr>
+  <tr><td>Registrado por</td><td>{academico}</td></tr>
+</table>
+<h2 style="color:#1a3c6b;font-size:16px;">Cursos inscriptos</h2>
+<table class="cursos">
+  <thead><tr><th>#</th><th>Curso</th><th>Rol</th><th>Estado</th></tr></thead>
+  <tbody>{cursos_html}</tbody>
+</table>
+<div class="firma">
+  <div>Firma del alumno</div>
+  <div>Sello / Firma académica</div>
+</div>
+</body>
+</html>"""
+
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html)

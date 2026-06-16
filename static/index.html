@@ -491,16 +491,19 @@
         <div id="portal-error-log" style="max-height:140px;overflow-y:auto;font-family:monospace;background:#f8fafc;border-radius:6px;padding:8px;border:1px solid var(--border);"></div>
       </div>
 
-      <!-- Mis envíos recientes -->
+      <!-- Mis inscripciones -->
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <h3 style="margin:0;">Mis envíos recientes</h3>
-          <button class="btn btn-secondary" style="font-size:.75rem;padding:5px 10px;" onclick="portalCargarMisEnvios()">🔄 Actualizar</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">📋 Mis inscripciones</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="envios-semestre-filter" placeholder="Filtrar por período" style="max-width:140px;padding:5px 8px;font-size:.8rem;" oninput="portalCargarMisEnvios()" />
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:5px 10px;" onclick="portalCargarMisEnvios()">🔄 Actualizar</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Fecha</th><th>Alumno</th><th>Cédula</th><th>Programa</th><th>Curso</th><th>Estado</th></tr></thead>
-            <tbody id="portal-envios-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Sin envíos recientes</td></tr></tbody>
+            <thead><tr><th>Fecha</th><th>Alumno</th><th>Cédula</th><th>Período</th><th>Cursos</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="portal-envios-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Sin inscripciones registradas</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -2291,24 +2294,44 @@ function portalLimpiarFicha() {
 async function portalCargarMisEnvios() {
   const tbody = document.getElementById('portal-envios-tbody');
   try {
-    const rows = await apiFetch('/api/inscripciones/pendientes?estado=pendiente');
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Sin envíos recientes</td></tr>'; return;
+    const sem = (document.getElementById('envios-semestre-filter')?.value || '').trim();
+    const qs = sem ? `?semestre=${encodeURIComponent(sem)}` : '';
+    const data = await apiFetch('/api/portal/mis-inscripciones' + qs);
+    const alumnos = data.alumnos || [];
+    if (!alumnos.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Sin inscripciones registradas</td></tr>'; return;
     }
     const estadoChip = e => e==='procesado' ? '<span class="chip chip-ok">Procesado</span>'
       : e==='error' ? '<span class="chip chip-error">Error</span>'
       : '<span class="chip chip-warn">Pendiente</span>';
-    tbody.innerHTML = rows.slice(0,30).map(r => `<tr>
-      <td style="font-size:.75rem;">${new Date(r.created_at||r.recibido||'').toLocaleString('es')}</td>
-      <td>${r.nombre||'—'}</td>
-      <td>${r.cedula||'—'}</td>
-      <td><span class="chip chip-skip">${r.programa||r.semestre||'—'}</span></td>
-      <td style="font-size:.78rem;">${r.curso||r.curso_id||'—'}</td>
-      <td>${estadoChip(r.estado)}</td>
+    tbody.innerHTML = alumnos.map(a => `<tr>
+      <td style="font-size:.75rem;">${(a.received_at||'').slice(0,10)}</td>
+      <td>${a.nombre||'—'}</td>
+      <td>${a.cedula||'—'}</td>
+      <td><span class="chip chip-skip">${a.semestre||'—'}</span></td>
+      <td style="font-size:.78rem;">${(a.cursos||[]).join('<br>')}</td>
+      <td>${estadoChip(a.estado_general)}</td>
+      <td><button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="verFormulario('${a.cedula}','${a.semestre||''}')">🖨️ Formulario</button></td>
     </tr>`).join('');
   } catch(ex) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--error)">${ex.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${ex.message}</td></tr>`;
   }
+}
+
+function verFormulario(cedula, semestre) {
+  const token = localStorage.getItem('token');
+  const sem = semestre ? `?semestre=${encodeURIComponent(semestre)}` : '';
+  // Open in new tab; pass token via query param handled by endpoint or use a temporary link
+  // We POST via a form trick to pass the auth header
+  const url = `/api/portal/formulario/${encodeURIComponent(cedula)}${sem}`;
+  fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
+    .then(r => { if (!r.ok) throw new Error('Error al generar formulario'); return r.text(); })
+    .then(html => {
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+    })
+    .catch(ex => _portalLog('Error formulario: ' + ex.message, 'error'));
 }
 
 // ── Parseo de planilla académica ─────────────────────────────────────────────
