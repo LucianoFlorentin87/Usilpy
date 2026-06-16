@@ -482,14 +482,6 @@
         </div>
       </div>
 
-      <!-- Log de errores en tiempo real -->
-      <div class="card" id="portal-log-card" style="display:none;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <h3 style="margin:0;font-size:.88rem;">🔎 Log del sistema</h3>
-          <button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="document.getElementById('portal-error-log').innerHTML='';document.getElementById('portal-log-card').style.display='none';">Limpiar</button>
-        </div>
-        <div id="portal-error-log" style="max-height:140px;overflow-y:auto;font-family:monospace;background:#f8fafc;border-radius:6px;padding:8px;border:1px solid var(--border);"></div>
-      </div>
 
       <!-- Mis inscripciones -->
       <div class="card">
@@ -2121,12 +2113,14 @@ let _portalMateriasSeleccionadas = [];
 
 function _portalLog(msg, tipo = 'info') {
   const log = document.getElementById('portal-error-log');
-  if (!log) return;
-  const color = tipo === 'error' ? 'var(--error)' : tipo === 'warn' ? 'var(--warn)' : 'var(--text-muted)';
+  const card = document.getElementById('portal-log-card');
+  if (!log || !card) return;
+  const color = tipo === 'error' ? '#f87171' : tipo === 'warn' ? '#fbbf24' : '#94a3b8';
+  const prefix = tipo === 'error' ? '✗' : tipo === 'warn' ? '⚠' : '·';
   const time = new Date().toLocaleTimeString('es');
-  log.innerHTML += `<div style="font-size:.78rem;color:${color};padding:2px 0;border-bottom:1px solid var(--border);">[${time}] ${msg}</div>`;
+  log.innerHTML += `<div style="color:${color};padding:1px 0;"><span style="color:#475569;">[${time}]</span> <span style="color:${color};">${prefix}</span> ${msg}</div>`;
   log.scrollTop = log.scrollHeight;
-  log.parentElement.style.display = '';
+  card.style.display = '';
 }
 
 async function portalBuscar() {
@@ -2828,5 +2822,29 @@ async function apiFetch(url, optsOrMethod = 'GET', legacyBody = null) {
   return resp.json();
 }
 </script>
+
+<!-- Floating real-time log -->
+<div id="portal-log-card" style="
+  display:none;
+  position:fixed;
+  bottom:20px;right:20px;
+  width:380px;max-width:calc(100vw - 40px);
+  background:#1e293b;
+  color:#e2e8f0;
+  border-radius:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.35);
+  z-index:9999;
+  font-size:.78rem;
+  overflow:hidden;
+">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#0f172a;border-radius:10px 10px 0 0;">
+    <span style="font-weight:600;letter-spacing:.03em;">🔎 Log en tiempo real</span>
+    <div style="display:flex;gap:6px;">
+      <button onclick="document.getElementById('portal-error-log').innerHTML=''" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:.72rem;">Limpiar</button>
+      <button onclick="document.getElementById('portal-log-card').style.display='none'" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:.72rem;">✕</button>
+    </div>
+  </div>
+  <div id="portal-error-log" style="max-height:200px;overflow-y:auto;padding:10px 12px;font-family:'Courier New',monospace;line-height:1.6;"></div>
+</div>
 </body>
 </html>
