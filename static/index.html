@@ -2520,27 +2520,68 @@ async function portalCargarMisEnvios() {
       <td><span class="chip chip-skip">${a.semestre||'—'}</span></td>
       <td style="font-size:.78rem;">${(a.cursos||[]).join('<br>')}</td>
       <td>${estadoChip(a.estado_general)}</td>
-      <td><button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="verFormulario('${a.cedula}','${a.semestre||''}')">🖨️ Formulario</button></td>
+      <td><button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="verFormulario(${JSON.stringify(a)})">🖨️ Formulario</button></td>
     </tr>`).join('');
   } catch(ex) {
     tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${ex.message}</td></tr>`;
   }
 }
 
-function verFormulario(cedula, semestre) {
-  const token = localStorage.getItem('token');
-  const sem = semestre ? `?semestre=${encodeURIComponent(semestre)}` : '';
-  // Open in new tab; pass token via query param handled by endpoint or use a temporary link
-  // We POST via a form trick to pass the auth header
-  const url = `/api/portal/formulario/${encodeURIComponent(cedula)}${sem}`;
-  fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
-    .then(r => { if (!r.ok) throw new Error('Error al generar formulario'); return r.text(); })
-    .then(html => {
-      const win = window.open('', '_blank');
-      win.document.write(html);
-      win.document.close();
-    })
-    .catch(ex => _portalLog('Error formulario: ' + ex.message, 'error'));
+function verFormulario(a) {
+  const cursosRows = (a.cursos||[]).map((c,i) =>
+    `<tr><td>${i+1}</td><td>${c}</td><td>Estudiante</td><td>${a.estado_general||'pendiente'}</td></tr>`
+  ).join('');
+  const academico = (a.source||'').replace('parseo:','');
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Formulario de Inscripción — ${a.nombre||''}</title>
+<style>
+  body{font-family:Arial,sans-serif;margin:40px;color:#333}
+  .logo{font-size:22px;font-weight:bold;color:#1a3c6b}
+  .subtitulo{font-size:13px;color:#555;margin-bottom:20px}
+  h1{color:#1a3c6b;border-bottom:2px solid #1a3c6b;padding-bottom:8px}
+  table.info{width:100%;border-collapse:collapse;margin-bottom:20px}
+  table.info td{padding:6px 10px;border:1px solid #ccc}
+  table.info td:first-child{font-weight:bold;width:180px;background:#f0f4fa}
+  table.cursos{width:100%;border-collapse:collapse;margin-top:10px}
+  table.cursos th{background:#1a3c6b;color:#fff;padding:8px;text-align:left}
+  table.cursos td{padding:7px 10px;border:1px solid #ddd}
+  table.cursos tr:nth-child(even){background:#f7f9fc}
+  .firma{margin-top:60px;display:flex;gap:80px}
+  .firma div{border-top:1px solid #333;padding-top:6px;text-align:center;min-width:200px}
+  .btn-print{margin:20px 0;padding:10px 24px;background:#1a3c6b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:15px}
+  @media print{.no-print{display:none}}
+</style>
+</head>
+<body>
+<div class="logo">USIL Paraguay</div>
+<div class="subtitulo">Universidad San Ignacio de Loyola</div>
+<h1>Formulario de Inscripción</h1>
+<button class="btn-print no-print" onclick="window.print()">🖨️ Imprimir</button>
+<table class="info">
+  <tr><td>Nombre completo</td><td>${a.nombre||'—'}</td></tr>
+  <tr><td>Cédula de identidad</td><td>${a.cedula||'—'}</td></tr>
+  <tr><td>Correo electrónico</td><td>${a.email||'—'}</td></tr>
+  <tr><td>Período / Semestre</td><td>${a.semestre||'—'}</td></tr>
+  <tr><td>Fecha de inscripción</td><td>${(a.received_at||'').slice(0,10)}</td></tr>
+  <tr><td>Registrado por</td><td>${academico||'—'}</td></tr>
+</table>
+<h2 style="color:#1a3c6b;font-size:16px;">Cursos inscriptos</h2>
+<table class="cursos">
+  <thead><tr><th>#</th><th>Curso</th><th>Rol</th><th>Estado</th></tr></thead>
+  <tbody>${cursosRows}</tbody>
+</table>
+<div class="firma">
+  <div>Firma del alumno</div>
+  <div>Sello / Firma académica</div>
+</div>
+</body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const url  = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 // ── Parseo de planilla académica ─────────────────────────────────────────────
