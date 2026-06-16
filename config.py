@@ -46,11 +46,13 @@ class Settings(BaseSettings):
     semestre_actual: str = "2025-2"
     cron_hora: str = "07:00"   # HH:MM UTC
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "ignore",
+    }
 
 
-@lru_cache
 def get_settings() -> Settings:
     return Settings()
