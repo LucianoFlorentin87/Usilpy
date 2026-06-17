@@ -2611,10 +2611,11 @@ function verFormulario(idx) {
   <div>Sello / Firma académica</div>
 </div>
 </body></html>`;
-  const blob = new Blob([html], {type:'text/html'});
-  const url  = URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  const win = window.open('', '_blank');
+  if (!win) { _portalLog('El browser bloqueó la ventana emergente. Permitir popups para este sitio.', 'warn'); return; }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
 }
 
 // ── Parseo de planilla académica ─────────────────────────────────────────────
