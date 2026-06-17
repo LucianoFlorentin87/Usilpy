@@ -1046,9 +1046,11 @@ async def mis_inscripciones(
                 "carrera":     r.get("carrera", ""),
                 "source":      r.get("source", ""),
                 "received_at": r.get("received_at", ""),
+                "ids":         [],
                 "cursos":      [],
                 "estados":     [],
             }
+        agrupado[key]["ids"].append(r.get("id", ""))
         agrupado[key]["cursos"].append({
             "nombre": r.get("curso_nombre") or r.get("detalle") or "",
             "dia": r.get("dia", ""),
@@ -1068,6 +1070,25 @@ async def mis_inscripciones(
             a["estado_general"] = "procesado"
 
     return {"alumnos": alumnos, "total": len(alumnos)}
+
+
+@app.delete("/api/portal/mis-inscripciones")
+async def portal_delete_inscripciones(payload: dict, current: dict = Depends(_require_admin_or_academico)):
+    """Elimina inscripciones propias (solo las generadas por el usuario actual)."""
+    ids = payload.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="Enviá la lista de ids")
+    source = f"parseo:{current.get('username', '')}"
+    import aiosqlite
+    from audit_service import DB_PATH
+    async with aiosqlite.connect(DB_PATH) as db:
+        placeholders = ",".join("?" * len(ids))
+        await db.execute(
+            f"DELETE FROM pending_enrollments WHERE id IN ({placeholders}) AND source = ?",
+            (*ids, source),
+        )
+        await db.commit()
+    return {"ok": True}
 
 
 @app.get("/api/portal/formulario/{cedula}")

@@ -2589,13 +2589,27 @@ async function portalCargarMisEnvios() {
       <td>${a.nombre||'—'}</td>
       <td>${a.cedula||'—'}</td>
       <td><span class="chip chip-skip">${a.semestre||'—'}</span></td>
-      <td style="font-size:.78rem;">${(a.cursos||[]).join('<br>')}</td>
+      <td style="font-size:.78rem;">${(a.cursos||[]).map(c=>typeof c==='string'?c:c.nombre||'').join('<br>')}</td>
       <td>${estadoChip(a.estado_general)}</td>
-      <td><button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="verFormulario(${idx})">🖨️ Formulario</button></td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="verFormulario(${idx})">🖨️ Formulario</button>
+        <button class="btn" style="font-size:.72rem;padding:3px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;" onclick="portalEliminarInscripcion(${idx})">🗑️ Limpiar</button>
+      </td>
     </tr>`).join('');
   } catch(ex) {
     tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${ex.message}</td></tr>`;
   }
+}
+
+async function portalEliminarInscripcion(idx) {
+  const a = _misInscripcionesData[idx];
+  if (!a) return;
+  if (!confirm(`¿Eliminar todas las inscripciones de ${a.nombre} (${a.semestre})?`)) return;
+  try {
+    await apiFetch('/api/portal/mis-inscripciones', { method:'DELETE', body: JSON.stringify({ids: a.ids||[]}) });
+    _portalLog(`Inscripciones de ${a.nombre} eliminadas`, 'warn');
+    portalCargarMisEnvios();
+  } catch(ex) { _portalLog('Error al eliminar: ' + ex.message, 'error'); }
 }
 
 function portalPreviewFormulario() {
