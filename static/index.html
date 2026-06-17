@@ -2107,6 +2107,7 @@ async function deleteSystemUser(id, username) {
 // ── Portal académico ─────────────────────────────────────────────────────────
 let _portalMaterias = [];
 let _portalMateriasSeleccionadas = [];
+let _misInscripcionesData = [];
 
 // ── Mallas curriculares ───────────────────────────────────────────────────────
 const MALLAS = {
@@ -2539,24 +2540,27 @@ async function portalCargarMisEnvios() {
     if (!alumnos.length) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Sin inscripciones registradas</td></tr>'; return;
     }
+    _misInscripcionesData = alumnos;
     const estadoChip = e => e==='procesado' ? '<span class="chip chip-ok">Procesado</span>'
       : e==='error' ? '<span class="chip chip-error">Error</span>'
       : '<span class="chip chip-warn">Pendiente</span>';
-    tbody.innerHTML = alumnos.map(a => `<tr>
+    tbody.innerHTML = alumnos.map((a, idx) => `<tr>
       <td style="font-size:.75rem;">${(a.received_at||'').slice(0,10)}</td>
       <td>${a.nombre||'—'}</td>
       <td>${a.cedula||'—'}</td>
       <td><span class="chip chip-skip">${a.semestre||'—'}</span></td>
       <td style="font-size:.78rem;">${(a.cursos||[]).join('<br>')}</td>
       <td>${estadoChip(a.estado_general)}</td>
-      <td><button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="verFormulario(${JSON.stringify(a)})">🖨️ Formulario</button></td>
+      <td><button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="verFormulario(${idx})">🖨️ Formulario</button></td>
     </tr>`).join('');
   } catch(ex) {
     tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${ex.message}</td></tr>`;
   }
 }
 
-function verFormulario(a) {
+function verFormulario(idx) {
+  const a = _misInscripcionesData[idx];
+  if (!a) { _portalLog('Datos no encontrados', 'error'); return; }
   const cursosRows = (a.cursos||[]).map((c,i) =>
     `<tr><td>${i+1}</td><td>${c}</td><td>Estudiante</td><td>${a.estado_general||'pendiente'}</td></tr>`
   ).join('');
