@@ -467,6 +467,17 @@
         </div>
         <div id="pf-materias-seleccionadas" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
 
+        <!-- Tabla de horarios por materia -->
+        <div id="pf-horarios-card" style="display:none;margin-top:14px;">
+          <div style="font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:6px;">Horarios <span style="font-weight:400;color:var(--text-muted);">(opcional — completá día y hora por materia)</span></div>
+          <div class="table-wrap">
+            <table id="pf-horarios-table">
+              <thead><tr><th>Materia</th><th>Día</th><th>Hora inicio</th><th>Hora fin</th></tr></thead>
+              <tbody id="pf-horarios-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="form-group" style="margin-top:14px;">
           <label>Observaciones (opcional)</label>
           <input id="pf-obs" type="text" placeholder="ej. alumno reincorporado, beca, cambio de carrera…" />
@@ -2476,13 +2487,38 @@ function portalFiltrarMaterias() {
 function portalToggleMateria(id, name, semestre) {
   const idx = _portalMateriasSeleccionadas.findIndex(x => x.id === id);
   if (idx >= 0) _portalMateriasSeleccionadas.splice(idx, 1);
-  else _portalMateriasSeleccionadas.push({id, name, semestre});
+  else _portalMateriasSeleccionadas.push({id, name, semestre, dia:'', hora_inicio:'', hora_fin:''});
   portalFiltrarMaterias();
+  _renderChipsYHorarios();
+}
+
+function _renderChipsYHorarios() {
   const chips = document.getElementById('pf-materias-seleccionadas');
   chips.innerHTML = _portalMateriasSeleccionadas.map(m =>
     `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:.78rem;">
       ${m.name} <span onclick="portalToggleMateria('${m.id.replace(/'/g,"\\'")}','${m.name.replace(/'/g,"\\'")}','')" style="cursor:pointer;font-weight:700;margin-left:2px;">✕</span>
     </span>`).join('');
+
+  const card  = document.getElementById('pf-horarios-card');
+  const tbody = document.getElementById('pf-horarios-tbody');
+  if (!_portalMateriasSeleccionadas.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  tbody.innerHTML = _portalMateriasSeleccionadas.map((m, i) => `<tr>
+    <td style="font-size:.82rem;">${m.name}</td>
+    <td><select onchange="_setHorario(${i},'dia',this.value)" style="font-size:.8rem;padding:3px 6px;">
+      <option value="">—</option>
+      ${['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'].map(d =>
+        `<option${m.dia===d?' selected':''}>${d}</option>`).join('')}
+    </select></td>
+    <td><input type="time" value="${m.hora_inicio}" onchange="_setHorario(${i},'hora_inicio',this.value)"
+      style="font-size:.8rem;padding:3px 6px;width:100px;" /></td>
+    <td><input type="time" value="${m.hora_fin}" onchange="_setHorario(${i},'hora_fin',this.value)"
+      style="font-size:.8rem;padding:3px 6px;width:100px;" /></td>
+  </tr>`).join('');
+}
+
+function _setHorario(i, campo, valor) {
+  if (_portalMateriasSeleccionadas[i]) _portalMateriasSeleccionadas[i][campo] = valor;
 }
 
 async function portalEnviarInscripcion() {
@@ -2509,7 +2545,7 @@ async function portalEnviarInscripcion() {
     programa: programa || carreraLabel,
     carrera: carreraLabel,
     periodo: semestre, obs,
-    cursos: _portalMateriasSeleccionadas.map(m => ({nombre_original: m.name, match_ok: true})),
+    cursos: _portalMateriasSeleccionadas.map(m => ({nombre_original: m.name, dia: m.dia||'', hora_inicio: m.hora_inicio||'', hora_fin: m.hora_fin||'', match_ok: true})),
     issues: [],
   };
   msg.textContent = 'Enviando…'; msg.style.color = 'var(--text-muted)';
@@ -2528,6 +2564,9 @@ function portalLimpiarFicha() {
   document.getElementById('portal-buscar-input').value = '';
   document.getElementById('portal-buscar-msg').textContent = '';
   _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-horarios-card').style.display = 'none';
+  document.getElementById('pf-horarios-tbody').innerHTML = '';
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
 }
 
 async function portalCargarMisEnvios() {
@@ -2561,30 +2600,55 @@ async function portalCargarMisEnvios() {
 function verFormulario(idx) {
   const a = _misInscripcionesData[idx];
   if (!a) { _portalLog('Datos no encontrados', 'error'); return; }
-  const cursosRows = (a.cursos||[]).map((c,i) =>
-    `<tr><td>${i+1}</td><td>${c}</td><td>Estudiante</td><td>${a.estado_general||'pendiente'}</td></tr>`
-  ).join('');
   const academico = (a.source||'').replace('parseo:','');
+
+  // Normaliza cursos — pueden ser strings o {nombre_original, dia, hora_inicio, hora_fin}
+  const cursos = (a.cursos||[]).map(c => typeof c === 'string'
+    ? {nombre: c, dia:'', hora_inicio:'', hora_fin:''}
+    : {nombre: c.nombre_original||c.nombre||c, dia: c.dia||'', hora_inicio: c.hora_inicio||'', hora_fin: c.hora_fin||''});
+
+  const cursosRows = cursos.map((c,i) =>
+    `<tr><td>${i+1}</td><td>${c.nombre}</td><td>${c.dia||'—'}</td><td>${c.hora_inicio&&c.hora_fin ? c.hora_inicio+' a '+c.hora_fin : '—'}</td></tr>`
+  ).join('');
+
+  // Grilla semanal
+  const dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const franjas = [...new Set(cursos.filter(c=>c.hora_inicio&&c.hora_fin).map(c=>c.hora_inicio+'|'+c.hora_fin))].sort();
+  const grilla = franjas.length ? `
+<h2 style="color:#1a3c6b;font-size:16px;margin-top:24px;">Grilla horaria</h2>
+<table class="grilla">
+  <thead><tr><th>Hora</th>${dias.map(d=>`<th>${d}</th>`).join('')}</tr></thead>
+  <tbody>${franjas.map(f => {
+    const [hi,hf] = f.split('|');
+    return `<tr><td style="white-space:nowrap;font-weight:600;">${hi} a ${hf}</td>${dias.map(d => {
+      const mat = cursos.find(c=>c.dia===d&&c.hora_inicio===hi&&c.hora_fin===hf);
+      return `<td>${mat ? mat.nombre : ''}</td>`;
+    }).join('')}</tr>`;
+  }).join('')}</tbody>
+</table>` : '';
+
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <title>Formulario de Inscripción — ${a.nombre||''}</title>
 <style>
-  body{font-family:Arial,sans-serif;margin:40px;color:#333}
-  .logo{font-size:22px;font-weight:bold;color:#1a3c6b}
-  .subtitulo{font-size:13px;color:#555;margin-bottom:20px}
-  h1{color:#1a3c6b;border-bottom:2px solid #1a3c6b;padding-bottom:8px}
-  table.info{width:100%;border-collapse:collapse;margin-bottom:20px}
-  table.info td{padding:6px 10px;border:1px solid #ccc}
-  table.info td:first-child{font-weight:bold;width:180px;background:#f0f4fa}
-  table.cursos{width:100%;border-collapse:collapse;margin-top:10px}
-  table.cursos th{background:#1a3c6b;color:#fff;padding:8px;text-align:left}
-  table.cursos td{padding:7px 10px;border:1px solid #ddd}
-  table.cursos tr:nth-child(even){background:#f7f9fc}
-  .firma{margin-top:60px;display:flex;gap:80px}
-  .firma div{border-top:1px solid #333;padding-top:6px;text-align:center;min-width:200px}
-  .btn-print{margin:20px 0;padding:10px 24px;background:#1a3c6b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:15px}
+  body{font-family:Arial,sans-serif;margin:40px;color:#333;font-size:13px}
+  .logo{font-size:20px;font-weight:bold;color:#1a3c6b}
+  .subtitulo{font-size:12px;color:#555;margin-bottom:16px}
+  h1{color:#1a3c6b;border-bottom:2px solid #1a3c6b;padding-bottom:6px;font-size:18px}
+  h2{color:#1a3c6b;font-size:14px;margin-top:20px;margin-bottom:6px}
+  .header-info{display:flex;gap:40px;margin-bottom:16px;flex-wrap:wrap}
+  .header-info div{line-height:1.8}
+  .header-info strong{color:#1a3c6b}
+  table.cursos,table.grilla{width:100%;border-collapse:collapse;margin-top:6px}
+  table.cursos th,table.grilla th{background:#1a3c6b;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+  table.cursos td,table.grilla td{padding:6px 10px;border:1px solid #ddd;font-size:12px}
+  table.cursos tr:nth-child(even),table.grilla tr:nth-child(even){background:#f7f9fc}
+  table.grilla td{text-align:center;min-width:80px}
+  .firma{margin-top:50px;display:flex;gap:80px}
+  .firma div{border-top:1px solid #333;padding-top:6px;text-align:center;min-width:180px;font-size:12px}
+  .btn-print{margin:16px 0;padding:8px 20px;background:#1a3c6b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px}
   @media print{.no-print{display:none}}
 </style>
 </head>
@@ -2593,19 +2657,20 @@ function verFormulario(idx) {
 <div class="subtitulo">Universidad San Ignacio de Loyola</div>
 <h1>Formulario de Inscripción</h1>
 <button class="btn-print no-print" onclick="window.print()">🖨️ Imprimir</button>
-<table class="info">
-  <tr><td>Nombre completo</td><td>${a.nombre||'—'}</td></tr>
-  <tr><td>Cédula de identidad</td><td>${a.cedula||'—'}</td></tr>
-  <tr><td>Correo electrónico</td><td>${a.email||'—'}</td></tr>
-  <tr><td>Período / Semestre</td><td>${a.semestre||'—'}</td></tr>
-  <tr><td>Fecha de inscripción</td><td>${(a.received_at||'').slice(0,10)}</td></tr>
-  <tr><td>Registrado por</td><td>${academico||'—'}</td></tr>
-</table>
-<h2 style="color:#1a3c6b;font-size:16px;">Cursos inscriptos</h2>
+<div class="header-info">
+  <div><strong>Nombre y Apellido:</strong><br>${a.nombre||'—'}</div>
+  <div><strong>Cédula:</strong><br>${a.cedula||'—'}</div>
+  <div><strong>Email:</strong><br>${a.email||'—'}</div>
+  <div><strong>Programa:</strong><br>${a.semestre||'—'}</div>
+  <div><strong>Fecha:</strong><br>${(a.received_at||'').slice(0,10)}</div>
+  <div><strong>Registrado por:</strong><br>${academico||'—'}</div>
+</div>
+<h2>Cursos inscriptos</h2>
 <table class="cursos">
-  <thead><tr><th>#</th><th>Curso</th><th>Rol</th><th>Estado</th></tr></thead>
+  <thead><tr><th>#</th><th>Curso</th><th>Día</th><th>Hora</th></tr></thead>
   <tbody>${cursosRows}</tbody>
 </table>
+${grilla}
 <div class="firma">
   <div>Firma del alumno</div>
   <div>Sello / Firma académica</div>
