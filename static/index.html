@@ -438,40 +438,22 @@
             <label>Email institucional</label>
             <input id="pf-email" type="email" placeholder="camila.flores@usil.edu.py" />
           </div>
-          <div class="form-group" style="max-width:210px;">
-            <label>Carrera</label>
-            <select id="pf-carrera" onchange="portalCarreraChange()">
-              <option value="">— Carrera —</option>
-              <option value="marketing">Marketing</option>
-              <option value="administracion">Administración de Empresas</option>
-              <option value="negocios">Negocios Internacionales</option>
-              <option value="contabilidad">Contabilidad</option>
-              <option value="economia">Economía</option>
-              <option value="hoteleria">Administración Hotelera y de Turismo</option>
-              <optgroup label="── CPEL (Semipresencial) ──"></optgroup>
-              <option value="cpel_marketing">Marketing (CPEL)</option>
-              <option value="cpel_administracion">Administración de Empresas (CPEL)</option>
-              <option value="cpel_negocios">Negocios Internacionales (CPEL)</option>
-              <option value="cpel_ingenieria">Ingeniería en Gestión Empresarial y de los Negocios (CPEL)</option>
-              <optgroup label="── GND (Virtual) ──"></optgroup>
-              <option value="gnd_marketing">Marketing (GND)</option>
-              <option value="gnd_administracion">Administración de Empresas (GND)</option>
-              <option value="gnd_negocios">Negocios Internacionales (GND)</option>
-            </select>
-          </div>
-          <div class="form-group" style="max-width:110px;">
+          <div class="form-group" style="max-width:120px;">
             <label>Programa</label>
-            <select id="pf-programa" onchange="portalCargarMaterias()">
+            <select id="pf-programa" onchange="portalProgramaChange()">
               <option value="">— Prog. —</option>
               <option value="GA">GA</option>
               <option value="GND">GND</option>
               <option value="CPEL">CPEL</option>
             </select>
           </div>
-          <div class="form-group" style="max-width:130px;">
-            <label>Semestre</label>
-            <input id="pf-semestre" type="text" placeholder="ej. 2026-2" />
+          <div class="form-group" style="max-width:280px;">
+            <label>Carrera</label>
+            <select id="pf-carrera" onchange="portalCarreraChange()">
+              <option value="">— Seleccioná un programa primero —</option>
+            </select>
           </div>
+          <input type="hidden" id="pf-semestre" />
         </div>
 
         <!-- Selección de materias por programa -->
@@ -2314,6 +2296,51 @@ const MALLAS = {
   },
 };
 
+// Carreras por programa
+const CARRERAS_POR_PROGRAMA = {
+  GA:   [
+    {value:'marketing',      label:'Marketing'},
+    {value:'administracion', label:'Administración de Empresas'},
+    {value:'negocios',       label:'Negocios Internacionales'},
+    {value:'contabilidad',   label:'Contabilidad'},
+    {value:'economia',       label:'Economía'},
+    {value:'hoteleria',      label:'Administración Hotelera y de Turismo'},
+  ],
+  CPEL: [
+    {value:'cpel_marketing',     label:'Marketing'},
+    {value:'cpel_administracion',label:'Administración de Empresas'},
+    {value:'cpel_negocios',      label:'Negocios Internacionales'},
+    {value:'cpel_ingenieria',    label:'Ingeniería en Gestión Empresarial y de los Negocios'},
+  ],
+  GND:  [
+    {value:'gnd_marketing',     label:'Marketing'},
+    {value:'gnd_administracion',label:'Administración de Empresas'},
+    {value:'gnd_negocios',      label:'Negocios Internacionales'},
+  ],
+};
+
+function _getSemestreActual() {
+  const m = new Date().getMonth() + 1; // 1-12
+  const y = new Date().getFullYear();
+  return m >= 3 && m <= 7 ? `${y}-1` : `${y}-2`;
+}
+
+function portalProgramaChange() {
+  const prog = document.getElementById('pf-programa').value;
+  const sel  = document.getElementById('pf-carrera');
+  sel.innerHTML = '<option value="">— Carrera —</option>';
+  (CARRERAS_POR_PROGRAMA[prog] || []).forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.value; o.textContent = c.label;
+    sel.appendChild(o);
+  });
+  // reset materias
+  _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
+  document.getElementById('pf-materias-lista').innerHTML =
+    '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná una carrera para ver las materias disponibles</p>';
+}
+
 function portalCarreraChange() {
   // Reset materias al cambiar carrera
   _portalMaterias = [];
@@ -2377,6 +2404,7 @@ function portalSeleccionarAlumno(u) {
   document.getElementById('pf-nombre').value   = partes.slice(0, mitad).join(' ');
   document.getElementById('pf-cedula').value   = u.sis_id || u.cedula || '';
   document.getElementById('pf-email').value    = u.email || '';
+  document.getElementById('pf-semestre').value = _getSemestreActual();
   document.getElementById('portal-ficha-badge').textContent = 'Alumno existente';
   document.getElementById('portal-ficha-badge').style.cssText = 'font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);';
   document.getElementById('portal-buscar-resultados').style.display = 'none';
@@ -2387,7 +2415,8 @@ function portalSeleccionarAlumno(u) {
 }
 
 function portalNuevoAlumno() {
-  ['pf-apellido','pf-nombre','pf-cedula','pf-email','pf-semestre','pf-obs'].forEach(id => document.getElementById(id).value = '');
+  ['pf-apellido','pf-nombre','pf-cedula','pf-email','pf-obs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pf-semestre').value = _getSemestreActual();
   document.getElementById('portal-ficha-badge').textContent = 'Alumno nuevo';
   document.getElementById('portal-ficha-badge').style.cssText = 'font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);';
   document.getElementById('portal-buscar-resultados').style.display = 'none';
@@ -2463,12 +2492,12 @@ async function portalEnviarInscripcion() {
   const email    = document.getElementById('pf-email').value.trim();
   const carrera  = document.getElementById('pf-carrera').value;
   const programa = document.getElementById('pf-programa').value;
-  const semestre = document.getElementById('pf-semestre').value.trim();
+  const semestre = document.getElementById('pf-semestre').value.trim() || _getSemestreActual();
   const obs      = document.getElementById('pf-obs').value.trim();
   const carreraLabel = carrera ? (MALLAS[carrera]?.label || carrera) : '';
 
-  if (!apellido || !nombre || !cedula || !semestre) {
-    msg.textContent = 'Apellido, nombre, cédula y semestre son requeridos.'; msg.style.color = 'var(--error)'; return;
+  if (!apellido || !nombre || !cedula) {
+    msg.textContent = 'Apellido, nombre y cédula son requeridos.'; msg.style.color = 'var(--error)'; return;
   }
   if (!_portalMateriasSeleccionadas.length) {
     msg.textContent = 'Seleccioná al menos una materia.'; msg.style.color = 'var(--error)'; return;
