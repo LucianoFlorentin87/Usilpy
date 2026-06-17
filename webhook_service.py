@@ -25,7 +25,10 @@ CREATE TABLE IF NOT EXISTS pending_enrollments (
     rol          TEXT DEFAULT 'StudentEnrollment',
     estado       TEXT DEFAULT 'pendiente',
     processed_at TEXT,
-    detalle      TEXT
+    detalle      TEXT,
+    dia          TEXT DEFAULT '',
+    hora_inicio  TEXT DEFAULT '',
+    hora_fin     TEXT DEFAULT ''
 )
 """
 
@@ -33,6 +36,11 @@ CREATE TABLE IF NOT EXISTS pending_enrollments (
 async def init_pending_table() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(_CREATE_PENDING)
+        for col in ("dia TEXT DEFAULT ''", "hora_inicio TEXT DEFAULT ''", "hora_fin TEXT DEFAULT ''"):
+            try:
+                await db.execute(f"ALTER TABLE pending_enrollments ADD COLUMN {col}")
+            except Exception:
+                pass
         await db.commit()
 
 
@@ -43,8 +51,8 @@ async def receive_enrollment(data: dict, source: str = "webhook") -> dict:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """INSERT INTO pending_enrollments
-               (id, received_at, source, semestre, cedula, nombre, email, curso_id, curso_nombre, rol)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+               (id, received_at, source, semestre, cedula, nombre, email, curso_id, curso_nombre, rol, dia, hora_inicio, hora_fin)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 row_id, ts, source,
                 data.get("semestre", ""),
@@ -54,6 +62,9 @@ async def receive_enrollment(data: dict, source: str = "webhook") -> dict:
                 data.get("curso_id", ""),
                 data.get("curso_nombre", ""),
                 data.get("rol", "StudentEnrollment"),
+                data.get("dia", ""),
+                data.get("hora_inicio", ""),
+                data.get("hora_fin", ""),
             ),
         )
         await db.commit()
@@ -73,8 +84,8 @@ async def receive_bulk(rows: list[dict], source: str = "webhook") -> dict:
                 continue
             await db.execute(
                 """INSERT INTO pending_enrollments
-                   (id, received_at, source, semestre, cedula, nombre, email, curso_id, curso_nombre, rol)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                   (id, received_at, source, semestre, cedula, nombre, email, curso_id, curso_nombre, rol, dia, hora_inicio, hora_fin)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     str(uuid.uuid4()), ts, source,
                     data.get("semestre", ""),
@@ -84,6 +95,9 @@ async def receive_bulk(rows: list[dict], source: str = "webhook") -> dict:
                     data.get("curso_id", ""),
                     data.get("curso_nombre", ""),
                     data.get("rol", "StudentEnrollment"),
+                    data.get("dia", ""),
+                    data.get("hora_inicio", ""),
+                    data.get("hora_fin", ""),
                 ),
             )
             accepted += 1

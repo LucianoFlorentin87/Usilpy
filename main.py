@@ -964,7 +964,10 @@ async def enviar_parseo_cola(payload: dict, current: dict = Depends(get_current_
                 "nombre":   a.get("nombre", ""),
                 "programa": a.get("programa", ""),
                 "semestre": a.get("periodo", ""),
-                "curso_nombre": curso.get("nombre_original", ""),
+                "curso_nombre": curso.get("nombre_original", curso.get("nombre", "")),
+                "dia":       curso.get("dia", ""),
+                "hora_inicio": curso.get("hora_inicio", ""),
+                "hora_fin":  curso.get("hora_fin", ""),
                 "source":   source,
             }
             try:
@@ -1042,7 +1045,12 @@ async def mis_inscripciones(
                 "cursos":      [],
                 "estados":     [],
             }
-        agrupado[key]["cursos"].append(r.get("curso_nombre") or r.get("detalle") or "")
+        agrupado[key]["cursos"].append({
+            "nombre": r.get("curso_nombre") or r.get("detalle") or "",
+            "dia": r.get("dia", ""),
+            "hora_inicio": r.get("hora_inicio", ""),
+            "hora_fin": r.get("hora_fin", ""),
+        })
         agrupado[key]["estados"].append(r.get("estado", ""))
 
     alumnos = list(agrupado.values())
