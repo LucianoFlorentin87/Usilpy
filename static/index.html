@@ -485,6 +485,7 @@
 
         <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <button class="btn btn-success" onclick="portalEnviarInscripcion()">✅ Enviar inscripción</button>
+          <button class="btn btn-secondary" onclick="portalPreviewFormulario()">🖨️ Vista previa</button>
           <button class="btn btn-secondary" onclick="portalLimpiarFicha()">✖ Cancelar</button>
           <span id="pf-msg" style="font-size:.83rem;"></span>
         </div>
@@ -2597,15 +2598,31 @@ async function portalCargarMisEnvios() {
   }
 }
 
-function verFormulario(idx) {
-  const a = _misInscripcionesData[idx];
-  if (!a) { _portalLog('Datos no encontrados', 'error'); return; }
-  const academico = (a.source||'').replace('parseo:','');
+function portalPreviewFormulario() {
+  const apellido = document.getElementById('pf-apellido').value.trim();
+  const nombre   = document.getElementById('pf-nombre').value.trim();
+  const cedula   = document.getElementById('pf-cedula').value.trim();
+  const email    = document.getElementById('pf-email').value.trim();
+  const semestre = document.getElementById('pf-semestre').value.trim() || _getSemestreActual();
+  const user     = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
+  if (!apellido && !nombre) { _portalLog('Completá los datos del alumno primero', 'warn'); return; }
+  const cursos = _portalMateriasSeleccionadas.map(m => ({
+    nombre: m.name, dia: m.dia||'', hora_inicio: m.hora_inicio||'', hora_fin: m.hora_fin||''
+  }));
+  _imprimirFormulario({
+    nombre: `${nombre} ${apellido}`.trim(),
+    cedula, email, semestre,
+    received_at: new Date().toISOString(),
+    source: `parseo:${user?.username||'académico'}`,
+    cursos,
+  });
+}
 
-  // Normaliza cursos — pueden ser strings o {nombre_original, dia, hora_inicio, hora_fin}
+function _imprimirFormulario(a) {
+  const academico = (a.source||'').replace('parseo:','');
   const cursos = (a.cursos||[]).map(c => typeof c === 'string'
     ? {nombre: c, dia:'', hora_inicio:'', hora_fin:''}
-    : {nombre: c.nombre_original||c.nombre||c, dia: c.dia||'', hora_inicio: c.hora_inicio||'', hora_fin: c.hora_fin||''});
+    : {nombre: c.nombre_original||c.nombre||String(c), dia: c.dia||'', hora_inicio: c.hora_inicio||'', hora_fin: c.hora_fin||''});
 
   const cursosRows = cursos.map((c,i) =>
     `<tr><td>${i+1}</td><td>${c.nombre}</td><td>${c.dia||'—'}</td><td>${c.hora_inicio&&c.hora_fin ? c.hora_inicio+' a '+c.hora_fin : '—'}</td></tr>`
@@ -2681,6 +2698,12 @@ ${grilla}
   win.document.open();
   win.document.write(html);
   win.document.close();
+}
+
+function verFormulario(idx) {
+  const a = _misInscripcionesData[idx];
+  if (!a) { _portalLog('Datos no encontrados', 'error'); return; }
+  _imprimirFormulario(a);
 }
 
 // ── Parseo de planilla académica ─────────────────────────────────────────────
