@@ -968,6 +968,8 @@ async def enviar_parseo_cola(payload: dict, current: dict = Depends(get_current_
                 "dia":       curso.get("dia", ""),
                 "hora_inicio": curso.get("hora_inicio", ""),
                 "hora_fin":  curso.get("hora_fin", ""),
+                "programa":  a.get("programa", ""),
+                "carrera":   a.get("carrera", ""),
                 "source":   source,
             }
             try:
@@ -1040,6 +1042,8 @@ async def mis_inscripciones(
                 "nombre":      r.get("nombre", ""),
                 "email":       r.get("email", ""),
                 "semestre":    r.get("semestre", ""),
+                "programa":    r.get("programa", ""),
+                "carrera":     r.get("carrera", ""),
                 "source":      r.get("source", ""),
                 "received_at": r.get("received_at", ""),
                 "cursos":      [],

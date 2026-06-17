@@ -2604,6 +2604,9 @@ function portalPreviewFormulario() {
   const cedula   = document.getElementById('pf-cedula').value.trim();
   const email    = document.getElementById('pf-email').value.trim();
   const semestre = document.getElementById('pf-semestre').value.trim() || _getSemestreActual();
+  const programa = document.getElementById('pf-programa').value;
+  const carreraVal = document.getElementById('pf-carrera').value;
+  const carreraLabel = carreraVal ? (MALLAS[carreraVal]?.label || carreraVal) : '';
   const user     = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
   if (!apellido && !nombre) { _portalLog('Completá los datos del alumno primero', 'warn'); return; }
   const cursos = _portalMateriasSeleccionadas.map(m => ({
@@ -2611,7 +2614,7 @@ function portalPreviewFormulario() {
   }));
   _imprimirFormulario({
     nombre: `${nombre} ${apellido}`.trim(),
-    cedula, email, semestre,
+    cedula, email, semestre, programa, carrera: carreraLabel,
     received_at: new Date().toISOString(),
     source: `parseo:${user?.username||'académico'}`,
     cursos,
@@ -2678,7 +2681,9 @@ function _imprimirFormulario(a) {
   <div><strong>Nombre y Apellido:</strong><br>${a.nombre||'—'}</div>
   <div><strong>Cédula:</strong><br>${a.cedula||'—'}</div>
   <div><strong>Email:</strong><br>${a.email||'—'}</div>
-  <div><strong>Programa:</strong><br>${a.semestre||'—'}</div>
+  <div><strong>Programa:</strong><br>${a.programa||'—'}</div>
+  <div><strong>Carrera:</strong><br>${a.carrera||'—'}</div>
+  <div><strong>Semestre:</strong><br>${a.semestre||'—'}</div>
   <div><strong>Fecha:</strong><br>${(a.received_at||'').slice(0,10)}</div>
   <div><strong>Registrado por:</strong><br>${academico||'—'}</div>
 </div>
