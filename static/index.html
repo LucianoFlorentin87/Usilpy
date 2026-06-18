@@ -801,43 +801,112 @@
     <!-- ══════════ PANEL: CREAR CURSOS ══════════ -->
     <div id="panel-crear-cursos" class="panel">
       <div class="card">
-        <h3>Crear cursos y equipos</h3>
-        <p>Subí un Excel con las materias del semestre. El sistema creará los cursos en Canvas y los equipos en Teams, y te dará un Excel con los IDs para usar en la matriculación.</p>
-
-        <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:20px;">
-          <strong>Formato esperado:</strong> columnas <code>materia</code> · <code>semestre</code> (opcional) · <code>programa</code> (opcional)
-        </div>
-
-        <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+          <span style="font-size:2rem;">🏫</span>
           <div>
-            <label>Archivo Excel (.xlsx)</label><br>
-            <input type="file" id="cursos-file" accept=".xlsx,.xls">
+            <h3 style="margin:0;">Crear cursos y equipos</h3>
+            <p style="margin:2px 0 0;color:#6b7280;font-size:.88rem;">Cargá el Excel de materias y el sistema crea los cursos en Canvas y equipos en Teams automáticamente.</p>
           </div>
-          <button class="btn btn-primary" onclick="crearCursos()">&#9654; Crear cursos y equipos</button>
-          <a id="cursos-download-btn" style="display:none;" class="btn btn-success" download="cursos_ids.xlsx">&#11015; Descargar Excel con IDs</a>
         </div>
 
-        <div id="cursos-status" style="display:none;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0;">
+          <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:16px;">
+            <div style="font-weight:700;color:#1d4ed8;margin-bottom:8px;font-size:.9rem;">📋 Columnas requeridas</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">materia</span><span style="color:#374151;font-size:.83rem;">Nombre del curso</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#6b7280;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">semestre</span><span style="color:#374151;font-size:.83rem;">Ej: 2025-2 <em>(opcional)</em></span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#6b7280;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">programa</span><span style="color:#374151;font-size:.83rem;">Ej: Ing. en Sistemas <em>(opcional)</em></span></div>
+            </div>
+          </div>
+          <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:16px;">
+            <div style="font-weight:700;color:#16a34a;margin-bottom:8px;font-size:.9rem;">✅ El sistema genera</div>
+            <div style="display:flex;flex-direction:column;gap:5px;font-size:.83rem;color:#374151;">
+              <div>📘 Curso en Canvas LMS</div>
+              <div>💼 Equipo en Microsoft Teams</div>
+              <div>📥 Excel con IDs listos para matricular</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:2px dashed #d1d5db;border-radius:10px;padding:24px;text-align:center;margin-bottom:16px;cursor:pointer;transition:border-color .2s;"
+             onclick="document.getElementById('cursos-file').click()"
+             id="cursos-dropzone">
+          <div style="font-size:2rem;margin-bottom:6px;">📂</div>
+          <div style="font-weight:600;color:#374151;margin-bottom:4px;">Seleccioná el archivo Excel</div>
+          <div style="font-size:.82rem;color:#9ca3af;" id="cursos-file-label">Hacé clic para elegir o arrastrá el archivo aquí · .xlsx</div>
+          <input type="file" id="cursos-file" accept=".xlsx,.xls" style="display:none;" onchange="document.getElementById('cursos-file-label').textContent = this.files[0]?.name || 'Hacé clic para elegir'">
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="crearCursos()" style="display:flex;align-items:center;gap:6px;">
+            <span>▶</span> Crear cursos y equipos
+          </button>
+          <button class="btn btn-secondary" onclick="descargarPlantillaCursos()" style="display:flex;align-items:center;gap:6px;">
+            <span>📄</span> Descargar plantilla
+          </button>
+          <a id="cursos-download-btn" style="display:none;" class="btn btn-success" download="cursos_ids.xlsx">
+            ⬇ Descargar Excel con IDs
+          </a>
+        </div>
+
+        <div id="cursos-status" style="display:none;margin-top:16px;"></div>
       </div>
     </div>
 
     <!-- ══════════ PANEL: MATRICULACIÓN MASIVA ══════════ -->
     <div id="panel-matriculacion-masiva" class="panel">
       <div class="card">
-        <h3>Matriculación masiva de alumnos</h3>
-        <p>Subí la planilla con los alumnos y los IDs de cursos/equipos. El sistema creará los usuarios que no existan, los matriculará y enviará los correos correspondientes.</p>
-
-        <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:20px;">
-          <strong>Formato esperado:</strong> columnas <code>Materia</code> · <code>ID Canvas</code> · <code>ID Ms</code> · <code>Alumno</code> · <code>SIS</code> · <code>Correo</code>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+          <span style="font-size:2rem;">🎓</span>
+          <div>
+            <h3 style="margin:0;">Matriculación masiva de alumnos</h3>
+            <p style="margin:2px 0 0;color:#6b7280;font-size:.88rem;">Cargá la planilla con alumnos e IDs. El sistema crea usuarios, los matricula en Canvas y Teams, y envía correos.</p>
+          </div>
         </div>
 
-        <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;">
-          <div>
-            <label>Planilla Excel (.xlsx)</label><br>
-            <input type="file" id="matriculacion-file" accept=".xlsx,.xls">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0;">
+          <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:16px;">
+            <div style="font-weight:700;color:#1d4ed8;margin-bottom:8px;font-size:.9rem;">📋 Columnas requeridas</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Materia</span><span style="color:#374151;font-size:.83rem;">Nombre del curso</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">ID Canvas</span><span style="color:#374151;font-size:.83rem;">ID numérico de Canvas</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">ID Ms</span><span style="color:#374151;font-size:.83rem;">GUID del equipo Teams</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Alumno</span><span style="color:#374151;font-size:.83rem;">Nombre completo</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">SIS</span><span style="color:#374151;font-size:.83rem;">Cédula / código SIS</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Correo</span><span style="color:#374151;font-size:.83rem;">Email institucional</span></div>
+            </div>
           </div>
-          <button class="btn btn-primary" onclick="ejecutarMatriculacion()">&#9654; Ejecutar matriculación</button>
-          <a id="matriculacion-download-btn" style="display:none;" class="btn btn-success" download="resultado_matriculacion.xlsx">&#11015; Descargar resultado</a>
+          <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:16px;">
+            <div style="font-weight:700;color:#16a34a;margin-bottom:8px;font-size:.9rem;">✅ El sistema ejecuta</div>
+            <div style="display:flex;flex-direction:column;gap:5px;font-size:.83rem;color:#374151;">
+              <div>👤 Crea usuarios nuevos si no existen</div>
+              <div>📘 Matricula en Canvas LMS</div>
+              <div>💼 Agrega al equipo de Teams</div>
+              <div>📧 Envía email de bienvenida</div>
+              <div>📥 Excel con resultado por alumno</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:2px dashed #d1d5db;border-radius:10px;padding:24px;text-align:center;margin-bottom:16px;cursor:pointer;transition:border-color .2s;"
+             onclick="document.getElementById('matriculacion-file').click()"
+             id="matriculacion-dropzone">
+          <div style="font-size:2rem;margin-bottom:6px;">📂</div>
+          <div style="font-weight:600;color:#374151;margin-bottom:4px;">Seleccioná la planilla Excel</div>
+          <div style="font-size:.82rem;color:#9ca3af;" id="matriculacion-file-label">Hacé clic para elegir o arrastrá el archivo aquí · .xlsx</div>
+          <input type="file" id="matriculacion-file" accept=".xlsx,.xls" style="display:none;" onchange="document.getElementById('matriculacion-file-label').textContent = this.files[0]?.name || 'Hacé clic para elegir'">
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="ejecutarMatriculacion()" style="display:flex;align-items:center;gap:6px;">
+            <span>▶</span> Ejecutar matriculación
+          </button>
+          <button class="btn btn-secondary" onclick="descargarPlantillaMatriculacion()" style="display:flex;align-items:center;gap:6px;">
+            <span>📄</span> Descargar plantilla
+          </button>
+          <a id="matriculacion-download-btn" style="display:none;" class="btn btn-success" download="resultado_matriculacion.xlsx">
+            ⬇ Descargar resultado
+          </a>
         </div>
 
         <div id="matriculacion-status" style="display:none;"></div>
@@ -3308,6 +3377,52 @@ async function apiFetch(url, optsOrMethod = 'GET', legacyBody = null) {
     throw new Error(err.detail||resp.statusText);
   }
   return resp.json();
+}
+
+// ── Plantillas descargables ────────────────────────────────────────────────────
+function _xlsxSimple(headers, rows, sheetName) {
+  // Genera un .xlsx mínimo usando solo XML (no requiere librería externa)
+  const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const cellId = (col, row) => String.fromCharCode(65+col) + row;
+  const makeRow = (rowIdx, vals) =>
+    `<row r="${rowIdx}">${vals.map((v,ci) =>
+      `<c r="${cellId(ci,rowIdx)}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`
+    ).join('')}</row>`;
+  const allRows = [headers, ...rows].map((r,i) => makeRow(i+1, r)).join('');
+  const sheet = `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${allRows}</sheetData></worksheet>`;
+  const wb = `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${esc(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+  const rels = `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`;
+  const ct = `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`;
+  // Minimal ZIP (stored, no compression) — using Blob with proper OOXML parts
+  // Since we can't do ZIP in vanilla JS easily, generate CSV fallback as .csv
+  return null; // signal to use CSV
+}
+
+function _descargarCSV(filename, headers, rows) {
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+}
+
+function descargarPlantillaCursos() {
+  _descargarCSV('plantilla_crear_cursos.csv',
+    ['materia','semestre','programa'],
+    [
+      ['Matemática I','2025-2','Ingeniería en Sistemas'],
+      ['Administración','2025-2','Administración de Empresas'],
+      ['Comunicación','2025-2',''],
+    ]
+  );
+}
+
+function descargarPlantillaMatriculacion() {
+  _descargarCSV('plantilla_matriculacion.csv',
+    ['Materia','ID Canvas','ID Ms','Alumno','SIS','Correo'],
+    [
+      ['Matemática I','12345','xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx','García Juan','1234567','juan.garcia@usil.edu.py'],
+      ['Matemática I','12345','xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx','López María','7654321','maria.lopez@usil.edu.py'],
+    ]
+  );
 }
 
 // ── Crear cursos y equipos ────────────────────────────────────────────────────
