@@ -75,7 +75,7 @@ async def init_pool() -> None:
     logger.info("DB init_pool — parsed host=%s port=%s user=%s db=%s",
                 kwargs["host"], kwargs["port"], kwargs["user"], kwargs["database"])
     _pool = await asyncpg.create_pool(**kwargs, min_size=1, max_size=10,
-                                      ssl="require")
+                                      ssl="require", statement_cache_size=0)
 
 
 def get_pool() -> asyncpg.Pool:
