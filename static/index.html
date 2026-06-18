@@ -171,21 +171,23 @@
     .next-run-badge { background: #1a2332; color: #8ca0bf; border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; font-family: monospace; }
 
     /* ── Login screen ── */
-    #login-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    #login-screen { position: fixed; inset: 0; background: #2B52CC; display: flex; align-items: center; justify-content: center; z-index: 1000; }
     #login-screen.hidden { display: none !important; }
-    .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 36px 32px; width: 100%; max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,.08); }
-    .login-card h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
-    .login-card p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px; }
-    .login-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
-    .login-field label { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
-    .login-field input { padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 0.9rem; outline: none; transition: border-color .15s; }
-    .login-field input:focus { border-color: var(--accent); }
-    #login-error { color: var(--error); font-size: 0.8rem; min-height: 18px; margin-bottom: 8px; }
-    .btn-login { width: 100%; padding: 11px; font-size: 0.9rem; font-weight: 600; border-radius: 7px; }
-    .login-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0; color: var(--text-muted); font-size: 0.78rem; }
-    .login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-    .btn-azure { width: 100%; padding: 10px; font-size: 0.85rem; font-weight: 500; border-radius: 7px; background: #fff; border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background .15s; }
-    .btn-azure:hover { background: var(--bg); }
+    .login-card { background: #fff; border-radius: 16px; padding: 40px 36px 36px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+    .login-logo { text-align: center; margin-bottom: 28px; }
+    .login-logo .usil-emblem { display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; background: #2B52CC; border-radius: 50%; margin-bottom: 12px; }
+    .login-logo .usil-emblem svg { width: 44px; height: 44px; }
+    .login-logo h2 { font-size: 1.4rem; font-weight: 800; color: #1a1a2e; margin: 0 0 2px; letter-spacing: .5px; }
+    .login-logo .subtitle { font-size: 0.78rem; color: #2B52CC; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; margin: 0; }
+    .login-divider-top { height: 1px; background: #e8edf5; margin: 0 0 24px; }
+    .login-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
+    .login-field label { font-size: 0.78rem; font-weight: 600; color: #555; letter-spacing: .3px; }
+    .login-field input { padding: 11px 13px; border: 1.5px solid #dde3f0; border-radius: 8px; font-size: 0.9rem; outline: none; transition: border-color .15s, box-shadow .15s; background: #f8faff; }
+    .login-field input:focus { border-color: #2B52CC; box-shadow: 0 0 0 3px rgba(43,82,204,.12); background: #fff; }
+    #login-error { color: #dc3545; font-size: 0.8rem; min-height: 18px; margin-bottom: 8px; }
+    .btn-login { width: 100%; padding: 13px; font-size: 0.95rem; font-weight: 700; border-radius: 8px; text-align: center; background: #2B52CC; color: #fff; border: none; cursor: pointer; letter-spacing: .3px; transition: background .15s, transform .1s; }
+    .btn-login:hover { background: #1e3fa0; }
+    .btn-login:active { transform: scale(.98); }
     .btn-azure svg { width: 18px; height: 18px; }
 
     /* ── Topbar user chip ── */
@@ -201,8 +203,17 @@
 <!-- ═══════════════════════════════ LOGIN ════════════════════════════════ -->
 <div id="login-screen">
   <div class="login-card">
-    <h2>Gestión Académica</h2>
-    <p>Iniciá sesión para continuar</p>
+    <div class="login-logo">
+      <div class="usil-emblem">
+        <!-- USIL monogram -->
+        <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <text x="22" y="30" font-family="Georgia,serif" font-size="22" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">USIL</text>
+        </svg>
+      </div>
+      <h2>Gestión Académica</h2>
+      <p class="subtitle">USIL Paraguay</p>
+    </div>
+    <div class="login-divider-top"></div>
     <div class="login-field">
       <label>Usuario</label>
       <input type="text" id="login-username" placeholder="admin" autocomplete="username" />
@@ -214,20 +225,12 @@
                onkeydown="if(event.key==='Enter') doLogin()"
                style="width:100%;padding-right:42px;" />
         <button type="button" id="pw-toggle" onclick="togglePassword()"
-          style="position:absolute;right:0;top:0;height:100%;width:40px;background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--text-muted);transition:color .15s;"
+          style="position:absolute;right:0;top:0;height:100%;width:40px;background:none;border:none;cursor:pointer;font-size:1.1rem;color:#aaa;transition:color .15s;"
           title="Mostrar/ocultar contraseña">👁</button>
       </div>
     </div>
     <p id="login-error"></p>
-    <button class="btn btn-primary btn-login" onclick="doLogin()">Iniciar sesión</button>
-    <div class="login-divider">o</div>
-    <button class="btn-azure" onclick="doAzureLogin()">
-      <svg viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="10" height="10" fill="#F25022"/><rect x="11" width="10" height="10" fill="#7FBA00"/>
-        <rect y="11" width="10" height="10" fill="#00A4EF"/><rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
-      </svg>
-      Continuar con Microsoft
-    </button>
+    <button class="btn-login" onclick="doLogin()">Iniciar sesión</button>
   </div>
 </div>
 
