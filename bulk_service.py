@@ -870,3 +870,185 @@ async def process_matriculacion_planilla(file_bytes: bytes, filename: str) -> tu
     excel_bytes = buf.getvalue()
 
     return summary, excel_bytes
+
+
+# ---------------------------------------------------------------------------
+# Inscripciones Canvas — formato nativo: SIS User ID | Course ID | Rol
+# ---------------------------------------------------------------------------
+
+async def process_canvas_enrollment_file(file_bytes: bytes, filename: str) -> bytes:
+    """Lee Excel con columnas 'SIS User ID', 'Course ID', 'Rol'.
+    Inscribe cada fila en Canvas y devuelve el mismo Excel con columnas
+    'Resultado' y 'FechaHoraEjecucion' agregadas."""
+    from datetime import datetime, timezone
+
+    df = _read_sheet(file_bytes, filename)
+    # Normalizar sólo para buscar, preservar nombres originales para el output
+    col_map = {c.strip().lower().replace(" ", "_"): c for c in df.columns}
+    norm = _normalize_cols(df.copy())
+
+    sis_col   = next((c for c in norm.columns if "sis" in c and "user" in c), None) or next((c for c in norm.columns if "sis" in c), None)
+    course_col= next((c for c in norm.columns if "course" in c), None)
+    rol_col   = next((c for c in norm.columns if "rol" in c), None)
+
+    if not sis_col or not course_col:
+        raise ValueError("El Excel debe tener columnas 'SIS User ID' y 'Course ID'")
+
+    resultados = []
+    fechas = []
+
+    for _, row in norm.iterrows():
+        sis_id  = str(row.get(sis_col, "")).strip()
+        course_id = str(row.get(course_col, "")).strip()
+        rol = str(row.get(rol_col, "StudentEnrollment")).strip() if rol_col else "StudentEnrollment"
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+        if not sis_id or not course_id:
+            resultados.append("Datos incompletos")
+            fechas.append(ts)
+            continue
+
+        try:
+            # Canvas acepta SIS login ID como sis_login_id:VALOR o email
+            user_ref = f"sis_login_id:{sis_id}" if not "@" in sis_id else sis_id
+            await canvas_service.enroll_user(course_id, user_ref, rol)
+            resultados.append("Inscripción exitosa")
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "already" in msg or "inscrito" in msg or "exists" in msg:
+                resultados.append("Usuario ya inscrito")
+            elif "not found" in msg or "no encontrado" in msg or "404" in msg:
+                if "course" in msg:
+                    resultados.append("Curso no encontrado")
+                else:
+                    resultados.append("Usuario no encontrado")
+            else:
+                resultados.append(f"Error: {str(exc)[:60]}")
+        fechas.append(ts)
+
+    df["Resultado"] = resultados
+    df["FechaHoraEjecucion"] = fechas
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inscripciones Canvas"
+
+    header_fill = PatternFill("solid", fgColor="1F4E79")
+    header_font = Font(color="FFFFFF", bold=True)
+    status_colors = {
+        "Inscripción exitosa": "C6EFCE",
+        "Usuario ya inscrito": "FFEB9C",
+        "Curso no encontrado": "FFC7CE",
+        "Usuario no encontrado": "FFC7CE",
+    }
+
+    for ci, col in enumerate(df.columns, 1):
+        cell = ws.cell(row=1, column=ci, value=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    resultado_col_idx = list(df.columns).index("Resultado") + 1
+
+    for ri, (_, row) in enumerate(df.iterrows(), 2):
+        for ci, val in enumerate(row, 1):
+            ws.cell(row=ri, column=ci, value=val)
+        resultado = row["Resultado"]
+        color = status_colors.get(resultado, "FFC7CE" if "Error" in resultado else "FFFFFF")
+        ws.cell(row=ri, column=resultado_col_idx).fill = PatternFill("solid", fgColor=color)
+
+    for ci in range(1, len(df.columns) + 1):
+        ws.column_dimensions[get_column_letter(ci)].width = 28
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Inscripciones Teams — formato nativo: Correo | Group ID
+# ---------------------------------------------------------------------------
+
+async def process_teams_enrollment_file(file_bytes: bytes, filename: str) -> bytes:
+    """Lee Excel con columnas 'Correo' y 'Group ID'.
+    Agrega cada usuario al equipo y devuelve el Excel con
+    'Resultado' y 'FechaHoraEjecucion' agregadas."""
+    from datetime import datetime, timezone
+
+    df = _read_sheet(file_bytes, filename)
+    norm = _normalize_cols(df.copy())
+
+    correo_col = next((c for c in norm.columns if "correo" in c or "email" in c or "mail" in c), None)
+    group_col  = next((c for c in norm.columns if "group" in c or "id" in c), None)
+
+    if not correo_col or not group_col:
+        raise ValueError("El Excel debe tener columnas 'Correo' y 'Group ID'")
+
+    resultados = []
+    fechas = []
+
+    for _, row in norm.iterrows():
+        correo   = str(row.get(correo_col, "")).strip()
+        group_id = str(row.get(group_col, "")).strip()
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+        if not correo or not group_id:
+            resultados.append("Datos incompletos")
+            fechas.append(ts)
+            continue
+
+        try:
+            az_user = await graph_service.get_user_by_upn(correo)
+            if not az_user:
+                resultados.append("Usuario no encontrado")
+                fechas.append(ts)
+                continue
+            await graph_service.add_member_to_team(group_id, az_user["id"])
+            resultados.append("Agregado correctamente")
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "already" in msg or "member" in msg or "exists" in msg or "409" in msg:
+                resultados.append("Ya es miembro")
+            elif "not found" in msg or "404" in msg:
+                resultados.append("Grupo no encontrado")
+            else:
+                resultados.append(f"Error: {str(exc)[:60]}")
+        fechas.append(ts)
+
+    df["Resultado"] = resultados
+    df["FechaHoraEjecucion"] = fechas
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inscripciones Teams"
+
+    header_fill = PatternFill("solid", fgColor="1F4E79")
+    header_font = Font(color="FFFFFF", bold=True)
+    status_colors = {
+        "Agregado correctamente": "C6EFCE",
+        "Ya es miembro":          "FFEB9C",
+        "Grupo no encontrado":    "FFC7CE",
+        "Usuario no encontrado":  "FFC7CE",
+    }
+
+    for ci, col in enumerate(df.columns, 1):
+        cell = ws.cell(row=1, column=ci, value=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    resultado_col_idx = list(df.columns).index("Resultado") + 1
+
+    for ri, (_, row) in enumerate(df.iterrows(), 2):
+        for ci, val in enumerate(row, 1):
+            ws.cell(row=ri, column=ci, value=val)
+        resultado = row["Resultado"]
+        color = status_colors.get(resultado, "FFC7CE" if "Error" in resultado else "FFFFFF")
+        ws.cell(row=ri, column=resultado_col_idx).fill = PatternFill("solid", fgColor=color)
+
+    for ci in range(1, len(df.columns) + 1):
+        ws.column_dimensions[get_column_letter(ci)].width = 28
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

@@ -855,63 +855,100 @@
 
     <!-- ══════════ PANEL: MATRICULACIÓN MASIVA ══════════ -->
     <div id="panel-matriculacion-masiva" class="panel">
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
-          <span style="font-size:2rem;">🎓</span>
+
+      <!-- ── Canvas Enrollments ── -->
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <span style="font-size:2rem;">📘</span>
           <div>
-            <h3 style="margin:0;">Matriculación masiva de alumnos</h3>
-            <p style="margin:2px 0 0;color:#6b7280;font-size:.88rem;">Cargá la planilla con alumnos e IDs. El sistema crea usuarios, los matricula en Canvas y Teams, y envía correos.</p>
+            <h3 style="margin:0;">Inscripciones Canvas</h3>
+            <p style="margin:2px 0 0;color:#6b7280;font-size:.88rem;">Cargá el Excel con SIS User ID y Course ID. El sistema inscribe a los alumnos y devuelve el resultado.</p>
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0;">
-          <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:16px;">
-            <div style="font-weight:700;color:#1d4ed8;margin-bottom:8px;font-size:.9rem;">📋 Columnas requeridas</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+          <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:14px;">
+            <div style="font-weight:700;color:#1d4ed8;margin-bottom:8px;font-size:.85rem;">📋 Columnas requeridas</div>
             <div style="display:flex;flex-direction:column;gap:6px;">
-              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Materia</span><span style="color:#374151;font-size:.83rem;">Nombre del curso</span></div>
-              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">ID Canvas</span><span style="color:#374151;font-size:.83rem;">ID numérico de Canvas</span></div>
-              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">ID Ms</span><span style="color:#374151;font-size:.83rem;">GUID del equipo Teams</span></div>
-              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Alumno</span><span style="color:#374151;font-size:.83rem;">Nombre completo</span></div>
-              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">SIS</span><span style="color:#374151;font-size:.83rem;">Cédula / código SIS</span></div>
-              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Correo</span><span style="color:#374151;font-size:.83rem;">Email institucional</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">SIS User ID</span><span style="color:#374151;font-size:.82rem;">Cédula o email del alumno</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Course ID</span><span style="color:#374151;font-size:.82rem;">ID numérico del curso Canvas</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#6b7280;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Rol</span><span style="color:#374151;font-size:.82rem;">StudentEnrollment <em>(opcional)</em></span></div>
             </div>
           </div>
-          <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:16px;">
-            <div style="font-weight:700;color:#16a34a;margin-bottom:8px;font-size:.9rem;">✅ El sistema ejecuta</div>
-            <div style="display:flex;flex-direction:column;gap:5px;font-size:.83rem;color:#374151;">
-              <div>👤 Crea usuarios nuevos si no existen</div>
-              <div>📘 Matricula en Canvas LMS</div>
-              <div>💼 Agrega al equipo de Teams</div>
-              <div>📧 Envía email de bienvenida</div>
-              <div>📥 Excel con resultado por alumno</div>
+          <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:14px;">
+            <div style="font-weight:700;color:#16a34a;margin-bottom:8px;font-size:.85rem;">✅ Resultados posibles</div>
+            <div style="display:flex;flex-direction:column;gap:5px;font-size:.82rem;">
+              <div><span style="background:#C6EFCE;padding:1px 6px;border-radius:3px;">Inscripción exitosa</span></div>
+              <div><span style="background:#FFEB9C;padding:1px 6px;border-radius:3px;">Usuario ya inscrito</span></div>
+              <div><span style="background:#FFC7CE;padding:1px 6px;border-radius:3px;">Curso no encontrado</span></div>
+              <div><span style="background:#FFC7CE;padding:1px 6px;border-radius:3px;">Usuario no encontrado</span></div>
             </div>
           </div>
         </div>
 
-        <div style="background:#fff;border:2px dashed #d1d5db;border-radius:10px;padding:24px;text-align:center;margin-bottom:16px;cursor:pointer;transition:border-color .2s;"
-             onclick="document.getElementById('matriculacion-file').click()"
-             id="matriculacion-dropzone">
-          <div style="font-size:2rem;margin-bottom:6px;">📂</div>
-          <div style="font-weight:600;color:#374151;margin-bottom:4px;">Seleccioná la planilla Excel</div>
-          <div style="font-size:.82rem;color:#9ca3af;" id="matriculacion-file-label">Hacé clic para elegir o arrastrá el archivo aquí · .xlsx</div>
-          <input type="file" id="matriculacion-file" accept=".xlsx,.xls" style="display:none;" onchange="document.getElementById('matriculacion-file-label').textContent = this.files[0]?.name || 'Hacé clic para elegir'">
+        <div style="background:#fff;border:2px dashed #d1d5db;border-radius:10px;padding:20px;text-align:center;margin-bottom:14px;cursor:pointer;"
+             onclick="document.getElementById('canvas-enroll-file').click()">
+          <div style="font-size:1.8rem;margin-bottom:4px;">📂</div>
+          <div style="font-weight:600;color:#374151;margin-bottom:2px;font-size:.9rem;">Seleccioná el archivo Excel</div>
+          <div style="font-size:.8rem;color:#9ca3af;" id="canvas-enroll-file-label">Hacé clic para elegir · .xlsx</div>
+          <input type="file" id="canvas-enroll-file" accept=".xlsx,.xls" style="display:none;"
+                 onchange="document.getElementById('canvas-enroll-file-label').textContent = this.files[0]?.name || 'Hacé clic para elegir'">
         </div>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="ejecutarMatriculacion()" style="display:flex;align-items:center;gap:6px;">
-            <span>▶</span> Ejecutar matriculación
-          </button>
-          <button class="btn btn-secondary" onclick="descargarPlantillaMatriculacion()" style="display:flex;align-items:center;gap:6px;">
-            <span>📄</span> Descargar plantilla
-          </button>
-          <a id="matriculacion-download-btn" style="display:none;" class="btn btn-success" download="resultado_matriculacion.xlsx">
-            ⬇ Descargar resultado
-          </a>
+          <button class="btn btn-primary" onclick="inscribirCanvas()" style="display:flex;align-items:center;gap:6px;">▶ Inscribir en Canvas</button>
+          <button class="btn btn-secondary" onclick="descargarPlantillaCanvas()" style="display:flex;align-items:center;gap:6px;">📄 Descargar plantilla</button>
+          <a id="canvas-enroll-download" style="display:none;" class="btn btn-success" download="resultado_canvas.xlsx">⬇ Descargar resultado</a>
+        </div>
+        <div id="canvas-enroll-status" style="display:none;margin-top:12px;"></div>
+      </div>
+
+      <!-- ── Teams Enrollments ── -->
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <span style="font-size:2rem;">💼</span>
+          <div>
+            <h3 style="margin:0;">Inscripciones Teams</h3>
+            <p style="margin:2px 0 0;color:#6b7280;font-size:.88rem;">Cargá el Excel con Correo y Group ID. El sistema agrega los usuarios a los equipos y devuelve el resultado.</p>
+          </div>
         </div>
 
-        <div id="matriculacion-status" style="display:none;"></div>
-        <div id="matriculacion-resumen" style="display:none;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+          <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:14px;">
+            <div style="font-weight:700;color:#1d4ed8;margin-bottom:8px;font-size:.85rem;">📋 Columnas requeridas</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Correo</span><span style="color:#374151;font-size:.82rem;">Email del alumno (UPN Azure)</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 8px;font-size:.78rem;font-family:monospace;">Group ID</span><span style="color:#374151;font-size:.82rem;">GUID del equipo Teams</span></div>
+            </div>
+          </div>
+          <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:14px;">
+            <div style="font-weight:700;color:#16a34a;margin-bottom:8px;font-size:.85rem;">✅ Resultados posibles</div>
+            <div style="display:flex;flex-direction:column;gap:5px;font-size:.82rem;">
+              <div><span style="background:#C6EFCE;padding:1px 6px;border-radius:3px;">Agregado correctamente</span></div>
+              <div><span style="background:#FFEB9C;padding:1px 6px;border-radius:3px;">Ya es miembro</span></div>
+              <div><span style="background:#FFC7CE;padding:1px 6px;border-radius:3px;">Grupo no encontrado</span></div>
+              <div><span style="background:#FFC7CE;padding:1px 6px;border-radius:3px;">Usuario no encontrado</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:2px dashed #d1d5db;border-radius:10px;padding:20px;text-align:center;margin-bottom:14px;cursor:pointer;"
+             onclick="document.getElementById('teams-enroll-file').click()">
+          <div style="font-size:1.8rem;margin-bottom:4px;">📂</div>
+          <div style="font-weight:600;color:#374151;margin-bottom:2px;font-size:.9rem;">Seleccioná el archivo Excel</div>
+          <div style="font-size:.8rem;color:#9ca3af;" id="teams-enroll-file-label">Hacé clic para elegir · .xlsx</div>
+          <input type="file" id="teams-enroll-file" accept=".xlsx,.xls" style="display:none;"
+                 onchange="document.getElementById('teams-enroll-file-label').textContent = this.files[0]?.name || 'Hacé clic para elegir'">
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="inscribirTeams()" style="display:flex;align-items:center;gap:6px;">▶ Inscribir en Teams</button>
+          <button class="btn btn-secondary" onclick="descargarPlantillaTeams()" style="display:flex;align-items:center;gap:6px;">📄 Descargar plantilla</button>
+          <a id="teams-enroll-download" style="display:none;" class="btn btn-success" download="resultado_teams.xlsx">⬇ Descargar resultado</a>
+        </div>
+        <div id="teams-enroll-status" style="display:none;margin-top:12px;"></div>
       </div>
+
     </div>
 
     <!-- ══════════ PANEL: CRON CONFIG ══════════ -->
@@ -3423,6 +3460,69 @@ function descargarPlantillaMatriculacion() {
       ['Matemática I','12345','xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx','López María','7654321','maria.lopez@usil.edu.py'],
     ]
   );
+}
+
+function descargarPlantillaCanvas() {
+  _descargarCSV('plantilla_inscripciones_canvas.csv',
+    ['SIS User ID','Course ID','Rol'],
+    [
+      ['3406399','1573','StudentEnrollment'],
+      ['5405805','1573','StudentEnrollment'],
+      ['glezcano@usil.edu.py','1539','StudentEnrollment'],
+    ]
+  );
+}
+
+function descargarPlantillaTeams() {
+  _descargarCSV('plantilla_inscripciones_teams.csv',
+    ['Correo','Group ID'],
+    [
+      ['glezcano@usil.edu.py','xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'],
+      ['lflorentin@usil.edu.py','xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'],
+    ]
+  );
+}
+
+async function inscribirCanvas() {
+  const file = document.getElementById('canvas-enroll-file').files[0];
+  if (!file) { alert('Seleccioná un archivo Excel'); return; }
+  const statusEl = document.getElementById('canvas-enroll-status');
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Procesando inscripciones Canvas...</div>';
+  document.getElementById('canvas-enroll-download').style.display = 'none';
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const resp = await fetch('/api/gestion/inscribir-canvas', {method:'POST', headers:{'Authorization':'Bearer '+getToken()}, body:fd});
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Error'); }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const btn = document.getElementById('canvas-enroll-download');
+    btn.href = url; btn.style.display = 'inline-flex';
+    statusEl.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:6px;">✅ Proceso completado. Descargá el Excel con los resultados.</div>';
+  } catch(ex) {
+    statusEl.innerHTML = `<div style="padding:12px;background:#fee2e2;border-radius:6px;">❌ Error: ${ex.message}</div>`;
+  }
+}
+
+async function inscribirTeams() {
+  const file = document.getElementById('teams-enroll-file').files[0];
+  if (!file) { alert('Seleccioná un archivo Excel'); return; }
+  const statusEl = document.getElementById('teams-enroll-status');
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Procesando inscripciones Teams...</div>';
+  document.getElementById('teams-enroll-download').style.display = 'none';
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const resp = await fetch('/api/gestion/inscribir-teams', {method:'POST', headers:{'Authorization':'Bearer '+getToken()}, body:fd});
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Error'); }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const btn = document.getElementById('teams-enroll-download');
+    btn.href = url; btn.style.display = 'inline-flex';
+    statusEl.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:6px;">✅ Proceso completado. Descargá el Excel con los resultados.</div>';
+  } catch(ex) {
+    statusEl.innerHTML = `<div style="padding:12px;background:#fee2e2;border-radius:6px;">❌ Error: ${ex.message}</div>`;
+  }
 }
 
 // ── Crear cursos y equipos ────────────────────────────────────────────────────

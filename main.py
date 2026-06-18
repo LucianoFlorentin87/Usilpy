@@ -1201,6 +1201,34 @@ async def gestion_matricular(file: UploadFile = File(...), _user=Depends(_requir
     return summary
 
 
+@app.post("/api/gestion/inscribir-canvas")
+async def gestion_inscribir_canvas(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Upload Excel SIS User ID|Course ID|Rol → inscribe en Canvas → returns Excel con Resultado"""
+    import bulk_service as _bulk
+    from fastapi.responses import Response
+    data = await file.read()
+    excel_bytes = await _bulk.process_canvas_enrollment_file(data, file.filename)
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=resultado_canvas.xlsx"}
+    )
+
+
+@app.post("/api/gestion/inscribir-teams")
+async def gestion_inscribir_teams(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Upload Excel Correo|Group ID → agrega a equipos Teams → returns Excel con Resultado"""
+    import bulk_service as _bulk
+    from fastapi.responses import Response
+    data = await file.read()
+    excel_bytes = await _bulk.process_teams_enrollment_file(data, file.filename)
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=resultado_teams.xlsx"}
+    )
+
+
 @app.get("/api/gestion/cron")
 async def gestion_get_cron(_user=Depends(_require_admin)):
     from scheduler import get_next_run, scheduler
