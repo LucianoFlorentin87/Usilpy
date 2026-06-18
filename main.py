@@ -1005,11 +1005,9 @@ async def mis_inscripciones(
     current: dict = Depends(_require_admin_or_academico),
 ):
     """Devuelve los registros de pending_enrollments generados por el usuario actual."""
-    import aiosqlite
-    from audit_service import DB_PATH
+    import db as _db
 
     username = current.get("username", "")
-    # admin puede ver todos; academico solo los suyos
     if current.get("role") == "admin":
         source_filter = "%parseo:%"
     else:
@@ -1025,12 +1023,10 @@ async def mis_inscripciones(
         params.append(estado)
 
     where = "WHERE " + " AND ".join(conditions)
-    query = f"SELECT * FROM pending_enrollments {where} ORDER BY received_at DESC LIMIT 2000"
-
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(query, params) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
+    rows = await _db.fetch(
+        f"SELECT * FROM pending_enrollments {where} ORDER BY received_at DESC LIMIT 2000",
+        *params,
+    )
 
     # Agrupa por alumno (cedula + semestre)
     agrupado: dict = {}
@@ -1079,15 +1075,12 @@ async def portal_delete_inscripciones(payload: dict, current: dict = Depends(_re
     if not ids:
         raise HTTPException(status_code=400, detail="Enviá la lista de ids")
     source = f"parseo:{current.get('username', '')}"
-    import aiosqlite
-    from audit_service import DB_PATH
-    async with aiosqlite.connect(DB_PATH) as db:
-        placeholders = ",".join("?" * len(ids))
-        await db.execute(
-            f"DELETE FROM pending_enrollments WHERE id IN ({placeholders}) AND source = ?",
-            (*ids, source),
-        )
-        await db.commit()
+    import db as _db
+    placeholders = ",".join("?" * len(ids))
+    await _db.execute(
+        f"DELETE FROM pending_enrollments WHERE id IN ({placeholders}) AND source = ?",
+        *ids, source,
+    )
     return {"ok": True}
 
 
@@ -1098,8 +1091,7 @@ async def formulario_inscripcion(
     _: dict = Depends(_require_admin_or_academico),
 ):
     """Genera HTML imprimible con el formulario de inscripción de un alumno."""
-    import aiosqlite
-    from webhook_service import DB_PATH
+    import db as _db
 
     conditions = ["cedula = ?"]
     params: list = [cedula]
@@ -1107,12 +1099,9 @@ async def formulario_inscripcion(
         conditions.append("semestre = ?")
         params.append(semestre)
     where = "WHERE " + " AND ".join(conditions)
-    query = f"SELECT * FROM pending_enrollments {where} ORDER BY received_at DESC"
-
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(query, params) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
+    rows = await _db.fetch(
+        f"SELECT * FROM pending_enrollments {where} ORDER BY received_at DESC", *params
+    )
 
     if not rows:
         raise HTTPException(status_code=404, detail="No se encontraron inscripciones para esta cédula")

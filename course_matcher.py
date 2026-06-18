@@ -14,10 +14,9 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-import aiosqlite
 from rapidfuzz import fuzz, process
 
-from audit_service import DB_PATH
+import db
 
 logger = logging.getLogger(__name__)
 
@@ -53,98 +52,76 @@ CREATE TABLE IF NOT EXISTS course_unresolved (
 
 
 async def init_matcher_tables() -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(_CREATE_ALIASES)
-        await db.execute(_CREATE_UNRESOLVED)
-        await db.commit()
+    await db.execute(_CREATE_ALIASES)
+    await db.execute(_CREATE_UNRESOLVED)
 
 
 # ── Alias lookups ─────────────────────────────────────────────────────────────
 
 async def get_alias(variant: str) -> dict | None:
-    """Return accepted alias for this variant, or None."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cur = await db.execute(
-            "SELECT * FROM course_aliases WHERE variant = ? AND estado != 'rechazado'",
-            (variant.strip(),),
-        )
-        row = await cur.fetchone()
-        return dict(row) if row else None
+    return await db.fetchrow(
+        "SELECT * FROM course_aliases WHERE variant = ? AND estado != 'rechazado'",
+        variant.strip(),
+    )
 
 
 async def save_alias(variant: str, canvas_sis_id: str, canvas_name: str,
                      score: float, estado: str = "auto") -> None:
     ts = datetime.now(timezone.utc).isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            """INSERT INTO course_aliases (variant, canvas_sis_id, canvas_name, score, estado, created_at)
-               VALUES (?,?,?,?,?,?)
-               ON CONFLICT(variant) DO UPDATE SET
-                 canvas_sis_id=excluded.canvas_sis_id,
-                 canvas_name=excluded.canvas_name,
-                 score=excluded.score,
-                 estado=excluded.estado""",
-            (variant.strip(), canvas_sis_id, canvas_name, score, estado, ts),
-        )
-        await db.commit()
+    await db.execute(
+        """INSERT INTO course_aliases (variant, canvas_sis_id, canvas_name, score, estado, created_at)
+           VALUES (?,?,?,?,?,?)
+           ON CONFLICT(variant) DO UPDATE SET
+             canvas_sis_id=EXCLUDED.canvas_sis_id,
+             canvas_name=EXCLUDED.canvas_name,
+             score=EXCLUDED.score,
+             estado=EXCLUDED.estado""",
+        variant.strip(), canvas_sis_id, canvas_name, score, estado, ts,
+    )
 
 
 async def resolve_alias(alias_id: int, canvas_sis_id: str, canvas_name: str,
                         resolved_by: str = "admin") -> None:
     ts = datetime.now(timezone.utc).isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            """UPDATE course_aliases
-               SET canvas_sis_id=?, canvas_name=?, estado='confirmado',
-                   resolved_at=?, resolved_by=?
-               WHERE id=?""",
-            (canvas_sis_id, canvas_name, ts, resolved_by, alias_id),
-        )
-        await db.commit()
+    await db.execute(
+        """UPDATE course_aliases
+           SET canvas_sis_id=?, canvas_name=?, estado='confirmado',
+               resolved_at=?, resolved_by=?
+           WHERE id=?""",
+        canvas_sis_id, canvas_name, ts, resolved_by, alias_id,
+    )
 
 
 async def list_aliases(estado: str | None = None) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        if estado:
-            cur = await db.execute(
-                "SELECT * FROM course_aliases WHERE estado=? ORDER BY created_at DESC", (estado,)
-            )
-        else:
-            cur = await db.execute("SELECT * FROM course_aliases ORDER BY created_at DESC")
-        return [dict(r) for r in await cur.fetchall()]
+    if estado:
+        return await db.fetch(
+            "SELECT * FROM course_aliases WHERE estado=? ORDER BY created_at DESC", estado
+        )
+    return await db.fetch("SELECT * FROM course_aliases ORDER BY created_at DESC")
 
 
 async def list_unresolved() -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cur = await db.execute(
-            "SELECT * FROM course_unresolved ORDER BY last_seen DESC"
-        )
-        return [dict(r) for r in await cur.fetchall()]
+    return await db.fetch("SELECT * FROM course_unresolved ORDER BY last_seen DESC")
 
 
 async def _record_unresolved(variant: str, semestre: str,
                               best_match: str, best_score: float) -> None:
     ts = datetime.now(timezone.utc).isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
-        existing = await (await db.execute(
-            "SELECT id, seen_count FROM course_unresolved WHERE variant=? AND semestre=?",
-            (variant.strip(), semestre),
-        )).fetchone()
-        if existing:
-            await db.execute(
-                "UPDATE course_unresolved SET seen_count=seen_count+1, last_seen=?, best_match=?, best_score=? WHERE id=?",
-                (ts, best_match, best_score, existing[0]),
-            )
-        else:
-            await db.execute(
-                """INSERT INTO course_unresolved (variant, semestre, best_match, best_score, first_seen, last_seen)
-                   VALUES (?,?,?,?,?,?)""",
-                (variant.strip(), semestre, best_match, best_score, ts, ts),
-            )
-        await db.commit()
+    existing = await db.fetchrow(
+        "SELECT id, seen_count FROM course_unresolved WHERE variant=? AND semestre=?",
+        variant.strip(), semestre,
+    )
+    if existing:
+        await db.execute(
+            "UPDATE course_unresolved SET seen_count=seen_count+1, last_seen=?, best_match=?, best_score=? WHERE id=?",
+            ts, best_match, best_score, existing["id"],
+        )
+    else:
+        await db.execute(
+            """INSERT INTO course_unresolved (variant, semestre, best_match, best_score, first_seen, last_seen)
+               VALUES (?,?,?,?,?,?)""",
+            variant.strip(), semestre, best_match, best_score, ts, ts,
+        )
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────

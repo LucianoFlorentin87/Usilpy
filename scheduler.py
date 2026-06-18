@@ -78,7 +78,9 @@ def get_next_run() -> str | None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
-    # Init audit DB + users table
+    # Init DB pool first, then tables
+    import db as _db
+    await _db.init_pool()
     await audit_service.init_db()
     # Seed initial admin from .env if no users exist yet
     if settings.admin_password_hash:
