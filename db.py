@@ -4,12 +4,16 @@ Uses asyncpg (PostgreSQL) when DATABASE_URL is set, otherwise raises on startup.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
+import traceback as _tb
 from typing import Any
 from urllib.parse import unquote
 
 import asyncpg
+
+logger = logging.getLogger(__name__)
 
 _pool: asyncpg.Pool | None = None
 
@@ -63,8 +67,15 @@ async def init_pool() -> None:
             "DATABASE_URL env var not set. "
             "Create a PostgreSQL database and set DATABASE_URL."
         )
+    # Log sanitized URL for diagnosis (hide password)
+    safe = re.sub(r"(:)[^@]+(@)", r"\1***\2", url)
+    logger.info("DB init_pool — raw url (sanitized): %s", safe)
+    logger.info("DB init_pool — called from:\n%s", "".join(_tb.format_stack()))
     kwargs = _parse_db_url(url)
-    _pool = await asyncpg.create_pool(**kwargs, min_size=1, max_size=10)
+    logger.info("DB init_pool — parsed host=%s port=%s user=%s db=%s",
+                kwargs["host"], kwargs["port"], kwargs["user"], kwargs["database"])
+    _pool = await asyncpg.create_pool(**kwargs, min_size=1, max_size=10,
+                                      ssl="require")
 
 
 def get_pool() -> asyncpg.Pool:
