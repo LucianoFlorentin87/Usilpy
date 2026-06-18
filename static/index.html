@@ -171,24 +171,62 @@
     .next-run-badge { background: #1a2332; color: #8ca0bf; border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; font-family: monospace; }
 
     /* ── Login screen ── */
-    #login-screen { position: fixed; inset: 0; background: #2B52CC; display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    /* ── Login screen ── */
+    #login-screen {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      background: #060e24;
+      overflow: hidden;
+    }
     #login-screen.hidden { display: none !important; }
-    .login-card { background: #fff; border-radius: 16px; padding: 40px 36px 36px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+
+    /* Tech background: gradient + animated grid */
+    #login-screen::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        linear-gradient(135deg, #060e24 0%, #0d2157 40%, #0a3d8f 70%, #1a5cb0 100%);
+      z-index: 0;
+    }
+    #login-screen::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(43,130,255,.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(43,130,255,.07) 1px, transparent 1px);
+      background-size: 48px 48px;
+      z-index: 1;
+    }
+    .login-glow {
+      position: absolute; border-radius: 50%; filter: blur(80px); z-index: 1; pointer-events: none;
+    }
+    .login-glow-1 { width: 400px; height: 400px; background: rgba(43,130,255,.18); top: -80px; left: -80px; }
+    .login-glow-2 { width: 500px; height: 500px; background: rgba(80,200,255,.10); bottom: -120px; right: -80px; }
+    .login-glow-3 { width: 250px; height: 250px; background: rgba(120,80,255,.12); top: 40%; left: 20%; }
+
+    .login-card {
+      position: relative; z-index: 2;
+      background: rgba(255,255,255,.97);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 44px 40px 40px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 32px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.08);
+    }
     .login-logo { text-align: center; margin-bottom: 28px; }
-    .login-logo .usil-emblem { display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; background: #2B52CC; border-radius: 50%; margin-bottom: 12px; }
-    .login-logo .usil-emblem svg { width: 44px; height: 44px; }
-    .login-logo h2 { font-size: 1.4rem; font-weight: 800; color: #1a1a2e; margin: 0 0 2px; letter-spacing: .5px; }
-    .login-logo .subtitle { font-size: 0.78rem; color: #2B52CC; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; margin: 0; }
-    .login-divider-top { height: 1px; background: #e8edf5; margin: 0 0 24px; }
+    .login-logo .usil-mark { margin: 0 auto 14px; width: 80px; height: 80px; }
+    .login-logo .usil-mark svg { width: 80px; height: 80px; }
+    .login-logo h2 { font-size: 1.35rem; font-weight: 800; color: #0d2157; margin: 0 0 3px; }
+    .login-logo .subtitle { font-size: 0.72rem; color: #2B52CC; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin: 0; }
+    .login-divider-top { height: 1px; background: linear-gradient(90deg,transparent,#dde3f0,transparent); margin: 0 0 26px; }
     .login-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
-    .login-field label { font-size: 0.78rem; font-weight: 600; color: #555; letter-spacing: .3px; }
-    .login-field input { padding: 11px 13px; border: 1.5px solid #dde3f0; border-radius: 8px; font-size: 0.9rem; outline: none; transition: border-color .15s, box-shadow .15s; background: #f8faff; }
-    .login-field input:focus { border-color: #2B52CC; box-shadow: 0 0 0 3px rgba(43,82,204,.12); background: #fff; }
+    .login-field label { font-size: 0.78rem; font-weight: 700; color: #3a4a6b; letter-spacing: .4px; text-transform: uppercase; }
+    .login-field input { padding: 12px 14px; border: 1.5px solid #dde3f0; border-radius: 9px; font-size: 0.9rem; outline: none; transition: border-color .15s, box-shadow .15s; background: #f5f8ff; color: #1a1a2e; }
+    .login-field input:focus { border-color: #2B52CC; box-shadow: 0 0 0 3px rgba(43,82,204,.13); background: #fff; }
     #login-error { color: #dc3545; font-size: 0.8rem; min-height: 18px; margin-bottom: 8px; }
-    .btn-login { width: 100%; padding: 13px; font-size: 0.95rem; font-weight: 700; border-radius: 8px; text-align: center; background: #2B52CC; color: #fff; border: none; cursor: pointer; letter-spacing: .3px; transition: background .15s, transform .1s; }
-    .btn-login:hover { background: #1e3fa0; }
+    .btn-login { width: 100%; padding: 14px; font-size: 0.95rem; font-weight: 800; border-radius: 9px; text-align: center; background: linear-gradient(135deg,#1e3fa0,#2B52CC); color: #fff; border: none; cursor: pointer; letter-spacing: .5px; transition: opacity .15s, transform .1s; box-shadow: 0 4px 16px rgba(43,82,204,.35); }
+    .btn-login:hover { opacity: .92; }
     .btn-login:active { transform: scale(.98); }
-    .btn-azure svg { width: 18px; height: 18px; }
 
     /* ── Topbar user chip ── */
     #user-chip { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
@@ -202,12 +240,26 @@
 
 <!-- ═══════════════════════════════ LOGIN ════════════════════════════════ -->
 <div id="login-screen">
+  <!-- tech glows -->
+  <div class="login-glow login-glow-1"></div>
+  <div class="login-glow login-glow-2"></div>
+  <div class="login-glow login-glow-3"></div>
   <div class="login-card">
     <div class="login-logo">
-      <div class="usil-emblem">
-        <!-- USIL monogram -->
-        <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <text x="22" y="30" font-family="Georgia,serif" font-size="22" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">USIL</text>
+      <!-- USIL monogram SVG recreation -->
+      <div class="usil-mark">
+        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="40" r="40" fill="#2B52CC"/>
+          <!-- U -->
+          <path d="M13 22 L13 46 Q13 56 23 56 Q33 56 33 46 L33 22" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+          <!-- S -->
+          <path d="M37 52 Q37 57 44 57 Q51 57 51 51 Q51 46 44 44 Q37 42 37 36 Q37 30 44 30 Q51 30 51 35" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+          <!-- I -->
+          <line x1="55" y1="30" x2="55" y2="57" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+          <!-- L -->
+          <path d="M60 30 L60 57 L70 57" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- decorative circle -->
+          <circle cx="40" cy="40" r="26" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
         </svg>
       </div>
       <h2>Gestión Académica</h2>
