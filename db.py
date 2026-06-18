@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 import re
 from typing import Any
-from urllib.parse import urlparse, urlunparse, quote, unquote
+from urllib.parse import unquote
 
 import asyncpg
 
@@ -27,17 +27,31 @@ def _pg(sql: str) -> str:
 
 
 def _parse_db_url(url: str) -> dict:
-    """Parse DATABASE_URL into kwargs for asyncpg, handling special chars in password."""
+    """Parse DATABASE_URL with regex to avoid urlparse choking on special chars in password.
+
+    Handles passwords with *, [, ] and other characters that confuse Python's urlparse,
+    including the Supabase Connect-button format: postgresql://user:[password]@host/db
+    """
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
-    parsed = urlparse(url)
-    password = unquote(parsed.password or "")
+    # scheme://user:password@host:port/database  (password may contain brackets/special chars)
+    m = re.match(
+        r"postgresql://([^:@]+):(.+)@([^:/\[\]]+)(?::(\d+))?/(.+)",
+        url,
+    )
+    if not m:
+        raise ValueError(f"Cannot parse DATABASE_URL — unexpected format")
+    user, password, host, port, database = m.groups()
+    # Strip literal brackets added by Supabase Connect UI: [password] → password
+    password = password.strip("[]")
+    # Decode any percent-encoding (e.g. %2A → *)
+    password = unquote(password)
     return {
-        "host": parsed.hostname,
-        "port": parsed.port or 5432,
-        "user": parsed.username,
+        "host": host,
+        "port": int(port or 5432),
+        "user": user,
         "password": password,
-        "database": (parsed.path or "").lstrip("/"),
+        "database": database.split("?")[0],  # strip query params if any
     }
 
 
