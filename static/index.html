@@ -3482,6 +3482,7 @@ async function inscribirCanvas() {
   statusEl.style.display = 'block';
   statusEl.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Procesando inscripciones Canvas...</div>';
   document.getElementById('canvas-enroll-download').style.display = 'none';
+  _portalLog(`Iniciando inscripciones Canvas — archivo: ${file.name}`);
   try {
     const fd = new FormData(); fd.append('file', file);
     const resp = await fetch('/api/gestion/inscribir-canvas', {method:'POST', headers:{'Authorization':'Bearer '+getToken()}, body:fd});
@@ -3491,8 +3492,10 @@ async function inscribirCanvas() {
     const btn = document.getElementById('canvas-enroll-download');
     btn.href = url; btn.style.display = 'inline-flex';
     statusEl.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:6px;">✅ Proceso completado. Descargá el Excel con los resultados.</div>';
+    _portalLog('Inscripciones Canvas completadas. Excel listo para descargar.', 'info');
   } catch(ex) {
     statusEl.innerHTML = `<div style="padding:12px;background:#fee2e2;border-radius:6px;">❌ Error: ${ex.message}</div>`;
+    _portalLog(`Error Canvas: ${ex.message}`, 'error');
   }
 }
 
@@ -3503,6 +3506,7 @@ async function inscribirTeams() {
   statusEl.style.display = 'block';
   statusEl.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Procesando inscripciones Teams...</div>';
   document.getElementById('teams-enroll-download').style.display = 'none';
+  _portalLog(`Iniciando inscripciones Teams — archivo: ${file.name}`);
   try {
     const fd = new FormData(); fd.append('file', file);
     const resp = await fetch('/api/gestion/inscribir-teams', {method:'POST', headers:{'Authorization':'Bearer '+getToken()}, body:fd});
@@ -3512,8 +3516,10 @@ async function inscribirTeams() {
     const btn = document.getElementById('teams-enroll-download');
     btn.href = url; btn.style.display = 'inline-flex';
     statusEl.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:6px;">✅ Proceso completado. Descargá el Excel con los resultados.</div>';
+    _portalLog('Inscripciones Teams completadas. Excel listo para descargar.', 'info');
   } catch(ex) {
     statusEl.innerHTML = `<div style="padding:12px;background:#fee2e2;border-radius:6px;">❌ Error: ${ex.message}</div>`;
+    _portalLog(`Error Teams: ${ex.message}`, 'error');
   }
 }
 
@@ -3524,8 +3530,9 @@ async function crearCursos() {
 
   const statusEl = document.getElementById('cursos-status');
   statusEl.style.display = 'block';
-  statusEl.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">&#9203; Procesando cursos y equipos... esto puede tardar varios minutos.</div>';
+  statusEl.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Procesando cursos y equipos... esto puede tardar varios minutos.</div>';
   document.getElementById('cursos-download-btn').style.display = 'none';
+  _portalLog(`Iniciando creación de cursos y equipos — archivo: ${file.name}`);
 
   try {
     const fd = new FormData();
@@ -3538,9 +3545,11 @@ async function crearCursos() {
     const btn = document.getElementById('cursos-download-btn');
     btn.href = url;
     btn.style.display = 'inline-block';
-    statusEl.innerHTML = '<div style="padding:12px;background:#d4edda;border-radius:6px;">&#9989; Procesamiento completado. Descargá el Excel con los IDs.</div>';
+    statusEl.innerHTML = '<div style="padding:12px;background:#d4edda;border-radius:6px;">✅ Procesamiento completado. Descargá el Excel con los IDs.</div>';
+    _portalLog('Cursos y equipos creados. Excel con IDs listo para descargar.', 'info');
   } catch(e) {
-    statusEl.innerHTML = `<div style="padding:12px;background:#f8d7da;border-radius:6px;">&#10060; Error: ${e.message}</div>`;
+    statusEl.innerHTML = `<div style="padding:12px;background:#f8d7da;border-radius:6px;">❌ Error: ${e.message}</div>`;
+    _portalLog(`Error al crear cursos: ${e.message}`, 'error');
   }
 }
 
