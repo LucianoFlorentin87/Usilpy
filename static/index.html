@@ -234,7 +234,7 @@
 <!-- ═══════════════════════════════ SIDEBAR ═══════════════════════════════ -->
 <nav id="sidebar">
   <h1>Gestión Académica</h1>
-  <p class="tagline">Canvas LMS · Azure AD · Teams</p>
+  <p class="nav-group-label">Gestión de Inscripciones</p>
 
   <!-- Reportes -->
   <div class="nav-group">
@@ -244,48 +244,6 @@
     </div>
     <div class="nav-item" data-panel="auditoria" onclick="showPanel('auditoria', this)">
       <span class="icon">📋</span> Auditoría
-    </div>
-  </div>
-
-  <!-- Matriculación -->
-  <div class="nav-group">
-    <div class="nav-group-label">Matriculación</div>
-    <div class="nav-item" data-panel="parseo-planilla" onclick="showPanel('parseo-planilla', this)">
-      <span class="icon">🧹</span> Parsear planilla académica
-    </div>
-    <div class="nav-item" data-panel="matriculacion" onclick="showPanel('matriculacion', this)">
-      <span class="icon">🎓</span> Ejecutar matriculación
-    </div>
-  </div>
-
-  <!-- Canvas -->
-  <div class="nav-group">
-    <div class="nav-group-label">Canvas LMS</div>
-    <div class="nav-item" data-panel="canvas-terms" onclick="showPanel('canvas-terms', this)">
-      <span class="icon">🗓️</span> Períodos
-    </div>
-    <div class="nav-item" data-panel="canvas-courses" onclick="showPanel('canvas-courses', this)">
-      <span class="icon">📚</span> Cursos
-    </div>
-    <div class="nav-item" data-panel="canvas-users" onclick="showPanel('canvas-users', this)">
-      <span class="icon">👤</span> Usuarios
-    </div>
-    <div class="nav-item" data-panel="canvas-enroll" onclick="showPanel('canvas-enroll', this)">
-      <span class="icon">✏️</span> Inscripciones
-    </div>
-  </div>
-
-  <!-- Teams -->
-  <div class="nav-group">
-    <div class="nav-group-label">Microsoft Teams</div>
-    <div class="nav-item" data-panel="azure-users" onclick="showPanel('azure-users', this)">
-      <span class="icon">🏢</span> Usuarios Azure AD
-    </div>
-    <div class="nav-item" data-panel="azure-groups" onclick="showPanel('azure-groups', this)">
-      <span class="icon">👥</span> Grupos
-    </div>
-    <div class="nav-item" data-panel="teams" onclick="showPanel('teams', this)">
-      <span class="icon">💬</span> Equipos
     </div>
   </div>
 
@@ -300,6 +258,12 @@
   <!-- Administración del sistema -->
   <div class="nav-group" id="nav-admin-group">
     <div class="nav-group-label">Administración</div>
+    <div class="nav-item" data-panel="parseo-planilla" onclick="showPanel('parseo-planilla', this)">
+      <span class="icon">🧹</span> Parsear planilla
+    </div>
+    <div class="nav-item" data-panel="matriculacion" onclick="showPanel('matriculacion', this)">
+      <span class="icon">🎓</span> Ejecutar matriculación
+    </div>
     <div class="nav-item" data-panel="system-users" onclick="showPanel('system-users', this)">
       <span class="icon">🔑</span> Usuarios del sistema
     </div>
