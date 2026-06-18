@@ -1176,6 +1176,36 @@ async def formulario_inscripcion(
 # Gestión masiva endpoints
 # ---------------------------------------------------------------------------
 
+@app.get("/api/gestion/plantilla-cursos")
+async def plantilla_cursos(_user=Depends(_require_admin)):
+    from fastapi.responses import Response
+    import bulk_service as _bulk
+    excel_bytes = _bulk.build_plantilla_cursos()
+    return Response(content=excel_bytes,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=plantilla_crear_cursos.xlsx"})
+
+
+@app.get("/api/gestion/plantilla-canvas")
+async def plantilla_canvas(_user=Depends(_require_admin)):
+    from fastapi.responses import Response
+    import bulk_service as _bulk
+    excel_bytes = _bulk.build_plantilla_canvas()
+    return Response(content=excel_bytes,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=plantilla_inscripciones_canvas.xlsx"})
+
+
+@app.get("/api/gestion/plantilla-teams")
+async def plantilla_teams(_user=Depends(_require_admin)):
+    from fastapi.responses import Response
+    import bulk_service as _bulk
+    excel_bytes = _bulk.build_plantilla_teams()
+    return Response(content=excel_bytes,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=plantilla_inscripciones_teams.xlsx"})
+
+
 @app.post("/api/gestion/crear-cursos")
 async def gestion_crear_cursos(file: UploadFile = File(...), _user=Depends(_require_admin)):
     """Upload Excel with materias → creates Canvas courses + Teams teams → returns Excel with IDs"""

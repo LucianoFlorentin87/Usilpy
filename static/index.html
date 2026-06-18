@@ -3441,15 +3441,20 @@ function _descargarCSV(filename, headers, rows) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
 }
 
+async function _descargarPlantillaServidor(endpoint, filename) {
+  try {
+    const resp = await fetch(endpoint, {headers:{'Authorization':'Bearer '+getToken()}});
+    if (!resp.ok) throw new Error('Error al descargar');
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  } catch(ex) { alert('No se pudo descargar la plantilla: ' + ex.message); }
+}
+
 function descargarPlantillaCursos() {
-  _descargarCSV('plantilla_crear_cursos.csv',
-    ['materia','semestre','programa'],
-    [
-      ['Matemática I','2025-2','Ingeniería en Sistemas'],
-      ['Administración','2025-2','Administración de Empresas'],
-      ['Comunicación','2025-2',''],
-    ]
-  );
+  _descargarPlantillaServidor('/api/gestion/plantilla-cursos', 'plantilla_crear_cursos.xlsx');
 }
 
 function descargarPlantillaMatriculacion() {
@@ -3463,24 +3468,11 @@ function descargarPlantillaMatriculacion() {
 }
 
 function descargarPlantillaCanvas() {
-  _descargarCSV('plantilla_inscripciones_canvas.csv',
-    ['SIS User ID','Course ID','Rol'],
-    [
-      ['3406399','1573','StudentEnrollment'],
-      ['5405805','1573','StudentEnrollment'],
-      ['glezcano@usil.edu.py','1539','StudentEnrollment'],
-    ]
-  );
+  _descargarPlantillaServidor('/api/gestion/plantilla-canvas', 'plantilla_inscripciones_canvas.xlsx');
 }
 
 function descargarPlantillaTeams() {
-  _descargarCSV('plantilla_inscripciones_teams.csv',
-    ['Correo','Group ID'],
-    [
-      ['glezcano@usil.edu.py','xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'],
-      ['lflorentin@usil.edu.py','xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'],
-    ]
-  );
+  _descargarPlantillaServidor('/api/gestion/plantilla-teams', 'plantilla_inscripciones_teams.xlsx');
 }
 
 async function inscribirCanvas() {
