@@ -129,15 +129,16 @@ async def get_dashboard_kpis() -> dict:
     today = datetime.now(timezone.utc).date().isoformat()
 
     rows = await db.fetch(
-        "SELECT accion, COUNT(*) as cnt FROM audit_log WHERE DATE(timestamp::date) = ? GROUP BY accion",
+        "SELECT accion, COUNT(*) as cnt FROM audit_log WHERE LEFT(timestamp, 10) = ? GROUP BY accion",
         today,
     )
     today_by_action: dict[str, int] = {r["accion"]: r["cnt"] for r in rows}
 
     daily = await db.fetch(
-        """SELECT DATE(timestamp::date) as day, COUNT(DISTINCT cedula) as cnt
-           FROM audit_log WHERE timestamp::date >= CURRENT_DATE - INTERVAL '6 days'
-           GROUP BY day ORDER BY day"""
+        """SELECT LEFT(timestamp, 10) as day, COUNT(DISTINCT cedula) as cnt
+           FROM audit_log WHERE LEFT(timestamp, 10) >= ?
+           GROUP BY day ORDER BY day""",
+        (datetime.now(timezone.utc).date() - __import__('datetime').timedelta(days=6)).isoformat(),
     )
 
     ejecuciones = await db.fetch(

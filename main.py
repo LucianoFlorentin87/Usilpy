@@ -636,6 +636,7 @@ async def update_system_user(user_id: str, payload: dict, _: dict = Depends(_req
         updated = await user_service.update_user(user_id, payload)
         if not updated:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        updated.pop("password_hash", None)
         return updated
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

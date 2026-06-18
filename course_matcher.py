@@ -25,7 +25,7 @@ LOW_THRESHOLD  = 60   # flag for review
 
 _CREATE_ALIASES = """
 CREATE TABLE IF NOT EXISTS course_aliases (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            SERIAL PRIMARY KEY,
     variant       TEXT UNIQUE NOT NULL,
     canvas_sis_id TEXT NOT NULL,
     canvas_name   TEXT,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS course_aliases (
 
 _CREATE_UNRESOLVED = """
 CREATE TABLE IF NOT EXISTS course_unresolved (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          SERIAL PRIMARY KEY,
     variant     TEXT NOT NULL,
     semestre    TEXT,
     best_match  TEXT,
