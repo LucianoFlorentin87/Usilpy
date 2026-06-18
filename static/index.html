@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gestión Académica Universitaria</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    /* ── Reset & base ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #f0f2f5;
@@ -26,28 +26,19 @@
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
 
     /* ── Sidebar ── */
-    #sidebar {
-      width: 240px; min-width: 240px; background: var(--sidebar-bg); display: flex; flex-direction: column;
-      padding: 0; overflow-y: auto;
-    }
+    #sidebar { width: 240px; min-width: 240px; background: var(--sidebar-bg); display: flex; flex-direction: column; padding: 0; overflow-y: auto; }
     #sidebar h1 { color: #fff; font-size: 1rem; font-weight: 700; padding: 20px 16px 8px; line-height: 1.3; }
     #sidebar .tagline { color: #8ca0bf; font-size: 0.72rem; padding: 0 16px 20px; }
     .nav-group { padding: 6px 0; }
     .nav-group-label { color: #5a7299; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 6px 16px 2px; }
-    .nav-item {
-      display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer;
-      color: #b0c4de; font-size: 0.85rem; border-left: 3px solid transparent; transition: all .15s;
-    }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer; color: #b0c4de; font-size: 0.85rem; border-left: 3px solid transparent; transition: all .15s; }
     .nav-item:hover { background: var(--sidebar-hover); color: #fff; }
     .nav-item.active { background: var(--sidebar-active); color: #fff; border-left-color: #5b9bd5; }
     .nav-item .icon { font-size: 1rem; width: 18px; text-align: center; flex-shrink: 0; }
 
     /* ── Main content ── */
     #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    #topbar {
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-    }
+    #topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
     #topbar h2 { font-size: 1.1rem; font-weight: 600; }
     #topbar .badge { background: var(--accent); color: #fff; font-size: 0.7rem; padding: 2px 8px; border-radius: 99px; }
     #content { flex: 1; overflow-y: auto; padding: 24px; }
@@ -61,26 +52,24 @@
     .card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 14px; }
 
     /* ── Buttons ── */
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px;
-      border: none; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all .15s;
-    }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all .15s; }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover { background: var(--accent-dark); }
     .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
     .btn-secondary:hover { background: var(--bg); }
     .btn-success { background: #059669; color: #fff; }
     .btn-success:hover { background: #047857; }
+    .btn-warn { background: #d97706; color: #fff; }
+    .btn-warn:hover { background: #b45309; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
 
     /* ── Forms ── */
     .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
     label { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
-    input, select, textarea {
-      padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
-      font-size: 0.85rem; outline: none; transition: border-color .15s;
-    }
+    input, select, textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; outline: none; transition: border-color .15s; }
     input:focus, select:focus { border-color: var(--accent); }
 
     /* ── Tables ── */
@@ -92,20 +81,16 @@
     tr:hover td { background: #f8fafc; }
 
     /* ── Status chips ── */
-    .chip {
-      display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; white-space: nowrap;
-    }
-    .chip-ok       { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
-    .chip-error    { background: var(--error-bg);   color: var(--error);   border: 1px solid var(--error-border); }
-    .chip-warn     { background: var(--warn-bg);    color: var(--warn);    border: 1px solid var(--warn-border); }
-    .chip-skip     { background: var(--skip-bg);    color: var(--skip);    border: 1px solid var(--skip-border); }
+    .chip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+    .chip-ok       { background: var(--success-bg); color: var(--success);  border: 1px solid var(--success-border); }
+    .chip-error    { background: var(--error-bg);   color: var(--error);    border: 1px solid var(--error-border); }
+    .chip-warn     { background: var(--warn-bg);    color: var(--warn);     border: 1px solid var(--warn-border); }
+    .chip-skip     { background: var(--skip-bg);    color: var(--skip);     border: 1px solid var(--skip-border); }
     .chip-existente { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+    .chip-dry      { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 
     /* ── Drag & drop zone ── */
-    #drop-zone {
-      border: 2px dashed var(--border); border-radius: 10px; padding: 36px 20px;
-      text-align: center; transition: all .2s; cursor: pointer; background: #fafbfd;
-    }
+    #drop-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 36px 20px; text-align: center; transition: all .2s; cursor: pointer; background: #fafbfd; }
     #drop-zone.dragging { border-color: var(--accent); background: #eff5ff; }
     #drop-zone .dz-icon { font-size: 2.5rem; margin-bottom: 10px; }
     #drop-zone p { color: var(--text-muted); font-size: 0.9rem; }
@@ -127,23 +112,68 @@
     .stat-total   { background: #eff6ff; color: #1d4ed8; }
     .stat-ok      { background: var(--success-bg); color: var(--success); }
     .stat-error   { background: var(--error-bg);   color: var(--error); }
+    .stat-warn    { background: var(--warn-bg);     color: var(--warn); }
+    .stat-info    { background: #f0fdf4; color: #166534; }
+
+    /* ── KPI Cards ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+    .kpi-card .kpi-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+    .kpi-card .kpi-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .kpi-card .kpi-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+    .kpi-blue  .kpi-value { color: #1d4ed8; }
+    .kpi-green .kpi-value { color: #065f46; }
+    .kpi-amber .kpi-value { color: #92400e; }
+    .kpi-red   .kpi-value { color: #991b1b; }
+
+    /* ── Chart ── */
+    .chart-container { position: relative; height: 220px; }
+
+    /* ── Log output ── */
+    .log-output { background: #0f172a; color: #94a3b8; border-radius: 8px; padding: 16px; font-family: 'Courier New', monospace; font-size: 0.78rem; line-height: 1.6; max-height: 340px; overflow-y: auto; }
+    .log-output .log-ok    { color: #4ade80; }
+    .log-output .log-warn  { color: #fbbf24; }
+    .log-output .log-error { color: #f87171; }
+    .log-output .log-info  { color: #60a5fa; }
+    .log-output .log-dry   { color: #a78bfa; }
+
+    /* ── Execution timeline ── */
+    .exec-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .exec-item:last-child { border-bottom: none; }
+    .exec-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .exec-dot-ok    { background: #10b981; }
+    .exec-dot-error { background: #ef4444; }
+    .exec-dot-warn  { background: #f59e0b; }
+    .exec-meta { flex: 1; min-width: 0; }
+    .exec-meta .exec-title { font-size: 0.82rem; font-weight: 600; }
+    .exec-meta .exec-sub   { font-size: 0.75rem; color: var(--text-muted); }
+    .exec-stats { display: flex; gap: 8px; font-size: 0.75rem; flex-wrap: wrap; }
+    .exec-stat  { background: var(--bg); border-radius: 99px; padding: 2px 8px; color: var(--text-muted); }
+
+    /* ── Matriculacion result accordion ── */
+    .alumno-result { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+    .alumno-result-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; background: #f8fafc; }
+    .alumno-result-header:hover { background: #f0f2f5; }
+    .alumno-result-body { padding: 12px 16px; display: none; background: #fff; }
+    .alumno-result-body.open { display: block; }
+    .materia-tag { display: inline-block; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 99px; padding: 2px 10px; font-size: 0.75rem; margin: 2px; }
+    .materia-tag-error { background: var(--error-bg); color: var(--error); border-color: var(--error-border); }
 
     /* ── Misc ── */
     .actions-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
     .hidden { display: none !important; }
     #results-section { margin-top: 20px; }
     .detail-text { font-size: 0.75rem; color: var(--text-muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .section-title { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .badge-count { background: var(--accent); color: #fff; border-radius: 99px; padding: 1px 7px; font-size: 0.72rem; font-weight: 600; }
+    .info-banner { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; font-size: 0.85rem; color: #1e40af; margin-bottom: 16px; }
+    .warn-banner { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 12px 16px; font-size: 0.85rem; color: var(--warn); margin-bottom: 16px; }
+    .next-run-badge { background: #1a2332; color: #8ca0bf; border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; font-family: monospace; }
 
     /* ── Login screen ── */
-    #login-screen {
-      position: fixed; inset: 0; background: var(--bg);
-      display: flex; align-items: center; justify-content: center; z-index: 1000;
-    }
+    #login-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 1000; }
     #login-screen.hidden { display: none !important; }
-    .login-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-      padding: 36px 32px; width: 100%; max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,.08);
-    }
+    .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 36px 32px; width: 100%; max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,.08); }
     .login-card h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
     .login-card p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px; }
     .login-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
@@ -173,23 +203,25 @@
   <div class="login-card">
     <h2>Gestión Académica</h2>
     <p>Iniciá sesión para continuar</p>
-
     <div class="login-field">
       <label>Usuario</label>
       <input type="text" id="login-username" placeholder="admin" autocomplete="username" />
     </div>
     <div class="login-field">
       <label>Contraseña</label>
-      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"
-             onkeydown="if(event.key==='Enter') doLogin()" />
+      <div style="position:relative;">
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter') doLogin()"
+               style="width:100%;padding-right:42px;" />
+        <button type="button" id="pw-toggle" onclick="togglePassword()"
+          style="position:absolute;right:0;top:0;height:100%;width:40px;background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--text-muted);transition:color .15s;"
+          title="Mostrar/ocultar contraseña">👁</button>
+      </div>
     </div>
     <p id="login-error"></p>
     <button class="btn btn-primary btn-login" onclick="doLogin()">Iniciar sesión</button>
-
     <div class="login-divider">o</div>
-
     <button class="btn-azure" onclick="doAzureLogin()">
-      <!-- Microsoft logo SVG -->
       <svg viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect width="10" height="10" fill="#F25022"/><rect x="11" width="10" height="10" fill="#7FBA00"/>
         <rect y="11" width="10" height="10" fill="#00A4EF"/><rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
@@ -202,46 +234,44 @@
 <!-- ═══════════════════════════════ SIDEBAR ═══════════════════════════════ -->
 <nav id="sidebar">
   <h1>Gestión Académica</h1>
-  <p class="tagline">Canvas LMS · Azure AD · Teams</p>
+  <p class="nav-group-label">Gestión de Inscripciones</p>
 
-  <!-- Carga Masiva (PRIMERO) -->
+  <!-- Reportes -->
   <div class="nav-group">
-    <div class="nav-group-label">Carga Masiva</div>
-    <div class="nav-item active" data-panel="bulk" onclick="showPanel('bulk', this)">
-      <span class="icon">📤</span> Carga Masiva
+    <div class="nav-group-label">Reportes</div>
+    <div class="nav-item active" data-panel="dashboard" onclick="showPanel('dashboard', this)">
+      <span class="icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item" data-panel="auditoria" onclick="showPanel('auditoria', this)">
+      <span class="icon">📋</span> Auditoría
     </div>
   </div>
 
-  <!-- Canvas -->
-  <div class="nav-group">
-    <div class="nav-group-label">Canvas LMS</div>
-    <div class="nav-item" data-panel="canvas-courses" onclick="showPanel('canvas-courses', this)">
-      <span class="icon">📚</span> Cursos
-    </div>
-    <div class="nav-item" data-panel="canvas-users" onclick="showPanel('canvas-users', this)">
-      <span class="icon">👤</span> Usuarios
-    </div>
-    <div class="nav-item" data-panel="canvas-enroll" onclick="showPanel('canvas-enroll', this)">
-      <span class="icon">✏️</span> Inscripciones
+  <!-- Portal académico (solo visible para rol academico) -->
+  <div class="nav-group" id="nav-portal-group" style="display:none;">
+    <div class="nav-group-label">Mi portal</div>
+    <div class="nav-item active" data-panel="portal-academico" onclick="showPanel('portal-academico', this)">
+      <span class="icon">📥</span> Cargar inscripciones
     </div>
   </div>
 
-  <!-- Azure -->
-  <div class="nav-group">
-    <div class="nav-group-label">Azure AD</div>
-    <div class="nav-item" data-panel="azure-users" onclick="showPanel('azure-users', this)">
-      <span class="icon">🏢</span> Usuarios
+  <!-- Administración del sistema -->
+  <div class="nav-group" id="nav-admin-group">
+    <div class="nav-group-label">Administración</div>
+    <div class="nav-item" data-panel="parseo-planilla" onclick="showPanel('parseo-planilla', this)">
+      <span class="icon">🧹</span> Parsear planilla
     </div>
-    <div class="nav-item" data-panel="azure-groups" onclick="showPanel('azure-groups', this)">
-      <span class="icon">👥</span> Grupos
+    <div class="nav-item" data-panel="matriculacion" onclick="showPanel('matriculacion', this)">
+      <span class="icon">🎓</span> Ejecutar matriculación
     </div>
-  </div>
-
-  <!-- Teams -->
-  <div class="nav-group">
-    <div class="nav-group-label">Microsoft Teams</div>
-    <div class="nav-item" data-panel="teams" onclick="showPanel('teams', this)">
-      <span class="icon">💬</span> Equipos
+    <div class="nav-item" data-panel="system-users" onclick="showPanel('system-users', this)">
+      <span class="icon">🔑</span> Usuarios del sistema
+    </div>
+    <div class="nav-item" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)">
+      <span class="icon">⏳</span> Inscripciones pendientes
+    </div>
+    <div class="nav-item" data-panel="course-aliases" onclick="showPanel('course-aliases', this)">
+      <span class="icon">🔗</span> Aliases de materias
     </div>
   </div>
 </nav>
@@ -249,9 +279,9 @@
 <!-- ═══════════════════════════════ MAIN ═══════════════════════════════════ -->
 <div id="main">
   <div id="topbar">
-    <h2 id="topbar-title">Carga Masiva</h2>
+    <h2 id="topbar-title">Dashboard</h2>
     <div style="display:flex; align-items:center; gap:12px;">
-      <span class="badge" id="topbar-badge">Excel / CSV</span>
+      <span class="badge" id="topbar-badge">Matriculación</span>
       <div id="user-chip">
         <div class="avatar" id="user-avatar">?</div>
         <span class="user-name" id="user-name-label"></span>
@@ -262,10 +292,505 @@
 
   <div id="content">
 
-    <!-- ══════════ PANEL: CARGA MASIVA ══════════ -->
-    <div class="panel active" id="panel-bulk">
+    <!-- ══════════ PANEL: ALIASES DE MATERIAS ══════════ -->
+    <div class="panel" id="panel-course-aliases">
+      <div class="card">
+        <h3>Aliases de Materias</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:14px;">
+          Cuando el sistema detecta un nombre de materia que no coincide exactamente con Canvas, lo guarda acá.
+          Los matches con confianza &lt;85% quedan como <strong>pendiente</strong> hasta que los confirmés o corrijás.
+          Una vez confirmado, el sistema recuerda la regla para siempre.
+        </p>
 
-      <!-- Selector de tipo -->
+        <div class="actions-row" style="gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="btn btn-primary" onclick="loadAliases()">🔄 Cargar aliases</button>
+        </div>
+
+        <!-- Manual alias form -->
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;">
+          <h4 style="font-size:.88rem;font-weight:600;margin-bottom:10px;">Agregar alias manualmente</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Variante (como viene en el Excel)</label>
+              <input id="alias-variant" type="text" placeholder="ej. Diseño Grafico" />
+            </div>
+            <div class="form-group">
+              <label>SIS ID del curso en Canvas</label>
+              <input id="alias-sis-id" type="text" placeholder="ej. USIL-2026-1-diseno-grafico" />
+            </div>
+            <div class="form-group">
+              <label>Nombre en Canvas (opcional)</label>
+              <input id="alias-canvas-name" type="text" placeholder="ej. Diseño Gráfico" />
+            </div>
+          </div>
+          <button class="btn btn-success" onclick="addManualAlias()">➕ Guardar alias</button>
+          <span id="alias-msg" style="margin-left:10px;font-size:.83rem;"></span>
+        </div>
+
+        <!-- Filter tabs -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadAliases('pendiente')">⚠ Pendientes</button>
+          <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadAliases('auto')">🤖 Auto-aceptados</button>
+          <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadAliases('confirmado')">✅ Confirmados</button>
+          <button class="btn btn-secondary" style="font-size:.78rem;" onclick="loadAliases()">📋 Todos</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Variante (Excel)</th><th>Canvas nombre</th><th>SIS ID</th><th>Confianza</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="aliases-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Haz clic en "Cargar aliases"</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: PORTAL ACADÉMICO ══════════ -->
+    <div class="panel" id="panel-portal-academico">
+
+      <!-- PASO 1: Buscar alumno -->
+      <div class="card">
+        <h3>Inscribir alumno</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:16px;">
+          Buscá al alumno por cédula o nombre. Si ya existe en Canvas o Azure AD los datos se pre-cargan automáticamente. Si es nuevo, completá el formulario.
+        </p>
+
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="form-group" style="flex:1;min-width:220px;">
+            <label>Buscar por cédula o nombre</label>
+            <input id="portal-buscar-input" type="text" placeholder="ej. 4802252 o Flores Rodas"
+              onkeydown="if(event.key==='Enter') portalBuscar()" />
+          </div>
+          <button class="btn btn-primary" onclick="portalBuscar()">🔍 Buscar</button>
+          <button class="btn btn-secondary" onclick="portalNuevoAlumno()">➕ Alumno nuevo</button>
+          <span id="portal-buscar-msg" style="font-size:.82rem;color:var(--text-muted);align-self:center;"></span>
+        </div>
+
+        <!-- Resultados de búsqueda -->
+        <div id="portal-buscar-resultados" style="display:none;margin-top:14px;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Nombre</th><th>Email</th><th>Cédula</th><th></th></tr></thead>
+              <tbody id="portal-buscar-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASO 2: Ficha del alumno + selección de materias -->
+      <div class="card" id="portal-ficha-card" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;" id="portal-ficha-titulo">Datos del alumno</h3>
+          <span id="portal-ficha-badge" style="font-size:.78rem;padding:4px 10px;border-radius:99px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;">Nuevo</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Apellido(s)</label>
+            <input id="pf-apellido" type="text" placeholder="ej. Flores Rodas" />
+          </div>
+          <div class="form-group">
+            <label>Nombre(s)</label>
+            <input id="pf-nombre" type="text" placeholder="ej. Camila Araceli" />
+          </div>
+          <div class="form-group" style="max-width:150px;">
+            <label>Cédula</label>
+            <input id="pf-cedula" type="text" placeholder="ej. 4802252" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email institucional</label>
+            <input id="pf-email" type="email" placeholder="camila.flores@usil.edu.py" />
+          </div>
+          <div class="form-group" style="max-width:120px;">
+            <label>Programa</label>
+            <select id="pf-programa" onchange="portalProgramaChange()">
+              <option value="">— Prog. —</option>
+              <option value="GA">GA</option>
+              <option value="GND">GND</option>
+              <option value="CPEL">CPEL</option>
+            </select>
+          </div>
+          <div class="form-group" style="max-width:280px;">
+            <label>Carrera</label>
+            <select id="pf-carrera" onchange="portalCarreraChange()">
+              <option value="">— Seleccioná un programa primero —</option>
+            </select>
+          </div>
+          <input type="hidden" id="pf-semestre" />
+        </div>
+
+        <!-- Selección de materias por programa -->
+        <div style="margin-bottom:8px;font-size:.8rem;font-weight:600;color:var(--text);">Materias a inscribir</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+          <input id="pf-materia-buscar" type="text" placeholder="Buscar materia…" style="flex:1;min-width:180px;"
+            oninput="portalFiltrarMaterias()" />
+        </div>
+        <div id="pf-materias-lista" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:#fafbfd;">
+          <p style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:16px 0;">Seleccioná un programa para ver las materias disponibles</p>
+        </div>
+        <div id="pf-materias-seleccionadas" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+
+        <!-- Tabla de horarios por materia -->
+        <div id="pf-horarios-card" style="display:none;margin-top:14px;">
+          <div style="font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:6px;">Horarios <span style="font-weight:400;color:var(--text-muted);">(opcional — completá día y hora por materia)</span></div>
+          <div class="table-wrap">
+            <table id="pf-horarios-table">
+              <thead><tr><th>Materia</th><th>Día</th><th>Hora inicio</th><th>Hora fin</th></tr></thead>
+              <tbody id="pf-horarios-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:14px;">
+          <label>Observaciones (opcional)</label>
+          <input id="pf-obs" type="text" placeholder="ej. alumno reincorporado, beca, cambio de carrera…" />
+        </div>
+
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-success" onclick="portalEnviarInscripcion()">✅ Enviar inscripción</button>
+          <button class="btn btn-secondary" onclick="portalPreviewFormulario()">🖨️ Vista previa</button>
+          <button class="btn btn-secondary" onclick="portalLimpiarFicha()">✖ Cancelar</button>
+          <span id="pf-msg" style="font-size:.83rem;"></span>
+        </div>
+      </div>
+
+
+      <!-- Mis inscripciones -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">📋 Mis inscripciones</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="envios-semestre-filter" placeholder="Filtrar por período" style="max-width:140px;padding:5px 8px;font-size:.8rem;" oninput="portalCargarMisEnvios()" />
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:5px 10px;" onclick="portalCargarMisEnvios()">🔄 Actualizar</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Alumno</th><th>Cédula</th><th>Período</th><th>Cursos</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="portal-envios-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Sin inscripciones registradas</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════ PANEL: PARSEO DE PLANILLA ACADÉMICA ══════════ -->
+    <div class="panel" id="panel-parseo-planilla">
+      <div class="card">
+        <h3>Parsear planilla académica</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:16px;">
+          Subí el Excel de inscripciones que comparte académico. El sistema lee cada pestaña (un alumno por pestaña),
+          extrae programa, período, nombre, cédula y cursos, y te muestra una vista previa antes de procesar.
+        </p>
+
+        <div style="background:#f0f7ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#1e40af;">
+          <strong>Formato esperado por pestaña:</strong>
+          C4 → Programa &nbsp;·&nbsp; C5 → Período &nbsp;·&nbsp; C9 → Nombre alumno &nbsp;·&nbsp; C12 → Cédula &nbsp;·&nbsp; G5:G20 → Cursos inscriptos
+        </div>
+
+        <div class="form-row" style="align-items:flex-end;gap:16px;flex-wrap:wrap;">
+          <div class="form-group">
+            <label>Archivo Excel de inscripciones (.xlsx)</label>
+            <input type="file" id="parseo-file-input" accept=".xlsx,.xls"
+              style="border:2px dashed var(--border);border-radius:6px;padding:10px;width:100%;cursor:pointer;" />
+          </div>
+          <div class="form-group" style="max-width:160px;">
+            <label>Semestre</label>
+            <input type="text" id="parseo-semestre" placeholder="ej. 2026-2" />
+          </div>
+        </div>
+        <div class="actions-row">
+          <button class="btn btn-primary" onclick="parsearPlanilla()">🔍 Analizar planilla</button>
+          <span id="parseo-msg" style="font-size:.83rem;color:var(--text-muted);"></span>
+        </div>
+      </div>
+
+      <!-- Vista previa resultados -->
+      <div class="card" id="parseo-result-card" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <h3 style="margin:0;">Vista previa — alumnos detectados</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <span id="parseo-stat-ok"   style="font-size:.8rem;padding:4px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">✅ 0 listos</span>
+            <span id="parseo-stat-warn" style="font-size:.8rem;padding:4px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);">⚠️ 0 con advertencias</span>
+            <span id="parseo-stat-err"  style="font-size:.8rem;padding:4px 10px;border-radius:99px;background:var(--error-bg);color:var(--error);border:1px solid var(--error-border);">❌ 0 con errores</span>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Pestaña</th>
+                <th>Nombre</th>
+                <th>Cédula</th>
+                <th>Programa</th>
+                <th>Período</th>
+                <th>Cursos</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="parseo-tbody"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-success" onclick="enviarParseoACola()">➕ Enviar listos a cola de inscripciones</button>
+          <button class="btn btn-secondary" onclick="descargarParseoExcel()">⬇ Descargar resumen Excel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: DASHBOARD ══════════ -->
+    <div class="panel active" id="panel-dashboard">
+
+      <!-- Kit de matriculación -->
+      <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#1e3a5f 0%,#2d6cdf 100%);border:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="color:#fff;font-size:1rem;font-weight:700;">📦 Kit de Matriculación 2026-2</div>
+            <div style="color:#bfdbfe;font-size:.82rem;margin-top:3px;">Excel completo con períodos, cursos, usuarios e inscripciones listo para completar — GA · GND · CPEL</div>
+          </div>
+          <button class="btn" onclick="downloadKit()" style="background:#fff;color:#1e3a5f;font-weight:700;white-space:nowrap;">
+            ⬇ Descargar kit 2026-2
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI row -->
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-label">Procesados hoy</div>
+          <div class="kpi-value" id="kpi-procesados">—</div>
+          <div class="kpi-sub">alumnos</div>
+        </div>
+        <div class="kpi-card kpi-green">
+          <div class="kpi-label">Creados hoy</div>
+          <div class="kpi-value" id="kpi-creados">—</div>
+          <div class="kpi-sub">usuarios nuevos</div>
+        </div>
+        <div class="kpi-card kpi-amber">
+          <div class="kpi-label">Ya existentes</div>
+          <div class="kpi-value" id="kpi-inscritos">—</div>
+          <div class="kpi-sub">inscripciones</div>
+        </div>
+        <div class="kpi-card kpi-red">
+          <div class="kpi-label">Errores hoy</div>
+          <div class="kpi-value" id="kpi-errores">—</div>
+          <div class="kpi-sub">requieren revisión</div>
+        </div>
+        <div class="kpi-card" style="border-top: 3px solid var(--sidebar-bg);">
+          <div class="kpi-label">Próxima ejecución</div>
+          <div id="kpi-proxima" style="font-size:0.82rem;font-weight:600;color:var(--text);margin-top:6px;">—</div>
+          <div class="kpi-sub" id="kpi-semestre">—</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap;">
+        <!-- Chart -->
+        <div class="card">
+          <h3>Alumnos procesados — últimos 7 días</h3>
+          <div class="chart-container">
+            <canvas id="chart-diario"></canvas>
+          </div>
+        </div>
+
+        <!-- Recent executions -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <h3 style="margin:0;">Últimas ejecuciones</h3>
+            <button class="btn btn-secondary" style="font-size:0.75rem;padding:5px 10px;" onclick="loadDashboard()">🔄</button>
+          </div>
+          <div id="exec-timeline"></div>
+        </div>
+      </div>
+
+      <!-- Recent enrollments table -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <h3 style="margin:0;">Últimas matriculaciones</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="dash-semestre-filter" onchange="loadDashboardTable()" style="font-size:0.8rem;padding:5px 8px;">
+              <option value="">Todos los semestres</option>
+            </select>
+            <button class="btn btn-secondary" style="font-size:0.75rem;padding:5px 10px;" onclick="loadDashboardTable()">🔄</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Timestamp</th><th>Cédula</th><th>Nombre</th><th>Acción</th><th>Plataforma</th><th>Curso</th><th>Semestre</th></tr></thead>
+            <tbody id="tbl-dash-enrollments"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /panel-dashboard -->
+
+
+    <!-- ══════════ PANEL: MATRICULACIÓN ══════════ -->
+    <div class="panel" id="panel-matriculacion">
+
+      <!-- Controls card -->
+      <div class="card">
+        <h3>Proceso de Matriculación Automática</h3>
+
+        <!-- Tabs: OneDrive vs Subir archivo -->
+        <div style="display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid var(--border);">
+          <button id="tab-onedrive" onclick="switchMatTab('onedrive')"
+            style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;">
+            ☁️ Desde OneDrive
+          </button>
+          <button id="tab-upload" onclick="switchMatTab('upload')"
+            style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;">
+            📂 Subir archivo Excel
+          </button>
+        </div>
+
+        <!-- OneDrive tab -->
+        <div id="matTab-onedrive">
+          <div class="info-banner">
+            ☁️ El sistema leerá el Excel de matriculación desde OneDrive (configurado en <code>ONEDRIVE_FILE_ID</code>).
+            Cada hoja del Excel corresponde a un alumno. Use <strong>DRY RUN</strong> para simular sin aplicar cambios.
+          </div>
+          <div class="form-row" style="margin-top:14px;">
+            <div class="form-group" style="max-width:200px;">
+              <label>Semestre (opcional)</label>
+              <input type="text" id="mat-semestre" placeholder="ej: 2025-2" />
+            </div>
+          </div>
+          <div class="actions-row">
+            <button class="btn btn-primary" id="btn-mat-run" onclick="runMatriculacion(false)">
+              ▶ Ejecutar matriculación
+            </button>
+            <button class="btn btn-warn" id="btn-mat-dryrun" onclick="runMatriculacion(true)">
+              🔍 DRY RUN (simular)
+            </button>
+          </div>
+        </div>
+
+        <!-- Upload tab -->
+        <div id="matTab-upload" style="display:none;">
+          <div class="info-banner" style="background:#f0f7ff;border-color:#93c5fd;color:#1e40af;">
+            📂 Subí tu archivo Excel directamente desde tu PC. Cada hoja debe corresponder a un alumno.
+            No necesita OneDrive configurado. Podés usar <strong>DRY RUN</strong> para simular antes de ejecutar.
+          </div>
+          <div class="form-row" style="margin-top:14px;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+            <div class="form-group">
+              <label>Archivo Excel (.xlsx)</label>
+              <input type="file" id="mat-file-input" accept=".xlsx,.xls"
+                style="border:2px dashed var(--border);border-radius:6px;padding:10px;width:100%;cursor:pointer;" />
+            </div>
+            <div class="form-group" style="max-width:180px;">
+              <label>Semestre (opcional)</label>
+              <input type="text" id="mat-semestre-upload" placeholder="ej: 2025-2" />
+            </div>
+          </div>
+          <div class="actions-row">
+            <button class="btn btn-primary" id="btn-mat-upload-run" onclick="runMatriculacionUpload(false)">
+              ▶ Ejecutar con archivo
+            </button>
+            <button class="btn btn-warn" id="btn-mat-upload-dryrun" onclick="runMatriculacionUpload(true)">
+              🔍 DRY RUN con archivo
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress + log -->
+      <div class="card" id="mat-progress-card" style="display:none;">
+        <h3 id="mat-progress-title">Procesando…</h3>
+        <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:10px;">
+          <div id="mat-progress-fill" style="height:100%;width:0%;background:var(--accent);border-radius:99px;transition:width .5s ease;"></div>
+        </div>
+        <div style="display:flex;gap:16px;font-size:12px;color:var(--text-muted);margin-bottom:10px;" id="mat-live-stats">
+          <span id="lstat-procesados">Procesados: 0</span>
+          <span id="lstat-creados" style="color:#16a34a;">Creados: 0</span>
+          <span id="lstat-inscritos" style="color:#2563eb;">Inscritos: 0</span>
+          <span id="lstat-errores" style="color:#dc2626;">Errores: 0</span>
+        </div>
+        <div class="log-output" id="mat-log"></div>
+      </div>
+
+      <!-- Results summary -->
+      <div id="mat-results" style="display:none;">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 style="margin:0;" id="mat-result-title">Resultado</h3>
+            <span id="mat-dry-badge" style="display:none;" class="chip chip-dry">DRY RUN</span>
+          </div>
+          <div class="stats-row">
+            <div class="stat-box stat-total"><div class="num" id="mat-stat-total">0</div><div class="lbl">Total alumnos</div></div>
+            <div class="stat-box stat-ok"><div class="num" id="mat-stat-creados">0</div><div class="lbl">Creados</div></div>
+            <div class="stat-box stat-info"><div class="num" id="mat-stat-existentes">0</div><div class="lbl">Existentes</div></div>
+            <div class="stat-box stat-warn"><div class="num" id="mat-stat-inscrip">0</div><div class="lbl">Inscripciones</div></div>
+            <div class="stat-box stat-error"><div class="num" id="mat-stat-errores">0</div><div class="lbl">Errores</div></div>
+          </div>
+        </div>
+
+        <!-- Validation errors -->
+        <div class="card" id="mat-val-errors" style="display:none;">
+          <h3 style="color:var(--error);">⚠️ Errores de validación — proceso no ejecutado</h3>
+          <div class="table-wrap" style="margin-top:12px;">
+            <table>
+              <thead><tr><th>Hoja</th><th>Cédula</th><th>Nombre</th><th>Error</th></tr></thead>
+              <tbody id="tbl-val-errors"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Per-student accordion -->
+        <div class="card">
+          <h3>Detalle por alumno <span class="badge-count" id="mat-alumno-count">0</span></h3>
+          <div id="mat-alumnos-list"></div>
+        </div>
+      </div>
+    </div><!-- /panel-matriculacion -->
+
+
+    <!-- ══════════ PANEL: AUDITORÍA ══════════ -->
+    <div class="panel" id="panel-auditoria">
+      <div class="card">
+        <h3>Log de Auditoría</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Filtrar por semestre</label>
+            <input type="text" id="aud-semestre" placeholder="ej: 2025-2" />
+          </div>
+          <div class="form-group">
+            <label>Filtrar por cédula</label>
+            <input type="text" id="aud-cedula" placeholder="3406399" />
+          </div>
+          <div class="form-group" style="justify-content:flex-end;">
+            <label>&nbsp;</label>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary" onclick="loadAuditoria()">🔍 Buscar</button>
+              <button class="btn btn-success" onclick="exportAuditoria()">⬇️ Exportar Excel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="margin:0;">Registros <span class="badge-count" id="aud-count">0</span></h3>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th><th>Cédula</th><th>Nombre</th>
+                <th>Acción</th><th>Plataforma</th><th>Curso</th><th>Semestre</th><th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-auditoria"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /panel-auditoria -->
+
+
+    <!-- ══════════ PANEL: CARGA MASIVA ══════════ -->
+    <div class="panel" id="panel-bulk">
       <div class="card">
         <h3>Tipo de carga</h3>
         <div class="form-row">
@@ -278,39 +803,30 @@
           </div>
           <div class="form-group" style="justify-content: flex-end;">
             <label>&nbsp;</label>
-            <button class="btn btn-secondary" onclick="downloadTemplate()">
-              ⬇️ Descargar plantilla vacía
-            </button>
+            <button class="btn btn-secondary" onclick="downloadTemplate()">⬇️ Descargar plantilla vacía</button>
           </div>
         </div>
       </div>
 
-      <!-- Drop zone -->
       <div class="card">
         <h3>Archivo Excel / CSV</h3>
         <div id="drop-zone" onclick="document.getElementById('file-input').click()">
           <div class="dz-icon">📂</div>
-          <p>Arrastra tu archivo aquí o <strong>haz clic para seleccionar</strong></p>
+          <p>Arrastrá tu archivo aquí o <strong>hacé clic para seleccionar</strong></p>
           <p style="font-size:0.75rem; margin-top:4px;">Formatos: .xlsx · .xls · .csv — máx. 10 MB</p>
           <p class="file-chosen hidden" id="chosen-filename"></p>
         </div>
         <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)" />
-
-        <!-- Progress -->
         <div id="progress-wrap">
           <p id="progress-label">Procesando…</p>
           <div id="progress-bar-track"><div id="progress-bar-fill"></div></div>
         </div>
-
         <div style="margin-top:14px; display:flex; gap:10px;">
-          <button class="btn btn-primary" id="btn-process" onclick="processBulk()" disabled>
-            ▶ Procesar archivo
-          </button>
+          <button class="btn btn-primary" id="btn-process" onclick="processBulk()" disabled>▶ Procesar archivo</button>
           <button class="btn btn-secondary" onclick="resetBulk()">↺ Limpiar</button>
         </div>
       </div>
 
-      <!-- Resultados -->
       <div id="results-section" class="hidden">
         <div class="card">
           <h3>Resumen</h3>
@@ -320,12 +836,9 @@
             <div class="stat-box stat-error"><div class="num" id="stat-errors">0</div><div class="lbl">Errores</div></div>
           </div>
           <div class="actions-row">
-            <button class="btn btn-success" id="btn-download-report" onclick="downloadReportExcel()">
-              ⬇️ Descargar reporte Excel
-            </button>
+            <button class="btn btn-success" id="btn-download-report" onclick="downloadReportExcel()">⬇️ Descargar reporte Excel</button>
           </div>
         </div>
-
         <div class="card">
           <h3>Detalle por fila</h3>
           <div class="table-wrap">
@@ -339,11 +852,169 @@
     </div><!-- /panel-bulk -->
 
 
+    <!-- ══════════ PANEL: USUARIOS DEL SISTEMA ══════════ -->
+    <div class="panel" id="panel-system-users">
+      <div class="card">
+        <h3>Usuarios del sistema</h3>
+        <div class="actions-row" style="gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="btn btn-primary" onclick="loadSystemUsers()">🔄 Cargar usuarios</button>
+        </div>
+
+        <!-- Create user form -->
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <h4 style="font-size:.88rem;font-weight:600;margin-bottom:10px;">Crear usuario</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Usuario</label>
+              <input id="su-username" type="text" placeholder="ej. maria.gomez" />
+            </div>
+            <div class="form-group">
+              <label>Nombre completo</label>
+              <input id="su-fullname" type="text" placeholder="ej. María Gómez" />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input id="su-email" type="email" placeholder="ej. maria@usil.edu.py" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contraseña</label>
+              <input id="su-password" type="password" placeholder="Contraseña inicial" />
+            </div>
+            <div class="form-group">
+              <label>Rol</label>
+              <select id="su-role">
+                <option value="academico">Académico — solo portal de carga</option>
+                <option value="viewer">Viewer — solo lectura</option>
+                <option value="admin">Admin — acceso total</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-success" onclick="createSystemUser()">➕ Crear usuario</button>
+          <span id="su-msg" style="margin-left:10px;font-size:.83rem;"></span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Usuario</th><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
+            <tbody id="su-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Haz clic en "Cargar usuarios"</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: INSCRIPCIONES PENDIENTES ══════════ -->
+    <div class="panel" id="panel-pending-enrollments">
+      <div class="card">
+        <h3>Inscripciones pendientes</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:14px;">
+          Registros cargados por usuarios académicos (portal o webhook) que aún no fueron procesados en Canvas.
+        </p>
+
+        <div class="actions-row" style="gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="btn btn-primary" onclick="loadPending()">🔄 Cargar pendientes</button>
+          <button class="btn btn-success" onclick="processAllPending()">▶ Procesar todos los pendientes</button>
+          <button class="btn btn-secondary" onclick="loadPending('procesado')">✅ Ver procesados</button>
+        </div>
+
+        <!-- Upload form for academico portal -->
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;">
+          <h4 style="font-size:.88rem;font-weight:600;margin-bottom:10px;">Cargar Excel de inscripciones</h4>
+          <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:10px;">
+            Columnas esperadas: <code>cedula</code>, <code>nombre</code>, <code>email</code>, <code>curso_id</code>, <code>semestre</code>, <code>rol</code> (opcional)
+          </p>
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group">
+              <label>Semestre (si no está en el archivo)</label>
+              <input id="pending-semestre" type="text" placeholder="ej. 2026-1" />
+            </div>
+            <div>
+              <input type="file" id="pending-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="document.getElementById('pending-file-label').textContent=this.files[0]?.name||''" />
+              <button class="btn btn-secondary" onclick="document.getElementById('pending-file').click()">📎 Elegir archivo</button>
+              <span id="pending-file-label" style="margin-left:8px;font-size:.82rem;color:var(--text-muted)"></span>
+            </div>
+            <div>
+              <button class="btn btn-primary" onclick="uploadPending()">⬆ Subir a cola</button>
+            </div>
+          </div>
+          <span id="pending-upload-msg" style="font-size:.83rem;"></span>
+        </div>
+
+        <div id="pending-summary" style="margin-bottom:10px;font-size:.83rem;color:var(--text-muted)"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th><input type="checkbox" id="pending-check-all" onchange="toggleAllPending(this)"></th>
+              <th>Recibido</th><th>Fuente</th><th>Cédula</th><th>Nombre</th><th>Email</th><th>Curso ID</th><th>Semestre</th><th>Estado</th>
+            </tr></thead>
+            <tbody id="pending-tbody"><tr><td colspan="9" style="text-align:center;color:var(--text-muted)">Haz clic en "Cargar pendientes"</td></tr></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;">
+          <button class="btn btn-success" onclick="processSelected()">▶ Procesar seleccionados</button>
+          <button class="btn btn-danger"  onclick="deleteSelected()">🗑 Eliminar seleccionados</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: CANVAS PERÍODOS ══════════ -->
+    <div class="panel" id="panel-canvas-terms">
+      <div class="card">
+        <h3>Períodos de Inscripción (Canvas)</h3>
+        <p style="color:var(--text-muted);font-size:.83rem;margin-bottom:14px;">
+          Los períodos se crean <strong>automáticamente</strong> al procesar un Excel de cursos (columna <code>semestre</code>).
+          Aquí podés ver los períodos existentes o crear uno manualmente.
+        </p>
+        <div class="actions-row" style="flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <button class="btn btn-primary" onclick="loadTerms()">🔄 Cargar períodos</button>
+        </div>
+
+        <!-- Create term form -->
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <h4 style="font-size:.88rem;font-weight:600;margin-bottom:10px;">Crear período manualmente</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nombre del período</label>
+              <input id="term-name" type="text" placeholder="ej. 2025-1" />
+            </div>
+          </div>
+          <button class="btn btn-success" onclick="createTerm()">➕ Crear período</button>
+          <span id="term-msg" style="margin-left:12px;font-size:.83rem;"></span>
+        </div>
+
+        <div class="table-wrap">
+          <table id="terms-table">
+            <thead><tr><th>ID</th><th>Nombre</th><th>Inicio</th><th>Fin</th></tr></thead>
+            <tbody id="terms-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Haz clic en "Cargar períodos"</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════════ PANEL: CANVAS CURSOS ══════════ -->
     <div class="panel" id="panel-canvas-courses">
       <div class="card">
         <h3>Cursos Canvas</h3>
-        <button class="btn btn-primary" onclick="loadCanvasCourses()">🔄 Cargar cursos</button>
+        <div class="actions-row" style="flex-wrap:wrap;gap:10px;">
+          <button class="btn btn-primary" onclick="loadCanvasCourses()">🔄 Cargar cursos</button>
+          <button class="btn btn-secondary" onclick="downloadTemplate('cursos')">⬇ Descargar plantilla</button>
+        </div>
+        <div id="bulk-cursos-zone" style="margin-top:16px;">
+          <div style="border:2px dashed var(--border);border-radius:8px;padding:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#fafbfc;">
+            <div style="flex:1;min-width:200px;">
+              <div style="font-size:.85rem;font-weight:600;margin-bottom:6px;">📂 Carga masiva de cursos (Canvas + Teams)</div>
+              <input type="file" id="file-cursos" accept=".xlsx,.xls" style="font-size:.82rem;" />
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" onclick="bulkUpload('cursos','file-cursos','/api/bulk/cursos','tbl-bulk-cursos')">▶ Procesar</button>
+            </div>
+          </div>
+          <div id="bulk-cursos-result" style="margin-top:10px;display:none;">
+            <div id="bulk-cursos-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+            <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Nombre</th><th>SIS ID</th><th>Canvas</th><th>Teams</th></tr></thead><tbody id="tbl-bulk-cursos"></tbody></table></div>
+          </div>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrap">
@@ -361,14 +1032,26 @@
         <h3>Crear usuario en Canvas</h3>
         <div class="form-row">
           <div class="form-group"><label>Nombre completo</label><input type="text" id="cu-name" placeholder="Juan Pérez" /></div>
-          <div class="form-group"><label>Email</label><input type="email" id="cu-email" placeholder="juan@uni.edu" /></div>
+          <div class="form-group"><label>Email</label><input type="email" id="cu-email" placeholder="juan@usil.edu.py" /></div>
           <div class="form-group"><label>SIS ID (opcional)</label><input type="text" id="cu-sis" placeholder="STU-001" /></div>
         </div>
         <button class="btn btn-primary" onclick="createCanvasUser()">➕ Crear usuario</button>
         <p id="cu-msg" style="margin-top:10px; font-size:0.85rem;"></p>
       </div>
       <div class="card">
-        <button class="btn btn-secondary" onclick="loadCanvasUsers()" style="margin-bottom:12px;">🔄 Cargar usuarios</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <button class="btn btn-secondary" onclick="loadCanvasUsers()">🔄 Cargar usuarios</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:.82rem;color:var(--text-muted);">📂 Carga masiva:</span>
+            <input type="file" id="file-canvas-users" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate('canvas-usuarios')">⬇ Plantilla</button>
+            <button class="btn btn-primary btn-sm" onclick="bulkUpload('canvas-usuarios','file-canvas-users','/api/bulk/canvas/usuarios','tbl-bulk-cusers')">▶ Procesar</button>
+          </div>
+        </div>
+        <div id="bulk-cusers-result" style="display:none;margin-bottom:12px;">
+          <div id="bulk-cusers-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+          <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Nombre</th><th>Email</th><th>Canvas</th></tr></thead><tbody id="tbl-bulk-cusers"></tbody></table></div>
+        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>SIS ID</th></tr></thead>
@@ -384,7 +1067,7 @@
         <h3>Inscribir usuario en curso</h3>
         <div class="form-row">
           <div class="form-group"><label>ID del curso</label><input type="text" id="en-course" placeholder="12345" /></div>
-          <div class="form-group"><label>ID o email del usuario</label><input type="text" id="en-user" placeholder="juan@uni.edu" /></div>
+          <div class="form-group"><label>ID o email del usuario</label><input type="text" id="en-user" placeholder="juan@usil.edu.py" /></div>
           <div class="form-group">
             <label>Rol</label>
             <select id="en-role">
@@ -398,13 +1081,39 @@
         <button class="btn btn-primary" onclick="enrollUser()">✅ Inscribir</button>
         <p id="en-msg" style="margin-top:10px; font-size:0.85rem;"></p>
       </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <span style="font-size:.9rem;font-weight:600;">📂 Inscripciones masivas (Canvas)</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <input type="file" id="file-canvas-enroll" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate('canvas-inscripciones')">⬇ Plantilla</button>
+            <button class="btn btn-primary btn-sm" onclick="bulkUpload('canvas-inscripciones','file-canvas-enroll','/api/bulk/canvas/inscripciones','tbl-bulk-enroll')">▶ Procesar</button>
+          </div>
+        </div>
+        <div id="bulk-enroll-result" style="display:none;">
+          <div id="bulk-enroll-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+          <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Email</th><th>Curso ID</th><th>Canvas</th></tr></thead><tbody id="tbl-bulk-enroll"></tbody></table></div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════ PANEL: AZURE USUARIOS ══════════ -->
     <div class="panel" id="panel-azure-users">
       <div class="card">
         <h3>Usuarios Azure AD</h3>
-        <button class="btn btn-primary" onclick="loadAzureUsers()">🔄 Cargar usuarios</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <button class="btn btn-primary" onclick="loadAzureUsers()">🔄 Cargar usuarios</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:.82rem;color:var(--text-muted);">📂 Carga masiva Azure AD:</span>
+            <input type="file" id="file-azure-users" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate('azure-usuarios')">⬇ Plantilla</button>
+            <button class="btn btn-primary btn-sm" onclick="bulkUpload('azure-usuarios','file-azure-users','/api/bulk/azure/usuarios','tbl-bulk-ausers')">▶ Procesar</button>
+          </div>
+        </div>
+        <div id="bulk-ausers-result" style="display:none;margin-top:12px;">
+          <div id="bulk-ausers-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+          <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Nombre</th><th>UPN</th><th>Azure</th><th>Grupo</th></tr></thead><tbody id="tbl-bulk-ausers"></tbody></table></div>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrap">
@@ -420,12 +1129,28 @@
     <div class="panel" id="panel-azure-groups">
       <div class="card">
         <h3>Grupos Azure AD</h3>
-        <button class="btn btn-primary" onclick="loadAzureGroups()">🔄 Cargar grupos</button>
+        <div class="form-row">
+          <div class="form-group"><label>Nombre del grupo</label><input type="text" id="grp-name" placeholder="Ej: Alumnos-2025-2" /></div>
+          <div class="form-group"><label>Descripción (opcional)</label><input type="text" id="grp-desc" placeholder="Grupo del semestre 2025-2" /></div>
+        </div>
+        <button class="btn btn-primary" onclick="createAzureGroup()">➕ Crear grupo</button>
+        <p id="grp-msg" style="margin-top:10px;font-size:.85rem;"></p>
       </div>
       <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <button class="btn btn-secondary" onclick="loadAzureGroups()">🔄 Cargar grupos</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:.82rem;color:var(--text-muted);">📂 Agregar miembros masivo:</span>
+            <input type="file" id="file-groups" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+            <button class="btn btn-primary btn-sm" onclick="bulkAddGroupMembers()">▶ Procesar</button>
+          </div>
+        </div>
+        <div id="grp-bulk-result" style="display:none;margin-bottom:12px;">
+          <div id="grp-bulk-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+        </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>ID</th><th>Nombre</th><th>Email</th></tr></thead>
+            <thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>Acción</th></tr></thead>
             <tbody id="tbl-agroups"></tbody>
           </table>
         </div>
@@ -434,11 +1159,58 @@
 
     <!-- ══════════ PANEL: TEAMS ══════════ -->
     <div class="panel" id="panel-teams">
+      <!-- Crear equipo -->
       <div class="card">
-        <h3>Microsoft Teams</h3>
-        <p style="color:var(--text-muted); font-size:0.9rem;">
-          Las operaciones de Teams se gestionan desde la sección de carga masiva o a través de los grupos de Azure AD.
-        </p>
+        <h3>Microsoft Teams — Equipos</h3>
+        <div class="form-row">
+          <div class="form-group"><label>Nombre del equipo</label><input type="text" id="tm-name" placeholder="Ej: 2025-2 - Matemática I" /></div>
+          <div class="form-group"><label>Descripción (opcional)</label><input type="text" id="tm-desc" placeholder="Equipo académico del semestre" /></div>
+        </div>
+        <button class="btn btn-primary" onclick="createTeam()">➕ Crear equipo</button>
+        <p id="tm-msg" style="margin-top:10px;font-size:.85rem;"></p>
+      </div>
+
+      <!-- Agregar miembro -->
+      <div class="card">
+        <h3>Agregar miembro a equipo</h3>
+        <div class="form-row">
+          <div class="form-group"><label>ID del equipo</label><input type="text" id="tm-teamid" placeholder="ID del equipo de Teams" /></div>
+          <div class="form-group"><label>ID del usuario (Azure AD)</label><input type="text" id="tm-userid" placeholder="ID del usuario" /></div>
+        </div>
+        <button class="btn btn-primary" onclick="addTeamMember()">✅ Agregar miembro</button>
+        <p id="tm-member-msg" style="margin-top:10px;font-size:.85rem;"></p>
+      </div>
+
+      <!-- Carga masiva de equipos -->
+      <div class="card">
+        <h3>Carga masiva de equipos</h3>
+        <div class="info-banner" style="background:#f0f7ff;border-color:#93c5fd;color:#1e40af;">
+          📂 Subí un Excel con columnas: <code>nombre</code>, <code>descripcion</code> (opcional).
+          Se crea un equipo de Teams por cada fila.
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;">
+          <input type="file" id="file-teams" accept=".xlsx,.xls,.csv" style="font-size:.82rem;" />
+          <button class="btn btn-secondary btn-sm" onclick="downloadTemplate('teams')">⬇ Plantilla</button>
+          <button class="btn btn-primary btn-sm" onclick="bulkCreateTeams()">▶ Crear equipos</button>
+        </div>
+        <div id="teams-bulk-result" style="display:none;margin-top:12px;">
+          <div id="teams-bulk-summary" style="font-size:.85rem;margin-bottom:8px;"></div>
+          <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Nombre</th><th>Teams</th></tr></thead><tbody id="tbl-bulk-teams"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Lista de equipos -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="margin:0;">Equipos existentes</h3>
+          <button class="btn btn-secondary" onclick="loadTeams()">🔄 Cargar equipos</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Nombre</th></tr></thead>
+            <tbody id="tbl-teams"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -448,27 +1220,67 @@
 <script>
 // ── Auth ─────────────────────────────────────────────────────────────────────
 const TOKEN_KEY = 'ga_token';
-
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
 function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
 function clearToken() { localStorage.removeItem(TOKEN_KEY); }
-
 function authHeaders() {
   const t = getToken();
   return t ? { 'Authorization': 'Bearer ' + t } : {};
 }
 
+let _currentUser = null;
+
 function showApp(user) {
+  _currentUser = user;
   document.getElementById('login-screen').classList.add('hidden');
   const initials = (user.name || user.sub || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('user-avatar').textContent = initials;
   document.getElementById('user-name-label').textContent = user.name || user.sub || '';
+  _applyRoleVisibility(user.role || 'viewer');
+  if (user.role === 'academico') {
+    showPanel('portal-academico', document.querySelector('[data-panel="portal-academico"]'));
+  } else {
+    loadDashboard();
+  }
+}
+
+function _applyRoleVisibility(role) {
+  const allGroups = document.querySelectorAll('.nav-group');
+
+  if (role === 'admin') {
+    // Admin ve todo
+    allGroups.forEach(g => g.style.display = '');
+    document.getElementById('panel-portal-academico')?.style && (document.getElementById('panel-portal-academico').style.display = 'none');
+  } else if (role === 'academico') {
+    // Académico: solo su portal
+    allGroups.forEach(g => g.style.display = 'none');
+    const portalGroup = document.getElementById('nav-portal-group');
+    if (portalGroup) portalGroup.style.display = '';
+  } else {
+    // Viewer: solo Reportes
+    allGroups.forEach(g => {
+      const label = g.querySelector('.nav-group-label');
+      if (label && label.textContent.trim() !== 'Reportes') g.style.display = 'none';
+    });
+  }
 }
 
 function showLogin(msg) {
   clearToken();
   document.getElementById('login-screen').classList.remove('hidden');
   if (msg) document.getElementById('login-error').textContent = msg;
+}
+
+function togglePassword() {
+  const input = document.getElementById('login-password');
+  const btn   = document.getElementById('pw-toggle');
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.textContent = showing ? '👁' : '🙈';
+  btn.style.color = showing ? 'var(--text-muted)' : 'var(--accent)';
+  // small bounce animation
+  btn.style.transform = 'scale(1.3)';
+  setTimeout(() => btn.style.transform = 'scale(1)', 150);
 }
 
 async function doLogin() {
@@ -478,72 +1290,57 @@ async function doLogin() {
   if (!username || !password) { document.getElementById('login-error').textContent = 'Completá usuario y contraseña'; return; }
   try {
     const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username, password}),
     });
-    if (!resp.ok) {
-      const e = await resp.json().catch(() => ({}));
-      throw new Error(e.detail || 'Credenciales incorrectas');
-    }
+    if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.detail || 'Credenciales incorrectas'); }
     const data = await resp.json();
     setToken(data.access_token);
     showApp(data.user);
-  } catch(ex) {
-    document.getElementById('login-error').textContent = ex.message;
-  }
+  } catch(ex) { document.getElementById('login-error').textContent = ex.message; }
 }
 
-function doAzureLogin() {
-  window.location.href = '/api/auth/azure/login';
-}
+function doAzureLogin() { window.location.href = '/api/auth/azure/login'; }
+function doLogout() { fetch('/api/auth/logout', {method:'POST'}); showLogin(''); }
 
-function doLogout() {
-  fetch('/api/auth/logout', { method: 'POST' });
-  showLogin('');
-}
-
-// Manejar token desde Azure callback (#token=...)
 (function handleFragment() {
   const hash = window.location.hash;
-  if (hash.startsWith('#token=')) {
-    const token = hash.slice(7);
-    setToken(token);
-    window.history.replaceState(null, '', '/');
-  }
-  if (hash.startsWith('#') && hash.includes('auth_error=')) {
-    const msg = decodeURIComponent(hash.split('auth_error=')[1] || 'Error de autenticación');
-    window.history.replaceState(null, '', '/');
-    showLogin(msg);
-    return;
+  if (hash.startsWith('#token=')) { setToken(hash.slice(7)); window.history.replaceState(null,'','/'); }
+  if (hash.includes('auth_error=')) {
+    const msg = decodeURIComponent(hash.split('auth_error=')[1] || 'Error');
+    window.history.replaceState(null,'','/'); showLogin(msg); return;
   }
   const params = new URLSearchParams(window.location.search);
   if (params.get('auth_error')) showLogin(decodeURIComponent(params.get('auth_error')));
 })();
 
-// Verificar token existente al cargar
 (async function checkAuth() {
-  const token = getToken();
-  if (!token) { showLogin(''); return; }
+  const token = getToken(); if (!token) { showLogin(''); return; }
   try {
-    const resp = await fetch('/api/auth/me', { headers: authHeaders() });
+    const resp = await fetch('/api/auth/me', {headers: authHeaders()});
     if (!resp.ok) throw new Error();
-    const user = await resp.json();
-    showApp(user);
-  } catch {
-    showLogin('La sesión expiró');
-  }
+    showApp(await resp.json());
+  } catch { showLogin('La sesión expiró'); }
 })();
 
-// ── Navigation ──────────────────────────────────────────────────────────────
+// ── Navigation ───────────────────────────────────────────────────────────────
 const panelTitles = {
-  'bulk': ['Carga Masiva', 'Excel / CSV'],
-  'canvas-courses': ['Cursos Canvas', 'Canvas LMS'],
-  'canvas-users': ['Usuarios Canvas', 'Canvas LMS'],
-  'canvas-enroll': ['Inscripciones', 'Canvas LMS'],
-  'azure-users': ['Usuarios Azure AD', 'Azure AD'],
-  'azure-groups': ['Grupos Azure AD', 'Azure AD'],
-  'teams': ['Equipos Teams', 'Microsoft Teams'],
+  'dashboard':        ['Dashboard',                 'Matriculación'],
+  'parseo-planilla':  ['Parsear planilla académica','Limpieza de datos'],
+  'portal-academico': ['Portal de carga',           'Académico'],
+  'matriculacion':    ['Matriculación',             'Automática'],
+  'auditoria':      ['Auditoría',         'Log de operaciones'],
+  'bulk':           ['Carga Masiva',      'Excel / CSV'],
+  'system-users':       ['Usuarios del sistema', 'Administración'],
+  'pending-enrollments':['Inscripciones pendientes', 'Administración'],
+  'course-aliases':     ['Aliases de materias',   'Fuzzy matching'],
+  'canvas-terms':   ['Períodos',          'Canvas LMS'],
+  'canvas-courses': ['Cursos Canvas',     'Canvas LMS'],
+  'canvas-users':   ['Usuarios Canvas',   'Canvas LMS'],
+  'canvas-enroll':  ['Inscripciones',     'Canvas LMS'],
+  'azure-users':    ['Usuarios Azure AD', 'Azure AD'],
+  'azure-groups':   ['Grupos Azure AD',   'Azure AD'],
+  'teams':          ['Equipos Teams',     'Microsoft Teams'],
 };
 
 function showPanel(id, el) {
@@ -554,35 +1351,447 @@ function showPanel(id, el) {
   const [title, badge] = panelTitles[id] || [id, ''];
   document.getElementById('topbar-title').textContent = title;
   document.getElementById('topbar-badge').textContent = badge;
+  if (id === 'system-users') loadSystemUsers();
+  if (id === 'portal-academico') portalCargarMisEnvios();
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+let _chartDiario = null;
+let _dashboardSemestres = [];
+
+async function loadDashboard() {
+  try {
+    const data = await apiFetch('/api/dashboard');
+    // KPIs
+    document.getElementById('kpi-procesados').textContent = data.hoy?.procesados ?? 0;
+    document.getElementById('kpi-creados').textContent = data.hoy?.creados ?? 0;
+    document.getElementById('kpi-inscritos').textContent = data.hoy?.inscritos ?? 0;
+    document.getElementById('kpi-errores').textContent = data.hoy?.errores ?? 0;
+
+    // Next run
+    if (data.proxima_ejecucion) {
+      const d = new Date(data.proxima_ejecucion);
+      document.getElementById('kpi-proxima').textContent = d.toLocaleString('es-PY', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+    }
+
+    // Chart
+    const labels = (data.ultimos_7_dias || []).map(r => r.day?.slice(5));
+    const values = (data.ultimos_7_dias || []).map(r => r.count);
+    if (_chartDiario) _chartDiario.destroy();
+    const ctx = document.getElementById('chart-diario').getContext('2d');
+    _chartDiario = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Alumnos procesados',
+          data: values,
+          backgroundColor: '#2d6cdf',
+          borderRadius: 5,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f0f2f5' } },
+          x: { grid: { display: false } },
+        }
+      }
+    });
+
+    // Execution timeline
+    const timeline = document.getElementById('exec-timeline');
+    const execs = data.ultimas_ejecuciones || [];
+    if (execs.length === 0) {
+      timeline.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:8px 0;">Sin ejecuciones registradas</p>';
+    } else {
+      timeline.innerHTML = execs.map(e => {
+        const dotClass = e.estado === 'exitoso' ? 'exec-dot-ok' : e.estado === 'con_errores' ? 'exec-dot-warn' : 'exec-dot-error';
+        const ts = (e.timestamp || '').slice(0, 16).replace('T', ' ');
+        return `<div class="exec-item">
+          <div class="exec-dot ${dotClass}"></div>
+          <div class="exec-meta">
+            <div class="exec-title">${e.tipo?.toUpperCase() || 'manual'} — ${e.semestre || '—'}</div>
+            <div class="exec-sub">${ts} UTC · ${e.duracion_seg?.toFixed(1) || 0}s</div>
+          </div>
+          <div class="exec-stats">
+            <span class="exec-stat">👥 ${e.total || 0}</span>
+            <span class="exec-stat">✅ ${e.creados || 0}</span>
+            ${e.errores ? `<span class="exec-stat" style="color:var(--error);">⚠ ${e.errores}</span>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // Collect semestres for filter
+    const semestresSet = new Set(execs.map(e => e.semestre).filter(Boolean));
+    _dashboardSemestres = [...semestresSet];
+    const sel = document.getElementById('dash-semestre-filter');
+    sel.innerHTML = '<option value="">Todos los semestres</option>' +
+      _dashboardSemestres.map(s => `<option value="${s}">${s}</option>`).join('');
+
+    await loadDashboardTable();
+  } catch(e) {
+    console.error('Dashboard error:', e);
+  }
+}
+
+async function loadDashboardTable() {
+  const semestre = document.getElementById('dash-semestre-filter').value;
+  const params = semestre ? `?semestre=${semestre}&limit=50` : '?limit=50';
+  try {
+    const rows = await apiFetch('/api/matriculacion/historial' + params);
+    const tbody = document.getElementById('tbl-dash-enrollments');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:16px;">Sin registros</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td style="font-size:0.75rem;">${(r.timestamp||'').slice(0,16).replace('T',' ')}</td>
+      <td>${r.cedula||''}</td>
+      <td>${r.nombre||''}</td>
+      <td>${chipAccion(r.accion)}</td>
+      <td><span style="font-size:0.75rem;color:var(--text-muted);">${r.plataforma||''}</span></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.curso||''}">${r.curso||''}</td>
+      <td>${r.semestre||''}</td>
+    </tr>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+function chipAccion(accion) {
+  const map = {creado:'chip-ok', inscrito:'chip-dry', error:'chip-error', omitido:'chip-skip'};
+  const lbl = {creado:'✓ Creado', inscrito:'↩ Inscrito', error:'✗ Error', omitido:'— Omitido'};
+  return `<span class="chip ${map[accion]||'chip-skip'}">${lbl[accion]||accion||'—'}</span>`;
+}
+
+// ── Matriculación ────────────────────────────────────────────────────────────
+function switchMatTab(tab) {
+  document.getElementById('matTab-onedrive').style.display = tab === 'onedrive' ? 'block' : 'none';
+  document.getElementById('matTab-upload').style.display = tab === 'upload' ? 'block' : 'none';
+  document.getElementById('tab-onedrive').style.cssText += tab === 'onedrive'
+    ? 'color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;'
+    : 'color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;';
+  document.getElementById('tab-upload').style.cssText += tab === 'upload'
+    ? 'color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;'
+    : 'color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;';
+}
+
+async function runMatriculacionUpload(dryRun) {
+  const fileInput = document.getElementById('mat-file-input');
+  const semestre = document.getElementById('mat-semestre-upload').value.trim() || null;
+  if (!fileInput.files || !fileInput.files[0]) {
+    alert('Por favor seleccioná un archivo Excel (.xlsx) antes de continuar.');
+    return;
+  }
+  const endpoint = dryRun ? '/api/matriculacion/upload/dry-run' : '/api/matriculacion/upload';
+  const url = semestre ? `${endpoint}?semestre=${encodeURIComponent(semestre)}` : endpoint;
+
+  document.getElementById('btn-mat-upload-run').disabled = true;
+  document.getElementById('btn-mat-upload-dryrun').disabled = true;
+  document.getElementById('mat-results').style.display = 'none';
+
+  _matStartProgress(dryRun ? '🔍 Simulando (DRY RUN)…' : '⚙️ Procesando matriculación…');
+  matLog('info', `[${new Date().toLocaleTimeString()}] Iniciando ${dryRun ? 'DRY RUN' : 'matriculación real'} desde archivo…`);
+  matLog('info', `Archivo: ${fileInput.files[0].name}`);
+  if (semestre) matLog('info', `Semestre: ${semestre}`);
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+
+  try {
+    const token = localStorage.getItem('token');
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || 'Error del servidor');
+    }
+    const { ejecucion_id } = await resp.json();
+    matLog('info', `ID ejecución: ${ejecucion_id}`);
+    await _pollProgress(ejecucion_id, dryRun);
+  } catch(ex) {
+    matLog('error', `✗ Error: ${ex.message}`);
+    document.getElementById('mat-progress-fill').style.width = '100%';
+    setTimeout(() => { document.getElementById('mat-progress-card').style.display = 'none'; }, 2000);
+  } finally {
+    document.getElementById('btn-mat-upload-run').disabled = false;
+    document.getElementById('btn-mat-upload-dryrun').disabled = false;
+  }
+}
+
+async function runMatriculacion(dryRun) {
+  const semestre = document.getElementById('mat-semestre').value.trim() || null;
+  const endpoint = dryRun ? '/api/matriculacion/dry-run' : '/api/matriculacion';
+  const url = semestre ? `${endpoint}?semestre=${encodeURIComponent(semestre)}` : endpoint;
+
+  document.getElementById('btn-mat-run').disabled = true;
+  document.getElementById('btn-mat-dryrun').disabled = true;
+  document.getElementById('mat-results').style.display = 'none';
+
+  _matStartProgress(dryRun ? '🔍 Simulando (DRY RUN)…' : '⚙️ Procesando matriculación…');
+  matLog('info', `[${new Date().toLocaleTimeString()}] Iniciando ${dryRun ? 'DRY RUN' : 'matriculación real'}…`);
+  if (semestre) matLog('info', `Semestre: ${semestre}`);
+  matLog('info', 'Descargando Excel desde OneDrive…');
+
+  try {
+    const data = await apiFetch(url, 'POST');
+    const ejecucion_id = data.ejecucion_id;
+    matLog('info', `ID ejecución: ${ejecucion_id}`);
+    await _pollProgress(ejecucion_id, dryRun);
+  } catch(ex) {
+    matLog('error', `✗ Error: ${ex.message}`);
+    document.getElementById('mat-progress-fill').style.width = '100%';
+    setTimeout(() => { document.getElementById('mat-progress-card').style.display = 'none'; }, 2000);
+  } finally {
+    document.getElementById('btn-mat-run').disabled = false;
+    document.getElementById('btn-mat-dryrun').disabled = false;
+  }
+}
+
+function _matStartProgress(title) {
+  const progressCard = document.getElementById('mat-progress-card');
+  progressCard.style.display = 'block';
+  document.getElementById('mat-progress-title').textContent = title;
+  document.getElementById('mat-progress-fill').style.width = '2%';
+  document.getElementById('mat-log').innerHTML = '';
+}
+
+let _lastProcessed = 0;
+async function _pollProgress(ejecucion_id, dryRun) {
+  _lastProcessed = 0;
+  const fill = document.getElementById('mat-progress-fill');
+  const titleEl = document.getElementById('mat-progress-title');
+
+  while (true) {
+    await new Promise(r => setTimeout(r, 1500));
+    let p;
+    try {
+      p = await apiFetch(`/api/matriculacion/progress/${ejecucion_id}`, 'GET');
+    } catch(e) { continue; }
+
+    const pct = p.porcentaje || 0;
+    fill.style.width = Math.max(pct, 2) + '%';
+
+    if (p.total > 0) {
+      titleEl.textContent = `⚙️ Procesando… ${p.procesados}/${p.total} alumnos (${pct}%)`;
+    }
+    document.getElementById('lstat-procesados').textContent = `Procesados: ${p.procesados}/${p.total}`;
+    document.getElementById('lstat-creados').textContent = `Creados: ${p.creados}`;
+    document.getElementById('lstat-inscritos').textContent = `Inscritos: ${p.inscripciones}`;
+    document.getElementById('lstat-errores').textContent = `Errores: ${p.errores}`;
+
+    // Log newly processed students
+    const newResults = (p.resultados || []).slice(_lastProcessed);
+    newResults.forEach(r => {
+      const icon = r.errores && r.errores.length ? '✗' : '✓';
+      const type = r.errores && r.errores.length ? 'error' : (r.es_nuevo ? 'ok' : 'info');
+      matLog(type, `${icon} ${r.nombre} (${r.cedula}) — ${r.es_nuevo ? 'NUEVO' : 'existente'} — ${r.cursos ? r.cursos.length : 0} curso(s)`);
+      if (r.errores && r.errores.length) r.errores.forEach(e => matLog('error', `    ${e}`));
+    });
+    _lastProcessed = (p.resultados || []).length;
+
+    if (p.estado === 'completado' || p.estado === 'fallido') {
+      fill.style.width = '100%';
+      if (p.estado === 'completado') {
+        const hasFailed = p.alumnos_con_error && p.alumnos_con_error.length > 0;
+        matLog(hasFailed ? 'error' : (dryRun ? 'dry' : 'ok'),
+          `${hasFailed ? '⚠' : '✓'} Completado — ${p.total} alumnos, ${p.creados} creados, ${p.errores} errores`);
+        if (dryRun) matLog('dry', 'MODO SIMULACIÓN: ningún cambio fue aplicado.');
+        if (hasFailed) {
+          matLog('error', `Alumnos con error: ${p.alumnos_con_error.join(', ')}`);
+          _showRetryButton(ejecucion_id);
+        }
+      } else {
+        matLog('error', `✗ Proceso fallido`);
+      }
+      setTimeout(() => { document.getElementById('mat-progress-card').style.display = 'none'; }, 2000);
+      // Fetch full result for summary panel
+      try {
+        const full = await apiFetch(`/api/matriculacion/progress/${ejecucion_id}`, 'GET');
+        renderMatriculacionResult({
+          ...full,
+          estado: p.estado === 'completado' ? (p.errores > 0 ? 'con_errores' : 'exitoso') : 'fallido',
+          total: full.total, creados: full.creados, existentes: full.existentes,
+          inscripciones: full.inscripciones, errores: full.errores,
+          resultados: full.resultados || [], errores_validacion: [],
+        }, dryRun);
+      } catch(e) {}
+      break;
+    }
+  }
+}
+
+function _showRetryButton(ejecucion_id) {
+  let btn = document.getElementById('btn-mat-retry');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'btn-mat-retry';
+    btn.className = 'btn btn-warn';
+    btn.style.marginTop = '10px';
+    document.getElementById('mat-results').prepend(btn);
+  }
+  btn.textContent = '↩ Reintentar alumnos con error';
+  btn.onclick = () => retryMatriculacion(ejecucion_id);
+}
+
+async function retryMatriculacion(ejecucion_id) {
+  const btn = document.getElementById('btn-mat-retry');
+  if (btn) btn.disabled = true;
+  try {
+    const result = await apiFetch(`/api/matriculacion/retry/${ejecucion_id}`, 'POST');
+    renderMatriculacionResult(result, false);
+  } catch(e) {
+    alert('Error al reintentar: ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function matLog(type, msg) {
+  const el = document.getElementById('mat-log');
+  const span = document.createElement('div');
+  span.className = `log-${type}`;
+  span.textContent = msg;
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderMatriculacionResult(result, dryRun) {
+  document.getElementById('mat-results').style.display = 'block';
+  document.getElementById('mat-dry-badge').style.display = dryRun ? 'inline-block' : 'none';
+  document.getElementById('mat-result-title').textContent =
+    result.estado === 'error_validacion' ? '⚠️ Error de validación' :
+    result.estado === 'fallido' ? '❌ Proceso fallido' : '✅ Resultado';
+
+  document.getElementById('mat-stat-total').textContent = result.total || 0;
+  document.getElementById('mat-stat-creados').textContent = result.creados || 0;
+  document.getElementById('mat-stat-existentes').textContent = result.existentes || 0;
+  document.getElementById('mat-stat-inscrip').textContent = result.inscripciones || 0;
+  document.getElementById('mat-stat-errores').textContent = result.errores || 0;
+
+  // Validation errors table
+  const valErrors = result.errores_validacion || [];
+  const valCard = document.getElementById('mat-val-errors');
+  if (valErrors.length) {
+    valCard.style.display = 'block';
+    document.getElementById('tbl-val-errors').innerHTML = valErrors.map(e =>
+      `<tr><td>${e.sheet_name||''}</td><td>${e.cedula||''}</td><td>${e.nombre||''}</td><td style="color:var(--error);">${e.error}</td></tr>`
+    ).join('');
+  } else {
+    valCard.style.display = 'none';
+  }
+
+  // Per-student accordion
+  const list = document.getElementById('mat-alumnos-list');
+  const resultados = result.resultados || [];
+  document.getElementById('mat-alumno-count').textContent = resultados.length;
+  list.innerHTML = resultados.map((r, i) => {
+    const hasErrors = r.errores?.length > 0;
+    const isNuevo = r.es_nuevo;
+    const statusIcon = hasErrors ? '⚠️' : isNuevo ? '🆕' : '↩️';
+    const cursos = r.cursos || [];
+    const cursosHtml = cursos.map(c => {
+      const tagClass = (c.errores?.length || 0) > 0 ? 'materia-tag-error' : 'materia-tag';
+      return `<span class="materia-tag ${tagClass}">${c.materia}</span>`;
+    }).join('');
+    const errorsHtml = (r.errores || []).map(e =>
+      `<div style="font-size:0.78rem;color:var(--error);padding:2px 0;">✗ ${e}</div>`
+    ).join('');
+    return `<div class="alumno-result">
+      <div class="alumno-result-header" onclick="toggleAccordion(${i})">
+        <span>${statusIcon}</span>
+        <span style="font-weight:600;font-size:0.88rem;">${r.nombre} <span style="font-weight:400;color:var(--text-muted);">(${r.cedula})</span></span>
+        <span style="font-size:0.78rem;color:var(--text-muted);margin-left:auto;">${r.email}</span>
+        ${hasErrors ? '<span class="chip chip-error" style="margin-left:8px;">⚠ Error</span>' : ''}
+        ${dryRun ? '<span class="chip chip-dry" style="margin-left:4px;">DRY</span>' : ''}
+        <span style="color:var(--text-muted);font-size:0.85rem;margin-left:8px;">▾</span>
+      </div>
+      <div class="alumno-result-body" id="accordion-${i}">
+        <div style="margin-bottom:8px;">
+          <span style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">MATERIAS:</span><br>
+          <div style="margin-top:4px;">${cursosHtml || '<span style="color:var(--text-muted);font-size:0.78rem;">Sin materias</span>'}</div>
+        </div>
+        ${hasErrors ? `<div style="margin-top:8px;padding:8px 12px;background:var(--error-bg);border-radius:6px;">${errorsHtml}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleAccordion(i) {
+  const el = document.getElementById('accordion-' + i);
+  el.classList.toggle('open');
+}
+
+// ── Auditoría ────────────────────────────────────────────────────────────────
+async function loadAuditoria() {
+  const semestre = document.getElementById('aud-semestre').value.trim();
+  const cedula = document.getElementById('aud-cedula').value.trim();
+  let params = [];
+  if (semestre) params.push(`semestre=${encodeURIComponent(semestre)}`);
+  if (cedula) params.push(`cedula=${encodeURIComponent(cedula)}`);
+  const qs = params.length ? '?' + params.join('&') : '';
+  try {
+    const rows = await apiFetch('/api/matriculacion/historial' + qs);
+    document.getElementById('aud-count').textContent = rows.length;
+    const tbody = document.getElementById('tbl-auditoria');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Sin registros</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td style="white-space:nowrap;font-size:0.75rem;">${(r.timestamp||'').slice(0,19).replace('T',' ')}</td>
+      <td>${r.cedula||''}</td>
+      <td>${r.nombre||''}</td>
+      <td>${chipAccion(r.accion)}</td>
+      <td style="font-size:0.78rem;color:var(--text-muted);">${r.plataforma||''}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.curso||''}">${r.curso||''}</td>
+      <td>${r.semestre||''}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.75rem;color:var(--text-muted);" title="${r.detalle||''}">${r.detalle||''}</td>
+    </tr>`).join('');
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function exportAuditoria() {
+  const semestre = document.getElementById('aud-semestre').value.trim();
+  const cedula = document.getElementById('aud-cedula').value.trim();
+  let params = [];
+  if (semestre) params.push(`semestre=${encodeURIComponent(semestre)}`);
+  if (cedula) params.push(`cedula=${encodeURIComponent(cedula)}`);
+  const qs = params.length ? '?' + params.join('&') : '';
+  try {
+    const resp = await fetch('/api/matriculacion/audit/export' + qs, {headers: authHeaders()});
+    if (!resp.ok) throw new Error(await resp.text());
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `auditoria_${semestre||'completa'}.xlsx`; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Error exportando: ' + e.message); }
 }
 
 // ── Bulk / Carga Masiva ──────────────────────────────────────────────────────
-let selectedFile = null;
-let lastReport = null;
+let selectedFile = null, lastReport = null;
 
 const dropZone = document.getElementById('drop-zone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragging');
-  const f = e.dataTransfer.files[0];
-  if (f) setFile(f);
-});
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragging'); const f=e.dataTransfer.files[0]; if(f) setFile(f); });
 
-function handleFileSelect(e) {
-  const f = e.target.files[0];
-  if (f) setFile(f);
-}
+function handleFileSelect(e) { const f=e.target.files[0]; if(f) setFile(f); }
 
 function setFile(f) {
-  const allowed = ['.xlsx', '.xls', '.csv'];
+  const allowed = ['.xlsx','.xls','.csv'];
   const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
   if (!allowed.includes(ext)) { alert('Formato no soportado. Use .xlsx, .xls o .csv'); return; }
-  if (f.size > 10 * 1024 * 1024) { alert('El archivo supera 10 MB'); return; }
+  if (f.size > 10*1024*1024) { alert('El archivo supera 10 MB'); return; }
   selectedFile = f;
   const el = document.getElementById('chosen-filename');
-  el.textContent = `✅ ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+  el.textContent = `✅ ${f.name} (${(f.size/1024).toFixed(1)} KB)`;
   el.classList.remove('hidden');
   document.getElementById('btn-process').disabled = false;
   document.getElementById('results-section').classList.add('hidden');
@@ -590,8 +1799,7 @@ function setFile(f) {
 }
 
 function resetBulk() {
-  selectedFile = null;
-  lastReport = null;
+  selectedFile = null; lastReport = null;
   document.getElementById('file-input').value = '';
   document.getElementById('chosen-filename').classList.add('hidden');
   document.getElementById('btn-process').disabled = true;
@@ -599,9 +1807,8 @@ function resetBulk() {
   setProgress(false);
 }
 
-function setProgress(show, pct = 0, label = 'Procesando…') {
-  const wrap = document.getElementById('progress-wrap');
-  wrap.style.display = show ? 'block' : 'none';
+function setProgress(show, pct=0, label='Procesando…') {
+  document.getElementById('progress-wrap').style.display = show ? 'block' : 'none';
   document.getElementById('progress-bar-fill').style.width = pct + '%';
   document.getElementById('progress-label').textContent = label;
 }
@@ -610,141 +1817,1212 @@ async function processBulk() {
   if (!selectedFile) return;
   const type = document.getElementById('bulk-type').value;
   const endpoint = type === 'usuarios' ? '/api/bulk/usuarios' : '/api/bulk/inscripciones';
-
   const btn = document.getElementById('btn-process');
   btn.disabled = true;
   setProgress(true, 10, 'Subiendo archivo…');
-
   const fd = new FormData();
   fd.append('file', selectedFile);
-
   try {
     setProgress(true, 30, 'Procesando en el servidor…');
-    const resp = await fetch(endpoint, { method: 'POST', body: fd, headers: authHeaders() });
+    const resp = await fetch(endpoint, {method:'POST', body:fd, headers:authHeaders()});
     setProgress(true, 80, 'Recibiendo resultados…');
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-      throw new Error(err.detail || 'Error del servidor');
-    }
-
+    if (!resp.ok) { const err=await resp.json().catch(()=>({detail:resp.statusText})); throw new Error(err.detail||'Error del servidor'); }
     const report = await resp.json();
     setProgress(true, 100, '¡Completado!');
     setTimeout(() => setProgress(false), 800);
-
     lastReport = report;
     renderResults(report);
-  } catch (ex) {
-    setProgress(false);
-    alert('Error: ' + ex.message);
-  } finally {
-    btn.disabled = false;
-  }
+  } catch(ex) { setProgress(false); alert('Error: ' + ex.message); }
+  finally { btn.disabled = false; }
 }
 
 function renderResults(report) {
   document.getElementById('stat-total').textContent = report.total;
   document.getElementById('stat-ok').textContent = report.success;
   document.getElementById('stat-errors').textContent = report.errors;
-
-  // Headers
   const thead = document.getElementById('results-thead');
   const isUsers = report.tipo === 'usuarios';
   thead.innerHTML = `<tr>
-    <th>Fila</th>
-    <th>${isUsers ? 'Email' : 'Email usuario'}</th>
-    <th>${isUsers ? 'Nombre' : 'Curso ID'}</th>
-    <th>Canvas</th><th>Detalle Canvas</th>
-    <th>Azure</th><th>Detalle Azure</th>
-    <th>Teams</th><th>Detalle Teams</th>
+    <th>Fila</th><th>${isUsers?'Email':'Email usuario'}</th><th>${isUsers?'Nombre':'Curso ID'}</th>
+    <th>Canvas</th><th>Detalle Canvas</th><th>Azure</th><th>Detalle Azure</th><th>Teams</th><th>Detalle Teams</th>
   </tr>`;
-
   const tbody = document.getElementById('results-tbody');
   tbody.innerHTML = '';
-  (report.rows || []).forEach(row => {
-    if (row.error_global) {
-      tbody.innerHTML += `<tr><td colspan="9" style="color:var(--error)">${row.error_global}</td></tr>`;
-      return;
-    }
+  (report.rows||[]).forEach(row => {
+    if (row.error_global) { tbody.innerHTML += `<tr><td colspan="9" style="color:var(--error)">${row.error_global}</td></tr>`; return; }
     tbody.innerHTML += `<tr>
-      <td>${row.fila || ''}</td>
-      <td>${row.email || ''}</td>
-      <td>${row.nombre || row.curso || ''}</td>
-      <td>${chip(row.canvas?.status)}</td>
-      <td><span class="detail-text" title="${row.canvas?.detalle || ''}">${row.canvas?.detalle || ''}</span></td>
-      <td>${chip(row.azure?.status)}</td>
-      <td><span class="detail-text" title="${row.azure?.detalle || ''}">${row.azure?.detalle || ''}</span></td>
-      <td>${chip(row.teams?.status)}</td>
-      <td><span class="detail-text" title="${row.teams?.detalle || ''}">${row.teams?.detalle || ''}</span></td>
+      <td>${row.fila||''}</td><td>${row.email||''}</td><td>${row.nombre||row.curso||''}</td>
+      <td>${chip(row.canvas?.status)}</td><td><span class="detail-text" title="${row.canvas?.detalle||''}">${row.canvas?.detalle||''}</span></td>
+      <td>${chip(row.azure?.status)}</td><td><span class="detail-text" title="${row.azure?.detalle||''}">${row.azure?.detalle||''}</span></td>
+      <td>${chip(row.teams?.status)}</td><td><span class="detail-text" title="${row.teams?.detalle||''}">${row.teams?.detalle||''}</span></td>
     </tr>`;
   });
-
   document.getElementById('results-section').classList.remove('hidden');
 }
 
 function chip(status) {
-  const map = {
-    ok: 'chip-ok', error: 'chip-error', advertencia: 'chip-warn',
-    omitido: 'chip-skip', existente: 'chip-existente'
-  };
-  const cls = map[status] || 'chip-skip';
-  const labels = { ok: '✓ OK', error: '✗ Error', advertencia: '⚠ Advertencia', omitido: '— Omitido', existente: '↩ Existente' };
-  return `<span class="chip ${cls}">${labels[status] || status || '—'}</span>`;
+  const map = {ok:'chip-ok', error:'chip-error', advertencia:'chip-warn', omitido:'chip-skip', existente:'chip-existente'};
+  const labels = {ok:'✓ OK', error:'✗ Error', advertencia:'⚠ Advertencia', omitido:'— Omitido', existente:'↩ Existente'};
+  return `<span class="chip ${map[status]||'chip-skip'}">${labels[status]||status||'—'}</span>`;
 }
 
 async function downloadReportExcel() {
   if (!lastReport) return;
   try {
     const resp = await fetch('/api/bulk/reporte-excel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(lastReport),
+      method:'POST', headers:{'Content-Type':'application/json',...authHeaders()}, body:JSON.stringify(lastReport),
     });
     if (!resp.ok) throw new Error('Error generando reporte');
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'reporte_carga_masiva.xlsx'; a.click();
+    const a = document.createElement('a'); a.href=url; a.download='reporte_carga_masiva.xlsx'; a.click();
     URL.revokeObjectURL(url);
-  } catch (ex) {
-    alert('Error: ' + ex.message);
+  } catch(ex) { alert('Error: ' + ex.message); }
+}
+
+function downloadKit() {
+  const a = document.createElement('a');
+  a.href = '/static/kit_matriculacion_2026-2.xlsx';
+  a.download = 'kit_matriculacion_2026-2.xlsx';
+  a.click();
+}
+
+function downloadTemplate(tipo) {
+  if (tipo) {
+    const a = document.createElement('a');
+    a.href = `/api/bulk/template/${tipo}`;
+    a.click();
+  } else {
+    window.open('/api/bulk/template', '_blank');
   }
 }
 
-function downloadTemplate() {
-  window.open('/api/bulk/template', '_blank');
+// ── Bulk upload genérico ──────────────────────────────────────────────────────
+const statusColors = { ok:'#c6efce', existente:'#ffeb9c', advertencia:'#ffeb9c', error:'#ffc7ce', omitido:'#f3f4f6' };
+
+async function bulkUpload(tipo, fileInputId, endpoint, tbodyId) {
+  const fileInput = document.getElementById(fileInputId);
+  if (!fileInput || !fileInput.files[0]) { alert('Seleccioná un archivo primero'); return; }
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: formData,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || 'Error del servidor');
+    }
+    const report = await resp.json();
+    renderBulkResult(tipo, report, tbodyId);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function renderBulkResult(tipo, report, tbodyId) {
+  const summaryId = tbodyId.replace('tbl-bulk-', 'bulk-').replace(tbodyId.split('-').pop(), tbodyId.split('-').pop() + '-summary').replace('tbl-bulk-','bulk-') ;
+  const resultDivId = tbodyId.replace('tbl-', '').replace('-', '-').split('-').slice(0,-1).join('-');
+
+  // Find result div
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  const resultDiv = tbody.closest('[id$="-result"]') || tbody.parentElement.parentElement.parentElement;
+
+  // Show summary
+  const summaryEl = resultDiv.querySelector('[id$="-summary"]');
+  if (summaryEl) {
+    const color = report.errors > 0 ? 'var(--error)' : 'var(--success)';
+    summaryEl.innerHTML = `<span style="color:${color};font-weight:600;">
+      Total: ${report.total} | ✅ OK: ${report.success} | ❌ Errores: ${report.errors}
+    </span>`;
+  }
+  resultDiv.style.display = 'block';
+
+  // Render rows
+  tbody.innerHTML = (report.rows || []).map(row => {
+    if (row.error_global) return `<tr><td colspan="10" style="color:red;">${row.error_global}</td></tr>`;
+    const canvasSt = row.canvas?.status || '';
+    const teamsSt = row.teams?.status || '';
+    const azureSt = row.azure?.status || '';
+
+    if (tipo === 'cursos') {
+      return `<tr>
+        <td>${row.fila||''}</td>
+        <td>${row.nombre||''}</td>
+        <td style="font-size:.78rem;">${row.sis_id||''}</td>
+        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${canvasSt} ${row.canvas?.detalle ? '— '+row.canvas.detalle : ''}</td>
+        <td style="background:${statusColors[teamsSt]||'#fff'};font-size:.82rem;">${teamsSt} ${row.teams?.detalle ? '— '+row.teams.detalle : ''}</td>
+      </tr>`;
+    } else if (tipo === 'canvas-usuarios') {
+      return `<tr>
+        <td>${row.fila||''}</td>
+        <td>${row.nombre||''}</td>
+        <td>${row.email||''}</td>
+        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${canvasSt} ${row.canvas?.detalle ? '— '+row.canvas.detalle : ''}</td>
+      </tr>`;
+    } else if (tipo === 'azure-usuarios') {
+      return `<tr>
+        <td>${row.fila||''}</td>
+        <td>${row.nombre||''}</td>
+        <td>${row.upn||''}</td>
+        <td style="background:${statusColors[azureSt]||'#fff'};font-size:.82rem;">${azureSt} ${row.azure?.detalle ? '— '+row.azure.detalle : ''}</td>
+        <td style="background:${statusColors[teamsSt]||'#fff'};font-size:.82rem;">${teamsSt} ${row.teams?.detalle||''}</td>
+      </tr>`;
+    } else if (tipo === 'canvas-inscripciones') {
+      return `<tr>
+        <td>${row.fila||''}</td>
+        <td>${row.email||''}</td>
+        <td>${row.curso||''}</td>
+        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${canvasSt} ${row.canvas?.detalle ? '— '+row.canvas.detalle : ''}</td>
+      </tr>`;
+    }
+    return `<tr><td colspan="10">${JSON.stringify(row)}</td></tr>`;
+  }).join('');
+}
+
+// ── System Users ─────────────────────────────────────────────────────────────
+async function loadSystemUsers() {
+  const tbody = document.getElementById('su-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">Cargando…</td></tr>';
+  try {
+    const users = await apiFetch('/api/users');
+    if (!users.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Sin usuarios</td></tr>'; return; }
+    const roleLabels = {admin:'🔴 Admin', academico:'🟡 Académico', viewer:'🔵 Viewer'};
+    tbody.innerHTML = users.map(u => {
+      const estado = u.active ? '<span class="chip chip-ok">Activo</span>' : '<span class="chip chip-error">Inactivo</span>';
+      const lastLogin = u.last_login ? new Date(u.last_login).toLocaleString('es') : '—';
+      const roleChip = `<span class="chip ${u.role==='admin'?'chip-error':u.role==='academico'?'chip-warn':'chip-skip'}">${roleLabels[u.role]||u.role}</span>`;
+      return `<tr>
+        <td><strong>${u.username}</strong></td>
+        <td>${u.full_name||'—'}</td>
+        <td style="font-size:.78rem">${u.email}</td>
+        <td>${roleChip}</td>
+        <td>${estado}</td>
+        <td style="font-size:.78rem">${lastLogin}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem" onclick="toggleUserActive('${u.id}',${u.active})">
+            ${u.active?'Desactivar':'Activar'}
+          </button>
+          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="changeUserRole('${u.id}','${u.role}')">
+            Cambiar rol
+          </button>
+          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="changeUserPassword('${u.id}','${u.username}')">
+            Contraseña
+          </button>
+          <button class="btn btn-danger" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="deleteSystemUser('${u.id}','${u.username}')">
+            Eliminar
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
+}
+
+async function createSystemUser() {
+  const msg = document.getElementById('su-msg');
+  const body = {
+    username:  document.getElementById('su-username').value.trim(),
+    full_name: document.getElementById('su-fullname').value.trim(),
+    email:     document.getElementById('su-email').value.trim(),
+    password:  document.getElementById('su-password').value,
+    role:      document.getElementById('su-role').value,
+  };
+  if (!body.username || !body.email || !body.password) {
+    msg.textContent = 'Usuario, email y contraseña son requeridos'; msg.style.color = 'var(--error)'; return;
+  }
+  msg.textContent = 'Creando…'; msg.style.color = 'var(--text-muted)';
+  try {
+    await apiFetch('/api/users', {method:'POST', body: JSON.stringify(body)});
+    msg.textContent = `✓ Usuario "${body.username}" creado`; msg.style.color = 'var(--success)';
+    ['su-username','su-fullname','su-email','su-password'].forEach(id => document.getElementById(id).value = '');
+    loadSystemUsers();
+  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
+}
+
+async function toggleUserActive(id, currentActive) {
+  try {
+    await apiFetch(`/api/users/${id}`, {method:'PATCH', body: JSON.stringify({active: currentActive ? 0 : 1})});
+    loadSystemUsers();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function changeUserRole(id, currentRole) {
+  const roles = ['admin','academico','viewer'];
+  const newRole = prompt(`Rol actual: ${currentRole}\nNuevo rol (admin / academico / viewer):`);
+  if (!newRole || !roles.includes(newRole.trim())) { alert('Rol inválido'); return; }
+  try {
+    await apiFetch(`/api/users/${id}`, {method:'PATCH', body: JSON.stringify({role: newRole.trim()})});
+    loadSystemUsers();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function changeUserPassword(id, username) {
+  const newPass = prompt(`Nueva contraseña para "${username}":`);
+  if (!newPass || newPass.length < 6) { alert('La contraseña debe tener al menos 6 caracteres'); return; }
+  try {
+    await apiFetch(`/api/users/${id}`, {method:'PATCH', body: JSON.stringify({password: newPass})});
+    alert(`✓ Contraseña actualizada para "${username}"`);
+  } catch(ex) { alert(ex.message); }
+}
+
+async function deleteSystemUser(id, username) {
+  if (!confirm(`¿Eliminar al usuario "${username}"? Esta acción no se puede deshacer.`)) return;
+  try {
+    await apiFetch(`/api/users/${id}`, {method:'DELETE'});
+    loadSystemUsers();
+  } catch(ex) { alert(ex.message); }
+}
+
+// ── Portal académico ─────────────────────────────────────────────────────────
+let _portalMaterias = [];
+let _portalMateriasSeleccionadas = [];
+let _misInscripcionesData = [];
+
+// ── Mallas curriculares ───────────────────────────────────────────────────────
+const MALLAS = {
+  marketing: {
+    label: "Marketing",
+    semestres: {
+      "1er Semestre": ["Lenguaje I","Desarrollo Personal I","Introducción a los Negocios","Matemática I","Inglés I","TIC I"],
+      "2do Semestre": ["Matemática II","Desarrollo Personal II","Historia y Realidad Socio Económica del Paraguay","Lenguaje II","Inglés II","Gestión de Empresas"],
+      "3er Semestre": ["Marketing","Contabilidad I","Economía General","Matemática III","Inglés III"],
+      "4to Semestre": ["Publicidad y Promoción","Sociedad, Estado y Empresa","Estadística I","Comportamiento Organizacional","Gerencia de Marketing","Inglés IV"],
+      "5to Semestre": ["Investigación y Análisis de Mercado Internacionales","Análisis Gerencial de la Información Financiera","Inglés V","Metodología de la Investigación","Microeconomía"],
+      "6to Semestre": ["Desarrollo y Gerencia de Producto","Diseño Digital para Marketing","Comportamiento del Consumidor","Macroeconomía","Investigación y Análisis de M.","Inglés VI"],
+      "7mo Semestre": ["Marketing de Servicios","Política de Precio","Ética y Filosofía","Canales y Distribución en Marketing","Guaraní"],
+      "8vo Semestre": ["Finanzas","Gerencia de Ventas","Marketing Relacional y CRM","E-Marketing","Marketing Estratégico","Portugués"],
+      "9no Semestre": ["Evaluación de Proyectos","Marketing Internacional","Marketing Industrial y B2B","Retailing & Trade Marketing"],
+      "10mo Semestre": ["Trabajo Final de Grado","Pasantías"],
+    }
+  },
+  administracion: {
+    label: "Administración de Empresas",
+    semestres: {
+      "1er Semestre": ["Lenguaje I","Desarrollo Personal I","Introducción a los Negocios","Matemática I","Inglés I","TIC I"],
+      "2do Semestre": ["Matemática II","Desarrollo Personal II","Historia y Realidad Socio Económica del Paraguay","Lenguaje II","Inglés II","Gestión de Empresas"],
+      "3er Semestre": ["Marketing","Contabilidad I","Economía General","Matemática III","Inglés III"],
+      "4to Semestre": ["Contabilidad de Costos","Sociedad, Estado y Empresa","Estadística I","Comportamiento Organizacional","Gerencia de Marketing","Inglés IV"],
+      "5to Semestre": ["Contabilidad II","Estadística II","Inglés V","Matemática Financiera","Metodología de la Investigación","TIC II","Microeconomía"],
+      "6to Semestre": ["Contabilidad de Gestión","Estrategias Gerenciales","Finanzas I","Macroeconomía","Investigación y Análisis de M.","Inglés VI"],
+      "7mo Semestre": ["Derecho Empresarial y Sociedades","Ética y Filosofía","Finanzas II","Gerencia de Capital Humano","Gerencia de Operaciones y Logística"],
+      "8vo Semestre": ["Mercado Financiero","Evaluación de Proyectos","Portugués"],
+      "9no Semestre": ["Guaraní","Planeamiento y Gestión Estratégica","Liderazgo Organizacional"],
+      "10mo Semestre": ["Trabajo Final de Grado","Pasantías"],
+    }
+  },
+  negocios: {
+    label: "Negocios Internacionales",
+    semestres: {
+      "1er Semestre": ["Lenguaje I","Desarrollo Personal I","Introducción a los Negocios","Matemática I","Inglés I","TIC I"],
+      "2do Semestre": ["Matemática II","Desarrollo Personal II","Historia y Realidad Socio Económica del Paraguay","Lenguaje II","Inglés II","Gestión de Empresas"],
+      "3er Semestre": ["Marketing","Contabilidad I","Economía General","Matemática III","Inglés III"],
+      "4to Semestre": ["Publicidad y Promoción","Sociedad, Estado y Empresa","Estadística I","Comportamiento Organizacional","Gerencia de Marketing","Inglés IV"],
+      "5to Semestre": ["Investigación y Análisis de Mercado Internacionales","Análisis Gerencial de la Información Financiera","Inglés V","Metodología de la Investigación","Microeconomía","International Trade I: Imports & Exports","International Human Resources"],
+      "6to Semestre": ["Macroeconomía","Investigación y Análisis de M. Avanzada","Comportamiento del Consumidor","Inglés VI","Marketing de Servicios","International Trade II: Logísticas"],
+      "7mo Semestre": ["Ética y Filosofía","Derecho Internacional","Guaraní","Finanzas","Aduanas","International Operations"],
+      "8vo Semestre": ["Promoción y Gestión de Exportaciones","Global Business Strategy","Portugués"],
+      "9no Semestre": ["Evaluación de Proyectos","Marketing Internacional","International Finance","Valoración Aduanera"],
+      "10mo Semestre": ["Trabajo Final de Grado","Pasantías"],
+    }
+  },
+  contabilidad: {
+    label: "Contabilidad",
+    semestres: {
+      "1er Semestre": ["Lenguaje I","Desarrollo Personal I","Introducción a los Negocios","Matemática I","Inglés I","TIC I"],
+      "2do Semestre": ["Matemática II","Desarrollo Personal II","Historia y Realidad Socio Económica del Paraguay","Lenguaje II","Inglés II","Gestión de Empresas"],
+      "3er Semestre": ["Marketing","Contabilidad I","Economía General","Matemática III","Inglés III"],
+      "4to Semestre": ["Publicidad y Promoción","Sociedad, Estado y Empresa","Estadística I","Comportamiento Organizacional","Gerencia de Marketing","Inglés IV"],
+      "5to Semestre": ["Investigación y Análisis de Mercado Internacionales","Análisis Gerencial de la Información Financiera","Inglés V","Metodología de la Investigación","Microeconomía"],
+      "6to Semestre": ["Desarrollo y Gerencia de Producto","Diseño Digital para Marketing","Comportamiento del Consumidor","Macroeconomía","Investigación y Análisis de M.","Inglés VI"],
+      "7mo Semestre": ["Marketing de Servicios","Política de Precio","Ética y Filosofía","Canales y Distribución en Marketing","Guaraní"],
+      "8vo Semestre": ["Finanzas","Gerencia de Ventas","Marketing Relacional y CRM","E-Marketing","Marketing Estratégico","Portugués"],
+      "9no Semestre": ["Evaluación de Proyectos","Marketing Internacional","Marketing Industrial y B2B","Retailing & Trade Marketing"],
+      "10mo Semestre": ["Trabajo Final de Grado","Pasantías"],
+    }
+  },
+  economia: {
+    label: "Economía",
+    semestres: {
+      "1er Semestre": ["Lenguaje I","Desarrollo Personal I","Introducción a los Negocios","Matemática I","Inglés I","TIC I"],
+      "2do Semestre": ["Matemática II","Desarrollo Personal II","Historia y Realidad Socio Económica del Paraguay","Lenguaje II","Inglés II","Gestión de Empresas"],
+      "3er Semestre": ["Marketing","Contabilidad I","Economía General","Matemática III","Inglés III"],
+      "4to Semestre": ["Publicidad y Promoción","Sociedad, Estado y Empresa","Estadística I","Comportamiento Organizacional","Gerencia de Marketing","Inglés IV"],
+      "5to Semestre": ["Investigación y Análisis de Mercado Internacionales","Análisis Gerencial de la Información Financiera","Inglés V","Metodología de la Investigación","Microeconomía"],
+      "6to Semestre": ["Desarrollo y Gerencia de Producto","Diseño Digital para Marketing","Comportamiento del Consumidor","Macroeconomía","Investigación y Análisis de M.","Inglés VI"],
+      "7mo Semestre": ["Marketing de Servicios","Política de Precio","Ética y Filosofía","Canales y Distribución en Marketing","Guaraní"],
+      "8vo Semestre": ["Finanzas","Gerencia de Ventas","Marketing Relacional y CRM","E-Marketing","Marketing Estratégico","Portugués"],
+      "9no Semestre": ["Evaluación de Proyectos","Marketing Internacional","Marketing Industrial y B2B","Retailing & Trade Marketing"],
+      "10mo Semestre": ["Trabajo Final de Grado","Pasantías"],
+    }
+  },
+  gnd_negocios: {
+    label: "Negocios Internacionales (GND)",
+    semestres: {
+      "1er Semestre": ["Comunicación Oral y Escrita","TIC","Teoría Económica","Matemática I","Administración I","Metodología del Aprendizaje"],
+      "2do Semestre": ["Matemática II","Contabilidad General","Legislación Comercial","Marketing","Administración II","Introducción a la Comercialización"],
+      "3er Semestre": ["Matemática Financiera","Estadística","Comercio Exterior","Legislación Laboral","Administración de Costos"],
+      "4to Semestre": ["Ética","Emprendedorismo","Marketing Operativo y Estratégico","Comportamiento Organizacional","Microeconomía"],
+      "5to Semestre": ["Costo, Precios y Cotizaciones","Organización, Sistemas y Métodos","Investigación y Análisis de Mercados","Macroeconomía","Aduanas","Inglés I"],
+      "6to Semestre": ["Promoción de Exportaciones","Guaraní","Operación de Importaciones","Seguros Internacionales","Legislación Tributaria"],
+      "7mo Semestre": ["Inglés II","Logística Internacional","Planificación Estratégica","Metodología de la Investigación","Administración y Gestión Financiera"],
+      "8vo Semestre": ["Finanzas Operativas","Recursos Humanos","Inglés III","Trabajo Final de Grado","Pasantía Profesional"],
+      "Materias Optativas": ["Taller de Innovación Empresarial","Metodología del Aprendizaje","Teoría Económica","Inglés I","Pymes y Empresas Familiares"],
+    }
+  },
+  gnd_administracion: {
+    label: "Administración de Empresas (GND)",
+    semestres: {
+      "1er Semestre": ["Comunicación Oral y Escrita","TIC","Sociología","Matemática I","Administración I"],
+      "2do Semestre": ["Matemática II","Marketing","Legislación Comercial","Contabilidad General","Administración II"],
+      "3er Semestre": ["Matemática Financiera","Organización, Sistemas y Métodos","Estadística","Legislación Laboral","Contabilidad de Costos"],
+      "4to Semestre": ["Guaraní","Emprendedorismo","Comercio Internacional","Microeconomía"],
+      "5to Semestre": ["Macroeconomía","Legislación Tributaria","Investigación y Análisis de Mercados","Administración de RR.HH."],
+      "6to Semestre": ["Sistema de Información Gerencial","Política y Estrategia de Empresas","Administración de la Producción y Operaciones","Ética para los Negocios"],
+      "7mo Semestre": ["Administración Estratégica","Logística","Administración Financiera","Formulación y Evaluación de Proyectos de Inversión","Metodología de la Investigación"],
+      "8vo Semestre": ["Mercado de Capitales y de Dinero","Auditoría de Gestión Administrativa","Trabajo Final de Grado","Pasantía Profesional"],
+      "Materias Optativas": ["Taller de Innovación Empresarial","Metodología del Aprendizaje","Teoría Económica","Inglés I","Pymes y Empresas Familiares"],
+    }
+  },
+  gnd_marketing: {
+    label: "Marketing (GND)",
+    semestres: {
+      "1er Semestre": ["Comunicación Oral y Escrita","TIC","Teoría Economía","Matemática I","Administración"],
+      "2do Semestre": ["Introducción al Marketing","Matemática II","Contabilidad General","Diseño Gráfico"],
+      "3er Semestre": ["Matemática Financiera","Estadística","Relaciones Públicas","Legislación Laboral","Fundamento de la Comunicación"],
+      "4to Semestre": ["Ética","Emprendedorismo","Marketing Operativo y Estratégico","Psicología de la Comunicación","Microeconomía"],
+      "5to Semestre": ["Marketing Institucional e Identidad Corporativa","Investigación y Análisis de Mercados","Macroeconomía","Administración de RR.HH."],
+      "6to Semestre": ["Community Manager","Guaraní","Conducta del Consumidor","Auditoría de Marketing"],
+      "7mo Semestre": ["Legislación Comercial","Gerencia de Marcas","Planificación Estratégica","Metodología de la Investigación","Marketing Internacional"],
+      "8vo Semestre": ["Marketing Digital","Retail Management","Gerencia de Ventas"],
+      "Materias Optativas": ["Taller de Innovación Empresarial","Pymes y Empresas Familiares","Inglés I","Sociología","Metodología del Aprendizaje"],
+    }
+  },
+  cpel_ingenieria: {
+    label: "Ingeniería en Gestión Empresarial y de los Negocios (CPEL)",
+    semestres: {
+      "1er Semestre": ["Liderazgo","Manejo de Conflictos","Técnicas de Negociación","Matemática I","Introducción a los Negocios","Empresas 4.0 I"],
+      "2do Semestre": ["Marketing: Estudio de Casos Nike","Estrategia Empresarial","Innovación y Desarrollo — Pensamiento Crítico, Estratégico y Creativo","Empresas 4.0 II","Matemática II","Protección de Datos"],
+      "3er Semestre": ["Comunicación — Storytelling y Apariciones Públicas","Comunicación Corporativa","Comunicación Digital","Estrategias de Comunicación","Inglés para Negocios I","Matemática Financiera","Contabilidad General"],
+      "4to Semestre": ["Business Intelligence","Investigación y Análisis de Mercado, Audiencias y Targeting","Negocios Internacionales","Inglés para Negocios II","Estadística","Microeconomía"],
+      "5to Semestre": ["Derecho Empresarial","Organización Sistemas y Métodos","Matemática Financiera","Fundamentos de la Contabilidad Financiera","Microeconomía","Employee Experience","Inglés para Negocios III","Guaraní"],
+      "6to Semestre": ["Product Management","Customer Experience","Pricing","Marketing B2B","Marketing Global","Branding","Inglés para Negocios IV"],
+      "7mo Semestre": ["Sistema de Información Gerencial","Administración de la Producción y Operaciones","Pymes y Empresas Familiares","Formulación y Evaluación de Proyectos de Inversión","Administración Pública","Logística"],
+      "8vo Semestre": ["Hub de Negocios","Integración Global","International Trade: Imports y Exports","Transporte Internacional y Local","Aduanas","Business Plan (Trabajo Final de Grado)"],
+    }
+  },
+  cpel_negocios: {
+    label: "Negocios Internacionales (CPEL)",
+    semestres: {
+      "1er Semestre": ["Liderazgo","Manejo de Conflictos","Técnicas de Negociación","Matemática I","Introducción a los Negocios","Empresas 4.0 I"],
+      "2do Semestre": ["Marketing: Estudio de Casos Nike","Estrategia Empresarial","Innovación y Desarrollo — Pensamiento Crítico, Estratégico y Creativo","Empresas 4.0 II","Matemática II","Protección de Datos"],
+      "3er Semestre": ["Comunicación — Storytelling y Apariciones Públicas","Comunicación Corporativa","Comunicación Digital","Estrategias de Comunicación","Inglés para Negocios I","Matemática Financiera","Contabilidad General"],
+      "4to Semestre": ["Business Intelligence","Investigación y Análisis de Mercado, Audiencias y Targeting","Negocios Internacionales","Inglés para Negocios II","Estadística","Microeconomía"],
+      "5to Semestre": ["Derecho Empresarial","Organización Sistemas y Métodos","Matemática Financiera","Fundamentos de la Contabilidad Financiera","Microeconomía","Employee Experience","Inglés para Negocios III","Guaraní"],
+      "6to Semestre": ["Product Management","Customer Experience","Pricing","Marketing B2B","Marketing Global","Branding","Inglés para Negocios IV"],
+      "7mo Semestre": ["Sistema de Información Gerencial","Administración de la Producción y Operaciones","Pymes y Empresas Familiares","Formulación y Evaluación de Proyectos de Inversión","Administración Pública","Logística"],
+      "8vo Semestre": ["Hub de Negocios","Integración Global","International Trade: Imports y Exports","Transporte Internacional y Local","Aduanas","Business Plan (Trabajo Final de Grado)"],
+    }
+  },
+  cpel_administracion: {
+    label: "Administración de Empresas (CPEL)",
+    semestres: {
+      "1er Semestre": ["Liderazgo","Manejo de Conflictos","Técnicas de Negociación","Matemática I","Empresas 4.0 I"],
+      "2do Semestre": ["Marketing: Estudio de Casos Nike","Estrategia Empresarial","Innovación y Desarrollo","Pensamiento Crítico, Estratégico y Creativo","Empresas 4.0 II","Matemática II","Protección de Datos"],
+      "3er Semestre": ["Comunicación — Storytelling y Apariciones Públicas","Comunicación Corporativa","Comunicación Digital","Estrategias de Comunicación","Inglés para Negocios I","Matemática Financiera","Contabilidad General"],
+      "4to Semestre": ["Business Intelligence","Investigación y Análisis de Mercado, Audiencias y Targeting","Negocios Internacionales","Inglés para Negocios II","Estadística","Microeconomía"],
+      "5to Semestre": ["Derecho Empresarial","Organización Sistemas y Métodos","Matemática Financiera","Fundamentos de la Contabilidad Financiera","Macroeconomía","Employee Experience","Inglés para Negocios III","Guaraní"],
+      "6to Semestre": ["Administración Financiera","Mercado de Capitales y de Dinero","Auditoría de Gestión Administrativa","Administración de Cooperativas y Seguros","IA Generativa","Análisis Gerencial de la Información Financiera"],
+      "7mo Semestre": ["Sistema de Información Gerencial","Administración de la Producción y Operaciones","Pymes y Empresas Familiares","Formulación y Evaluación de Proyectos de Inversión","Administración Pública","Logística"],
+      "8vo Semestre": ["Metodología de Design Thinking","Procesos de Design Thinking","Mindset Empresarial","Business Plan (Trabajo Final de Grado)"],
+    }
+  },
+  // ── CPEL (Semipresencial) ───────────────────────────────────────────────────
+  cpel_marketing: {
+    label: "Marketing (CPEL)",
+    semestres: {
+      "1er Semestre": ["Liderazgo","Manejo de Conflictos","Técnicas de Negociación","Matemática I","Introducción a los Negocios","Empresas 4.0 I"],
+      "2do Semestre": ["Marketing: Estudio de Casos Nike","Estrategia Empresarial","Innovación y Desarrollo — Pensamiento Crítico, Estratégico y Creativo","Empresas 4.0 II","Matemática II","Protección de Datos"],
+      "3er Semestre": ["Comunicación — Storytelling y Apariciones Públicas","Comunicación Corporativa","Comunicación Digital","Estrategias de Comunicación","Inglés para Negocios I","Matemática Financiera","Contabilidad General"],
+      "4to Semestre": ["Business Intelligence","Investigación y Análisis de Mercado, Audiencias y Targeting","Negocios Internacionales","Inglés para Negocios II","Estadística","Microeconomía"],
+      "5to Semestre": ["Derecho Empresarial","Organización Sistemas y Métodos","Matemática Financiera","Fundamentos de la Contabilidad Financiera","Macroeconomía","Employee Experience","Inglés para Negocios III","Guaraní"],
+      "6to Semestre": ["Product Management","Customer Experience","Pricing","Marketing B2B","Marketing Global","Branding","Inglés para Negocios IV"],
+      "7mo Semestre": ["Marca Personal","Comunicación Estratégica y Corporativa","Marketing Internacional","IA Generativa","Supply Chain","Formulación y Evaluación de Proyectos"],
+      "8vo Semestre": ["Análisis de Datos","Retail Management","Inteligencia de Negocios","Trabajo Final de Grado (Plan de Marketing)","Pasantía Profesional"],
+    }
+  },
+  hoteleria: {
+    label: "Administración Hotelera y de Turismo",
+    semestres: {
+      "1er Semestre": ["Comunicación Oral y Escrita","TIC","Introducción a la Hotelería","Matemática I","Introducción al Turismo","Administración General"],
+      "2do Semestre": ["Matemática II","Inglés I","Historia del Patrimonio Cultural Paraguayo","Organización y Gestión de Hoteles I","Contabilidad General","Sociología"],
+      "3er Semestre": ["Mercadotécnica Turística y Hotelera","Organización, Sistemas y Métodos","Estadística Aplicada","Inglés II","Legislación Laboral","Protocolo y Relaciones Públicas"],
+      "4to Semestre": ["Guaraní","Organización y Gestión de Hoteles II","Emprendedorismo","Comercio Internacional","Microeconomía","Inglés III"],
+      "5to Semestre": ["Macroeconomía","Agencia de Viajes y Operadores Turísticos","Geografía y Recursos Turísticos I","Alimentos y Bebidas I","Investigación y Análisis de Mercados Turística y Hotelera","Administración de RRHH"],
+      "6to Semestre": ["Transporte y Traslados Turísticos","Presupuesto Empresarial","Sistemas de Costos Hoteleros","Ética","Organización y Promoción del Turismo","Ecoturismo y Recreación"],
+      "7mo Semestre": ["Planificación Turística y Hotelera","Planificación y Organización de Eventos","Administración Financiera","Formulación y Evaluación de Proyectos de Inversión","Gerencia Estratégica Políticas de Negocio","Metodología de la Investigación"],
+      "8vo Semestre": ["Alimentos y Bebidas II","Auditoría de Gestión Administrativa","Administración de Hoteles","Geografía y Recursos Turísticos II","Trabajo Final de Grado","Pasantía Profesional"],
+      "Materias Optativas": ["Business Intelligence / Big Data","Turismo Cultural","Taller de Innovación Empresarial","Clúster y Competitividad","Ecommerce","Psicología Organizacional","Turismo Naturaleza y Desarrollo Sustentable"],
+    }
+  },
+};
+
+// Carreras por programa
+const CARRERAS_POR_PROGRAMA = {
+  GA:   [
+    {value:'marketing',      label:'Marketing'},
+    {value:'administracion', label:'Administración de Empresas'},
+    {value:'negocios',       label:'Negocios Internacionales'},
+    {value:'contabilidad',   label:'Contabilidad'},
+    {value:'economia',       label:'Economía'},
+    {value:'hoteleria',      label:'Administración Hotelera y de Turismo'},
+  ],
+  CPEL: [
+    {value:'cpel_marketing',     label:'Marketing'},
+    {value:'cpel_administracion',label:'Administración de Empresas'},
+    {value:'cpel_negocios',      label:'Negocios Internacionales'},
+    {value:'cpel_ingenieria',    label:'Ingeniería en Gestión Empresarial y de los Negocios'},
+  ],
+  GND:  [
+    {value:'gnd_marketing',     label:'Marketing'},
+    {value:'gnd_administracion',label:'Administración de Empresas'},
+    {value:'gnd_negocios',      label:'Negocios Internacionales'},
+  ],
+};
+
+function _getSemestreActual() {
+  const m = new Date().getMonth() + 1; // 1-12
+  const y = new Date().getFullYear();
+  return m >= 3 && m <= 7 ? `${y}-1` : `${y}-2`;
+}
+
+function portalProgramaChange() {
+  const prog = document.getElementById('pf-programa').value;
+  const sel  = document.getElementById('pf-carrera');
+  sel.innerHTML = '<option value="">— Carrera —</option>';
+  (CARRERAS_POR_PROGRAMA[prog] || []).forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.value; o.textContent = c.label;
+    sel.appendChild(o);
+  });
+  // reset materias
+  _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
+  document.getElementById('pf-materias-lista').innerHTML =
+    '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná una carrera para ver las materias disponibles</p>';
+}
+
+function portalCarreraChange() {
+  // Reset materias al cambiar carrera
+  _portalMaterias = [];
+  _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
+  portalCargarMaterias();
+}
+
+function _portalLog(msg, tipo = 'info') {
+  const log = document.getElementById('portal-error-log');
+  const card = document.getElementById('portal-log-card');
+  if (!log || !card) return;
+  const color = tipo === 'error' ? '#f87171' : tipo === 'warn' ? '#fbbf24' : '#94a3b8';
+  const prefix = tipo === 'error' ? '✗' : tipo === 'warn' ? '⚠' : '·';
+  const time = new Date().toLocaleTimeString('es');
+  log.innerHTML += `<div style="color:${color};padding:1px 0;"><span style="color:#475569;">[${time}]</span> <span style="color:${color};">${prefix}</span> ${msg}</div>`;
+  log.scrollTop = log.scrollHeight;
+  card.style.display = '';
+}
+
+async function portalBuscar() {
+  const q = document.getElementById('portal-buscar-input').value.trim();
+  const msg = document.getElementById('portal-buscar-msg');
+  if (q.length < 2) { msg.textContent = 'Ingresá al menos 2 caracteres.'; return; }
+  msg.textContent = 'Buscando…';
+  _portalLog(`Buscando "${q}" en Canvas y Azure AD…`);
+  try {
+    const data = await apiFetch(`/api/alumnos/buscar?q=${encodeURIComponent(q)}`);
+    const results = data.resultados || [];
+    const errores = data.errores || [];
+    errores.forEach(e => _portalLog(e, 'error'));
+
+    const tbody = document.getElementById('portal-buscar-tbody');
+    if (!results.length) {
+      msg.textContent = errores.length
+        ? `Sin resultados (${errores.length} error${errores.length>1?'es':''} — ver log)`
+        : 'No encontrado — podés cargarlo como alumno nuevo.';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Sin resultados</td></tr>';
+      document.getElementById('portal-buscar-resultados').style.display = '';
+      return;
+    }
+    msg.textContent = `${results.length} resultado${results.length!==1?'s':''} encontrado${results.length!==1?'s':''}.`;
+    _portalLog(`${results.length} alumno${results.length!==1?'s':''} encontrado${results.length!==1?'s':''}.`, 'info');
+    tbody.innerHTML = results.map(u => {
+      return `<tr>
+        <td><strong>${u.nombre||'—'}</strong></td>
+        <td style="font-size:.78rem;">${u.email||'—'}</td>
+        <td>${u.sis_id||u.cedula||'—'}</td>
+        <td><button class="btn btn-primary" style="padding:4px 10px;font-size:.78rem;"
+          onclick='portalSeleccionarAlumno(${JSON.stringify(u)})'>Seleccionar</button></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('portal-buscar-resultados').style.display = '';
+  } catch(ex) { msg.textContent = ex.message; _portalLog(ex.message, 'error'); }
+}
+
+function portalSeleccionarAlumno(u) {
+  const partes = (u.nombre || '').trim().split(' ');
+  const mitad = Math.ceil(partes.length / 2);
+  document.getElementById('pf-apellido').value = partes.slice(mitad).join(' ');
+  document.getElementById('pf-nombre').value   = partes.slice(0, mitad).join(' ');
+  document.getElementById('pf-cedula').value   = u.sis_id || u.cedula || '';
+  document.getElementById('pf-email').value    = u.email || '';
+  document.getElementById('pf-semestre').value = _getSemestreActual();
+  document.getElementById('portal-ficha-badge').textContent = 'Alumno existente';
+  document.getElementById('portal-ficha-badge').style.cssText = 'font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);';
+  document.getElementById('portal-buscar-resultados').style.display = 'none';
+  document.getElementById('portal-ficha-card').style.display = '';
+  _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
+  portalCargarMaterias();
+}
+
+function portalNuevoAlumno() {
+  ['pf-apellido','pf-nombre','pf-cedula','pf-email','pf-obs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pf-semestre').value = _getSemestreActual();
+  document.getElementById('portal-ficha-badge').textContent = 'Alumno nuevo';
+  document.getElementById('portal-ficha-badge').style.cssText = 'font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);';
+  document.getElementById('portal-buscar-resultados').style.display = 'none';
+  document.getElementById('portal-ficha-card').style.display = '';
+  _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
+  portalCargarMaterias();
+}
+
+function portalCargarMaterias() {
+  const lista = document.getElementById('pf-materias-lista');
+  const carrera = document.getElementById('pf-carrera')?.value || '';
+  if (!carrera || !MALLAS[carrera]) {
+    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná una carrera para ver las materias disponibles</p>';
+    return;
+  }
+  // Construye lista plana con id sintético = nombre
+  const malla = MALLAS[carrera];
+  _portalMaterias = [];
+  for (const [sem, materias] of Object.entries(malla.semestres)) {
+    for (const m of materias) {
+      _portalMaterias.push({ id: m, name: m, semestre: sem });
+    }
+  }
+  document.getElementById('pf-materia-buscar').value = '';
+  portalFiltrarMaterias();
+}
+
+function portalFiltrarMaterias() {
+  const q = (document.getElementById('pf-materia-buscar').value || '').toLowerCase();
+  const lista = document.getElementById('pf-materias-lista');
+  const carrera = document.getElementById('pf-carrera')?.value || '';
+  if (!carrera || !MALLAS[carrera]) {
+    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná una carrera primero</p>';
+    return;
+  }
+  const malla = MALLAS[carrera];
+  let html = '';
+  for (const [sem, materias] of Object.entries(malla.semestres)) {
+    const filtradas = q ? materias.filter(m => m.toLowerCase().includes(q)) : materias;
+    if (!filtradas.length) continue;
+    html += `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;padding:8px 4px 3px;text-transform:uppercase;">${sem}</div>`;
+    html += filtradas.map(m => {
+      const sel = _portalMateriasSeleccionadas.some(x => x.id === m);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;${sel?'background:#eff6ff;border-left:3px solid #3b82f6;':''}"
+        onclick="portalToggleMateria('${m.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}','${sem.replace(/'/g,"\\'")}')">
+        <span style="font-size:1rem;width:18px;text-align:center;">${sel?'☑':'☐'}</span>
+        <span style="font-size:.83rem;flex:1;">${m}</span>
+      </div>`;
+    }).join('');
+  }
+  if (!html) html = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Sin resultados</p>';
+  lista.innerHTML = html;
+}
+
+function portalToggleMateria(id, name, semestre) {
+  const idx = _portalMateriasSeleccionadas.findIndex(x => x.id === id);
+  if (idx >= 0) _portalMateriasSeleccionadas.splice(idx, 1);
+  else _portalMateriasSeleccionadas.push({id, name, semestre, dia:'', hora_inicio:'', hora_fin:''});
+  portalFiltrarMaterias();
+  _renderChipsYHorarios();
+}
+
+function _renderChipsYHorarios() {
+  const chips = document.getElementById('pf-materias-seleccionadas');
+  chips.innerHTML = _portalMateriasSeleccionadas.map(m =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:.78rem;">
+      ${m.name} <span onclick="portalToggleMateria('${m.id.replace(/'/g,"\\'")}','${m.name.replace(/'/g,"\\'")}','')" style="cursor:pointer;font-weight:700;margin-left:2px;">✕</span>
+    </span>`).join('');
+
+  const card  = document.getElementById('pf-horarios-card');
+  const tbody = document.getElementById('pf-horarios-tbody');
+  if (!_portalMateriasSeleccionadas.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  tbody.innerHTML = _portalMateriasSeleccionadas.map((m, i) => `<tr>
+    <td style="font-size:.82rem;">${m.name}</td>
+    <td><select onchange="_setHorario(${i},'dia',this.value)" style="font-size:.8rem;padding:3px 6px;">
+      <option value="">—</option>
+      ${['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'].map(d =>
+        `<option${m.dia===d?' selected':''}>${d}</option>`).join('')}
+    </select></td>
+    <td><input type="time" value="${m.hora_inicio}" onchange="_setHorario(${i},'hora_inicio',this.value)"
+      style="font-size:.8rem;padding:3px 6px;width:100px;" /></td>
+    <td><input type="time" value="${m.hora_fin}" onchange="_setHorario(${i},'hora_fin',this.value)"
+      style="font-size:.8rem;padding:3px 6px;width:100px;" /></td>
+  </tr>`).join('');
+}
+
+function _setHorario(i, campo, valor) {
+  if (_portalMateriasSeleccionadas[i]) _portalMateriasSeleccionadas[i][campo] = valor;
+}
+
+async function portalEnviarInscripcion() {
+  const msg = document.getElementById('pf-msg');
+  const apellido = document.getElementById('pf-apellido').value.trim();
+  const nombre   = document.getElementById('pf-nombre').value.trim();
+  const cedula   = document.getElementById('pf-cedula').value.trim();
+  const email    = document.getElementById('pf-email').value.trim();
+  const carrera  = document.getElementById('pf-carrera').value;
+  const programa = document.getElementById('pf-programa').value;
+  const semestre = document.getElementById('pf-semestre').value.trim() || _getSemestreActual();
+  const obs      = document.getElementById('pf-obs').value.trim();
+  const carreraLabel = carrera ? (MALLAS[carrera]?.label || carrera) : '';
+
+  if (!apellido || !nombre || !cedula) {
+    msg.textContent = 'Apellido, nombre y cédula son requeridos.'; msg.style.color = 'var(--error)'; return;
+  }
+  if (!_portalMateriasSeleccionadas.length) {
+    msg.textContent = 'Seleccioná al menos una materia.'; msg.style.color = 'var(--error)'; return;
+  }
+  const alumno = {
+    nombre: `${nombre} ${apellido}`,
+    cedula, email,
+    programa: programa || carreraLabel,
+    carrera: carreraLabel,
+    periodo: semestre, obs,
+    cursos: _portalMateriasSeleccionadas.map(m => ({nombre_original: m.name, dia: m.dia||'', hora_inicio: m.hora_inicio||'', hora_fin: m.hora_fin||'', match_ok: true})),
+    issues: [],
+  };
+  msg.textContent = 'Enviando…'; msg.style.color = 'var(--text-muted)';
+  try {
+    const res = await apiFetch('/api/parseo/enviar-cola', { method:'POST', body: JSON.stringify({alumnos:[alumno]}) });
+    msg.textContent = `✅ ${res.enviados} inscripcion${res.enviados!==1?'es':'ón'} enviada${res.enviados!==1?'s':''} a la cola.`;
+    msg.style.color = 'var(--success)';
+    setTimeout(() => portalLimpiarFicha(), 1500);
+    portalCargarMisEnvios();
+  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
+}
+
+function portalLimpiarFicha() {
+  document.getElementById('portal-ficha-card').style.display = 'none';
+  document.getElementById('portal-buscar-resultados').style.display = 'none';
+  document.getElementById('portal-buscar-input').value = '';
+  document.getElementById('portal-buscar-msg').textContent = '';
+  _portalMateriasSeleccionadas = [];
+  document.getElementById('pf-horarios-card').style.display = 'none';
+  document.getElementById('pf-horarios-tbody').innerHTML = '';
+  document.getElementById('pf-materias-seleccionadas').innerHTML = '';
+}
+
+async function portalCargarMisEnvios() {
+  const tbody = document.getElementById('portal-envios-tbody');
+  try {
+    const sem = (document.getElementById('envios-semestre-filter')?.value || '').trim();
+    const qs = sem ? `?semestre=${encodeURIComponent(sem)}` : '';
+    const data = await apiFetch('/api/portal/mis-inscripciones' + qs);
+    const alumnos = data.alumnos || [];
+    if (!alumnos.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Sin inscripciones registradas</td></tr>'; return;
+    }
+    _misInscripcionesData = alumnos;
+    const estadoChip = e => e==='procesado' ? '<span class="chip chip-ok">Procesado</span>'
+      : e==='error' ? '<span class="chip chip-error">Error</span>'
+      : '<span class="chip chip-warn">Pendiente</span>';
+    tbody.innerHTML = alumnos.map((a, idx) => `<tr>
+      <td style="font-size:.75rem;">${(a.received_at||'').slice(0,10)}</td>
+      <td>${a.nombre||'—'}</td>
+      <td>${a.cedula||'—'}</td>
+      <td><span class="chip chip-skip">${a.semestre||'—'}</span></td>
+      <td style="font-size:.78rem;">${(a.cursos||[]).map(c=>typeof c==='string'?c:c.nombre||'').join('<br>')}</td>
+      <td>${estadoChip(a.estado_general)}</td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="verFormulario(${idx})">🖨️ Formulario</button>
+        <button class="btn" style="font-size:.72rem;padding:3px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;" onclick="portalEliminarInscripcion(${idx})">🗑️ Limpiar</button>
+      </td>
+    </tr>`).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
+}
+
+async function portalEliminarInscripcion(idx) {
+  const a = _misInscripcionesData[idx];
+  if (!a) return;
+  if (!confirm(`¿Eliminar todas las inscripciones de ${a.nombre} (${a.semestre})?`)) return;
+  try {
+    await apiFetch('/api/portal/mis-inscripciones', { method:'DELETE', body: JSON.stringify({ids: a.ids||[]}) });
+    _portalLog(`Inscripciones de ${a.nombre} eliminadas`, 'warn');
+    portalCargarMisEnvios();
+  } catch(ex) { _portalLog('Error al eliminar: ' + ex.message, 'error'); }
+}
+
+function portalPreviewFormulario() {
+  const apellido = document.getElementById('pf-apellido').value.trim();
+  const nombre   = document.getElementById('pf-nombre').value.trim();
+  const cedula   = document.getElementById('pf-cedula').value.trim();
+  const email    = document.getElementById('pf-email').value.trim();
+  const semestre = document.getElementById('pf-semestre').value.trim() || _getSemestreActual();
+  const programa = document.getElementById('pf-programa').value;
+  const carreraVal = document.getElementById('pf-carrera').value;
+  const carreraLabel = carreraVal ? (MALLAS[carreraVal]?.label || carreraVal) : '';
+  const user     = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
+  if (!apellido && !nombre) { _portalLog('Completá los datos del alumno primero', 'warn'); return; }
+  const cursos = _portalMateriasSeleccionadas.map(m => ({
+    nombre: m.name, dia: m.dia||'', hora_inicio: m.hora_inicio||'', hora_fin: m.hora_fin||''
+  }));
+  _imprimirFormulario({
+    nombre: `${nombre} ${apellido}`.trim(),
+    cedula, email, semestre, programa, carrera: carreraLabel,
+    received_at: new Date().toISOString(),
+    source: `parseo:${user?.username||'académico'}`,
+    cursos,
+  });
+}
+
+function _imprimirFormulario(a) {
+  const academico = (a.source||'').replace('parseo:','');
+  const cursos = (a.cursos||[]).map(c => typeof c === 'string'
+    ? {nombre: c, dia:'', hora_inicio:'', hora_fin:''}
+    : {nombre: c.nombre_original||c.nombre||String(c), dia: c.dia||'', hora_inicio: c.hora_inicio||'', hora_fin: c.hora_fin||''});
+
+  const cursosRows = cursos.map((c,i) =>
+    `<tr><td>${i+1}</td><td>${c.nombre}</td><td>${c.dia||'—'}</td><td>${c.hora_inicio&&c.hora_fin ? c.hora_inicio+' a '+c.hora_fin : '—'}</td></tr>`
+  ).join('');
+
+  // Grilla semanal
+  const dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const franjas = [...new Set(cursos.filter(c=>c.hora_inicio&&c.hora_fin).map(c=>c.hora_inicio+'|'+c.hora_fin))].sort();
+  const grilla = franjas.length ? `
+<h2 style="color:#1a3c6b;font-size:16px;margin-top:24px;">Grilla horaria</h2>
+<table class="grilla">
+  <thead><tr><th>Hora</th>${dias.map(d=>`<th>${d}</th>`).join('')}</tr></thead>
+  <tbody>${franjas.map(f => {
+    const [hi,hf] = f.split('|');
+    return `<tr><td style="white-space:nowrap;font-weight:600;">${hi} a ${hf}</td>${dias.map(d => {
+      const mat = cursos.find(c=>c.dia===d&&c.hora_inicio===hi&&c.hora_fin===hf);
+      return `<td>${mat ? mat.nombre : ''}</td>`;
+    }).join('')}</tr>`;
+  }).join('')}</tbody>
+</table>` : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Formulario de Inscripción — ${a.nombre||''}</title>
+<style>
+  body{font-family:Arial,sans-serif;margin:40px;color:#333;font-size:13px}
+  .logo{font-size:20px;font-weight:bold;color:#1a3c6b}
+  .subtitulo{font-size:12px;color:#555;margin-bottom:16px}
+  h1{color:#1a3c6b;border-bottom:2px solid #1a3c6b;padding-bottom:6px;font-size:18px}
+  h2{color:#1a3c6b;font-size:14px;margin-top:20px;margin-bottom:6px}
+  .header-info{display:flex;gap:40px;margin-bottom:16px;flex-wrap:wrap}
+  .header-info div{line-height:1.8}
+  .header-info strong{color:#1a3c6b}
+  table.cursos,table.grilla{width:100%;border-collapse:collapse;margin-top:6px}
+  table.cursos th,table.grilla th{background:#1a3c6b;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+  table.cursos td,table.grilla td{padding:6px 10px;border:1px solid #ddd;font-size:12px}
+  table.cursos tr:nth-child(even),table.grilla tr:nth-child(even){background:#f7f9fc}
+  table.grilla td{text-align:center;min-width:80px}
+  .firma{margin-top:50px;display:flex;gap:80px}
+  .firma div{border-top:1px solid #333;padding-top:6px;text-align:center;min-width:180px;font-size:12px}
+  .btn-print{margin:16px 0;padding:8px 20px;background:#1a3c6b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px}
+  @media print{.no-print{display:none}}
+</style>
+</head>
+<body>
+<div class="logo">USIL Paraguay</div>
+<div class="subtitulo">Universidad San Ignacio de Loyola</div>
+<h1>Formulario de Inscripción</h1>
+<button class="btn-print no-print" onclick="window.print()">🖨️ Imprimir</button>
+<div class="header-info">
+  <div><strong>Nombre y Apellido:</strong><br>${a.nombre||'—'}</div>
+  <div><strong>Cédula:</strong><br>${a.cedula||'—'}</div>
+  <div><strong>Email:</strong><br>${a.email||'—'}</div>
+  <div><strong>Programa:</strong><br>${a.programa||'—'}</div>
+  <div><strong>Carrera:</strong><br>${a.carrera||'—'}</div>
+  <div><strong>Semestre:</strong><br>${a.semestre||'—'}</div>
+  <div><strong>Fecha:</strong><br>${(a.received_at||'').slice(0,10)}</div>
+  <div><strong>Registrado por:</strong><br>${academico||'—'}</div>
+</div>
+<h2>Cursos inscriptos</h2>
+<table class="cursos">
+  <thead><tr><th>#</th><th>Curso</th><th>Día</th><th>Hora</th></tr></thead>
+  <tbody>${cursosRows}</tbody>
+</table>
+${grilla}
+<div class="firma">
+  <div>Firma del alumno</div>
+  <div>Sello / Firma académica</div>
+</div>
+</body></html>`;
+  const win = window.open('', '_blank');
+  if (!win) { _portalLog('El browser bloqueó la ventana emergente. Permitir popups para este sitio.', 'warn'); return; }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
+function verFormulario(idx) {
+  const a = _misInscripcionesData[idx];
+  if (!a) { _portalLog('Datos no encontrados', 'error'); return; }
+  _imprimirFormulario(a);
+}
+
+// ── Parseo de planilla académica ─────────────────────────────────────────────
+let _parseoResultados = [];
+
+async function parsearPlanilla() {
+  const fileInput = document.getElementById('parseo-file-input');
+  const msg = document.getElementById('parseo-msg');
+  const semestre = document.getElementById('parseo-semestre').value.trim();
+
+  if (!fileInput.files.length) {
+    msg.textContent = 'Seleccioná un archivo Excel primero.'; msg.style.color = 'var(--error)'; return;
+  }
+
+  msg.textContent = 'Analizando…'; msg.style.color = 'var(--text-muted)';
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  if (semestre) formData.append('semestre', semestre);
+
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/parseo/planilla', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.statusText); }
+    const data = await res.json();
+    _parseoResultados = data.alumnos;
+    msg.textContent = `Planilla analizada — ${data.alumnos.length} pestañas procesadas.`;
+    msg.style.color = 'var(--success)';
+    _renderParseoResultados(data.alumnos);
+  } catch(ex) {
+    msg.textContent = ex.message; msg.style.color = 'var(--error)';
+  }
+}
+
+function _renderParseoResultados(alumnos) {
+  const tbody = document.getElementById('parseo-tbody');
+  const card = document.getElementById('parseo-result-card');
+  card.style.display = '';
+
+  let ok = 0, warn = 0, err = 0;
+  tbody.innerHTML = alumnos.map((a, i) => {
+    const issues = a.issues || [];
+    const estado = issues.some(x => x.tipo === 'error') ? 'error'
+                 : issues.length ? 'warn' : 'ok';
+    if (estado === 'ok') ok++;
+    else if (estado === 'warn') warn++;
+    else err++;
+
+    const chip = estado === 'ok'
+      ? '<span class="chip chip-ok">✅ Listo</span>'
+      : estado === 'warn'
+      ? `<span class="chip chip-warn">⚠️ ${issues.length} aviso${issues.length>1?'s':''}</span>`
+      : `<span class="chip chip-error">❌ ${issues.filter(x=>x.tipo==='error').length} error${issues.filter(x=>x.tipo==='error').length>1?'es':''}</span>`;
+
+    const cursosHtml = (a.cursos || []).map(c =>
+      `<div style="font-size:.75rem;${c.match_ok?'':'color:var(--warn);'}">${c.nombre_original}${c.match_ok?'':' ⚠️'}</div>`
+    ).join('');
+
+    const issuesHtml = issues.length
+      ? `<div style="margin-top:4px;">${issues.map(x=>`<div style="font-size:.72rem;color:${x.tipo==='error'?'var(--error)':'var(--warn)'};">${x.tipo==='error'?'❌':'⚠️'} ${x.mensaje}</div>`).join('')}</div>`
+      : '';
+
+    return `<tr>
+      <td style="color:var(--text-muted);font-size:.75rem;">${i+1}</td>
+      <td style="font-size:.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${a.pestaña}">${a.pestaña}</td>
+      <td><strong>${a.nombre || '<span style="color:var(--error)">Sin nombre</span>'}</strong>${issuesHtml}</td>
+      <td>${a.cedula || '<span style="color:var(--error)">—</span>'}</td>
+      <td><span class="chip chip-skip">${a.programa || '—'}</span></td>
+      <td style="font-size:.78rem;">${a.periodo || '—'}</td>
+      <td>${cursosHtml || '<span style="color:var(--text-muted);font-size:.75rem;">Sin cursos</span>'}</td>
+      <td>${chip}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('parseo-stat-ok').textContent   = `✅ ${ok} listos`;
+  document.getElementById('parseo-stat-warn').textContent = `⚠️ ${warn} con advertencias`;
+  document.getElementById('parseo-stat-err').textContent  = `❌ ${err} con errores`;
+}
+
+async function enviarParseoACola() {
+  const listos = _parseoResultados.filter(a => !(a.issues||[]).some(x=>x.tipo==='error'));
+  if (!listos.length) { alert('No hay alumnos listos para enviar.'); return; }
+  try {
+    const res = await apiFetch('/api/parseo/enviar-cola', {
+      method: 'POST',
+      body: JSON.stringify({ alumnos: listos }),
+    });
+    alert(`✅ ${res.enviados} alumno${res.enviados!==1?'s':''} enviado${res.enviados!==1?'s':''} a la cola de inscripciones.`);
+  } catch(ex) { alert(ex.message); }
+}
+
+async function descargarParseoExcel() {
+  if (!_parseoResultados.length) { alert('No hay datos para descargar.'); return; }
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/parseo/exportar', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alumnos: _parseoResultados }),
+    });
+    if (!res.ok) throw new Error('Error al exportar');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'parseo_planilla.xlsx'; a.click();
+  } catch(ex) { alert(ex.message); }
+}
+
+// ── Pending Enrollments ───────────────────────────────────────────────────────
+let _pendingRows = [];
+
+async function loadPending(estado = 'pendiente') {
+  const tbody = document.getElementById('pending-tbody');
+  const summary = document.getElementById('pending-summary');
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center">Cargando…</td></tr>';
+  try {
+    const [rows, stats] = await Promise.all([
+      apiFetch(`/api/inscripciones/pendientes?estado=${estado}`),
+      apiFetch('/api/inscripciones/pendientes/stats'),
+    ]);
+    _pendingRows = rows;
+    summary.textContent = `Pendientes: ${stats.pendiente||0} · Procesados: ${stats.procesado||0} · Errores: ${stats.error||0}`;
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">Sin registros en estado "${estado}"</td></tr>`;
+      return;
+    }
+    const stateChip = s => s === 'pendiente' ? 'chip-warn' : s === 'procesado' ? 'chip-ok' : s === 'error' ? 'chip-error' : 'chip-skip';
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td><input type="checkbox" class="pending-check" value="${r.id}"></td>
+      <td style="font-size:.75rem">${new Date(r.received_at).toLocaleString('es')}</td>
+      <td style="font-size:.75rem;color:var(--text-muted)">${r.source||'—'}</td>
+      <td>${r.cedula}</td>
+      <td>${r.nombre||'—'}</td>
+      <td style="font-size:.75rem">${r.email||'—'}</td>
+      <td style="font-size:.75rem">${r.curso_id||'—'}</td>
+      <td>${r.semestre||'—'}</td>
+      <td><span class="chip ${stateChip(r.estado)}">${r.estado}</span>${r.detalle?`<br><small style="color:var(--text-muted)">${r.detalle}</small>`:''}</td>
+    </tr>`).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
+}
+
+function toggleAllPending(cb) {
+  document.querySelectorAll('.pending-check').forEach(c => c.checked = cb.checked);
+}
+
+function _selectedPendingIds() {
+  return [...document.querySelectorAll('.pending-check:checked')].map(c => c.value);
+}
+
+async function processSelected() {
+  const ids = _selectedPendingIds();
+  if (!ids.length) { alert('Seleccioná al menos un registro'); return; }
+  try {
+    const r = await apiFetch('/api/inscripciones/pendientes/procesar', {method:'POST', body: JSON.stringify({ids})});
+    alert(`Procesados: ${r.ok} · Errores: ${r.errors}`);
+    loadPending();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function processAllPending() {
+  const ids = _pendingRows.filter(r => r.estado === 'pendiente').map(r => r.id);
+  if (!ids.length) { alert('No hay pendientes para procesar'); return; }
+  if (!confirm(`¿Procesar ${ids.length} inscripciones pendientes?`)) return;
+  try {
+    const r = await apiFetch('/api/inscripciones/pendientes/procesar', {method:'POST', body: JSON.stringify({ids})});
+    alert(`Procesados: ${r.ok} · Errores: ${r.errors}`);
+    loadPending();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function deleteSelected() {
+  const ids = _selectedPendingIds();
+  if (!ids.length) { alert('Seleccioná al menos un registro'); return; }
+  if (!confirm(`¿Eliminar ${ids.length} registros?`)) return;
+  try {
+    await apiFetch('/api/inscripciones/pendientes', {method:'DELETE', body: JSON.stringify({ids})});
+    loadPending();
+  } catch(ex) { alert(ex.message); }
+}
+
+async function uploadPending() {
+  const file = document.getElementById('pending-file').files[0];
+  const msg  = document.getElementById('pending-upload-msg');
+  if (!file) { msg.textContent = 'Elegí un archivo primero'; msg.style.color = 'var(--error)'; return; }
+  msg.textContent = 'Subiendo…'; msg.style.color = 'var(--text-muted)';
+  const semestre = document.getElementById('pending-semestre').value.trim();
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const url = '/api/inscripciones/pendientes/upload' + (semestre ? `?semestre=${encodeURIComponent(semestre)}` : '');
+    const r = await apiFetch(url, {method:'POST', body: fd, noContentType: true});
+    msg.textContent = `✓ ${r.accepted} registros en cola · ${r.errors?.length||0} errores`;
+    msg.style.color = r.errors?.length ? 'var(--warn)' : 'var(--success)';
+    loadPending();
+  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
+}
+
+// ── Course Aliases ────────────────────────────────────────────────────────────
+async function loadAliases(estado) {
+  const tbody = document.getElementById('aliases-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">Cargando…</td></tr>';
+  try {
+    const url = '/api/course-aliases' + (estado ? `?estado=${estado}` : '');
+    const rows = await apiFetch(url);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sin aliases registrados</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(a => {
+      const chipClass = a.estado === 'confirmado' ? 'chip-ok' : a.estado === 'pendiente' ? 'chip-warn' : 'chip-skip';
+      const score = a.score != null ? Math.round(a.score) + '%' : '—';
+      const actions = a.estado === 'pendiente'
+        ? `<button class="btn btn-success" style="padding:3px 10px;font-size:.75rem;" onclick="confirmAlias(${a.id},'${a.canvas_sis_id}','${(a.canvas_name||'').replace(/'/g,"\\'")}')">✓ Confirmar</button>
+           <button class="btn btn-danger"  style="padding:3px 10px;font-size:.75rem;margin-left:4px;" onclick="rejectAlias(${a.id})">✗</button>`
+        : '—';
+      return `<tr>
+        <td><code>${a.variant}</code></td>
+        <td>${a.canvas_name || '—'}</td>
+        <td style="font-size:.75rem;color:var(--text-muted)">${a.canvas_sis_id}</td>
+        <td><span class="chip ${score < 85 ? 'chip-warn' : 'chip-ok'}">${score}</span></td>
+        <td><span class="chip ${chipClass}">${a.estado}</span></td>
+        <td>${actions}</td>
+      </tr>`;
+    }).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
+}
+
+async function confirmAlias(id, sisSid, canvasName) {
+  try {
+    await apiFetch(`/api/course-aliases/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({canvas_sis_id: sisSid, canvas_name: canvasName})
+    });
+    loadAliases('pendiente');
+  } catch(ex) { alert(ex.message); }
+}
+
+async function rejectAlias(id) {
+  try {
+    await apiFetch(`/api/course-aliases/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({canvas_sis_id: '', canvas_name: '', estado: 'rechazado'})
+    });
+    loadAliases('pendiente');
+  } catch(ex) { alert(ex.message); }
+}
+
+async function addManualAlias() {
+  const variant = document.getElementById('alias-variant').value.trim();
+  const sisId   = document.getElementById('alias-sis-id').value.trim();
+  const name    = document.getElementById('alias-canvas-name').value.trim();
+  const msg     = document.getElementById('alias-msg');
+  if (!variant || !sisId) { msg.textContent = 'Variant y SIS ID son requeridos'; msg.style.color='var(--error)'; return; }
+  try {
+    await apiFetch('/api/course-aliases/manual', {
+      method: 'POST',
+      body: JSON.stringify({variant, canvas_sis_id: sisId, canvas_name: name})
+    });
+    msg.textContent = '✓ Alias guardado'; msg.style.color = 'var(--success)';
+    document.getElementById('alias-variant').value = '';
+    document.getElementById('alias-sis-id').value = '';
+    document.getElementById('alias-canvas-name').value = '';
+    loadAliases();
+  } catch(ex) { msg.textContent = ex.message; msg.style.color = 'var(--error)'; }
+}
+
+// ── Canvas Períodos ───────────────────────────────────────────────────────────
+async function loadTerms() {
+  const tbody = document.getElementById('terms-tbody');
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Cargando…</td></tr>';
+  try {
+    const terms = await apiFetch('/api/canvas/terms');
+    if (!terms.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Sin períodos registrados</td></tr>';
+      return;
+    }
+    tbody.innerHTML = terms.map(t => `<tr>
+      <td>${t.id}</td>
+      <td><strong>${t.name || '—'}</strong></td>
+      <td>${t.start_at ? new Date(t.start_at).toLocaleDateString('es') : '—'}</td>
+      <td>${t.end_at   ? new Date(t.end_at).toLocaleDateString('es')   : '—'}</td>
+    </tr>`).join('');
+  } catch(ex) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--error)">${ex.message}</td></tr>`;
+  }
+}
+
+async function createTerm() {
+  const name = document.getElementById('term-name').value.trim();
+  const msg  = document.getElementById('term-msg');
+  if (!name) { msg.textContent = 'Ingresá el nombre del período'; msg.style.color = 'var(--error)'; return; }
+  msg.textContent = 'Creando…'; msg.style.color = 'var(--text-muted)';
+  try {
+    const t = await apiFetch('/api/canvas/terms', {method:'POST', body: JSON.stringify({name})});
+    msg.textContent = `✓ Período "${t.name || name}" listo (id=${t.id})`;
+    msg.style.color = 'var(--success)';
+    document.getElementById('term-name').value = '';
+    loadTerms();
+  } catch(ex) {
+    msg.textContent = ex.message;
+    msg.style.color = 'var(--error)';
+  }
 }
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
 async function loadCanvasCourses() {
   try {
     const data = await apiFetch('/api/canvas/courses');
-    const tbody = document.getElementById('tbl-courses');
-    tbody.innerHTML = data.map(c => `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.course_code || ''}</td><td>${c.workflow_state || ''}</td></tr>`).join('');
+    document.getElementById('tbl-courses').innerHTML = data.map(c =>
+      `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.course_code||''}</td><td>${c.workflow_state||''}</td></tr>`
+    ).join('');
   } catch(e) { alert(e.message); }
 }
 
 async function loadCanvasUsers() {
   try {
     const data = await apiFetch('/api/canvas/users');
-    const tbody = document.getElementById('tbl-cusers');
-    tbody.innerHTML = data.map(u => `<tr><td>${u.id}</td><td>${u.name}</td><td>${u.email || ''}</td><td>${u.sis_user_id || ''}</td></tr>`).join('');
+    document.getElementById('tbl-cusers').innerHTML = data.map(u =>
+      `<tr><td>${u.id}</td><td>${u.name}</td><td>${u.email||''}</td><td>${u.sis_user_id||''}</td></tr>`
+    ).join('');
   } catch(e) { alert(e.message); }
 }
 
 async function createCanvasUser() {
-  const payload = {
-    nombre: document.getElementById('cu-name').value.trim(),
-    email: document.getElementById('cu-email').value.trim(),
-    sis_id: document.getElementById('cu-sis').value.trim(),
-  };
+  const payload = {nombre: document.getElementById('cu-name').value.trim(), email: document.getElementById('cu-email').value.trim(), sis_id: document.getElementById('cu-sis').value.trim()};
   if (!payload.nombre || !payload.email) { alert('Nombre y email son obligatorios'); return; }
   try {
-    const r = await apiFetch('/api/canvas/users', 'POST', payload);
+    const r = await apiFetch('/api/canvas/users','POST',payload);
     document.getElementById('cu-msg').textContent = `✅ Usuario creado (ID: ${r.id})`;
-  } catch(e) {
-    document.getElementById('cu-msg').textContent = '❌ ' + e.message;
-  }
+  } catch(e) { document.getElementById('cu-msg').textContent = '❌ ' + e.message; }
 }
 
 async function enrollUser() {
@@ -753,42 +3031,181 @@ async function enrollUser() {
   const role = document.getElementById('en-role').value;
   if (!courseId || !userId) { alert('Completa todos los campos'); return; }
   try {
-    await apiFetch(`/api/canvas/courses/${courseId}/enrollments`, 'POST', { user_id: userId, role });
+    await apiFetch(`/api/canvas/courses/${courseId}/enrollments`,'POST',{user_id:userId,role});
     document.getElementById('en-msg').textContent = '✅ Inscripción creada';
-  } catch(e) {
-    document.getElementById('en-msg').textContent = '❌ ' + e.message;
-  }
+  } catch(e) { document.getElementById('en-msg').textContent = '❌ ' + e.message; }
 }
 
 // ── Azure ─────────────────────────────────────────────────────────────────────
 async function loadAzureUsers() {
   try {
     const data = await apiFetch('/api/azure/users');
-    const tbody = document.getElementById('tbl-ausers');
-    tbody.innerHTML = data.map(u => `<tr><td>${u.id?.slice(0,8)}…</td><td>${u.displayName}</td><td>${u.userPrincipalName}</td><td>${u.mail || ''}</td></tr>`).join('');
+    document.getElementById('tbl-ausers').innerHTML = data.map(u =>
+      `<tr><td>${u.id?.slice(0,8)}…</td><td>${u.displayName}</td><td>${u.userPrincipalName}</td><td>${u.mail||''}</td></tr>`
+    ).join('');
   } catch(e) { alert(e.message); }
 }
 
 async function loadAzureGroups() {
   try {
     const data = await apiFetch('/api/azure/groups');
-    const tbody = document.getElementById('tbl-agroups');
-    tbody.innerHTML = data.map(g => `<tr><td>${g.id?.slice(0,8)}…</td><td>${g.displayName}</td><td>${g.mail || ''}</td></tr>`).join('');
+    document.getElementById('tbl-agroups').innerHTML = data.map(g =>
+      `<tr>
+        <td style="font-size:.78rem;">${g.id?.slice(0,8)}…</td>
+        <td>${g.displayName}</td>
+        <td>${g.mail||''}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${g.id}')">📋 Copiar ID</button></td>
+      </tr>`
+    ).join('');
   } catch(e) { alert(e.message); }
 }
 
+async function createAzureGroup() {
+  const name = document.getElementById('grp-name').value.trim();
+  const desc = document.getElementById('grp-desc').value.trim();
+  if (!name) { alert('El nombre del grupo es obligatorio'); return; }
+  try {
+    const r = await apiFetch('/api/azure/groups', 'POST', {display_name: name, description: desc});
+    document.getElementById('grp-msg').innerHTML = `<span style="color:var(--success)">✅ Grupo creado: ${r.displayName} (ID: ${r.id?.slice(0,8)}…)</span>`;
+    loadAzureGroups();
+  } catch(e) { document.getElementById('grp-msg').innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`; }
+}
+
+async function bulkAddGroupMembers() {
+  const fileInput = document.getElementById('file-groups');
+  if (!fileInput?.files[0]) { alert('Seleccioná un archivo primero'); return; }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  try {
+    const resp = await fetch('/api/bulk/azure/usuarios', { method:'POST', headers: authHeaders(), body: formData });
+    const report = await resp.json();
+    document.getElementById('grp-bulk-result').style.display = 'block';
+    document.getElementById('grp-bulk-summary').innerHTML =
+      `<span style="font-weight:600">Total: ${report.total} | ✅ OK: ${report.success} | ❌ Errores: ${report.errors}</span>`;
+  } catch(e) { alert(e.message); }
+}
+
+// ── Teams ─────────────────────────────────────────────────────────────────────
+async function createTeam() {
+  const name = document.getElementById('tm-name').value.trim();
+  const desc = document.getElementById('tm-desc').value.trim();
+  if (!name) { alert('El nombre del equipo es obligatorio'); return; }
+  document.getElementById('tm-msg').textContent = '⏳ Creando equipo (puede tardar hasta 60 seg)…';
+  try {
+    const r = await apiFetch('/api/teams', 'POST', {display_name: name, description: desc});
+    document.getElementById('tm-msg').innerHTML = `<span style="color:var(--success)">✅ Equipo creado: ${r.displayName||name} — ID: <code>${r.id||''}</code></span>`;
+    loadTeams();
+  } catch(e) { document.getElementById('tm-msg').innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`; }
+}
+
+async function addTeamMember() {
+  const teamId = document.getElementById('tm-teamid').value.trim();
+  const userId = document.getElementById('tm-userid').value.trim();
+  if (!teamId || !userId) { alert('Completá todos los campos'); return; }
+  try {
+    await apiFetch('/api/teams/members', 'POST', {team_id: teamId, user_id: userId});
+    document.getElementById('tm-member-msg').innerHTML = `<span style="color:var(--success)">✅ Miembro agregado correctamente</span>`;
+  } catch(e) { document.getElementById('tm-member-msg').innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`; }
+}
+
+async function loadTeams() {
+  try {
+    const data = await apiFetch('/api/teams');
+    document.getElementById('tbl-teams').innerHTML = data.map(t =>
+      `<tr>
+        <td style="font-size:.78rem;">${t.id?.slice(0,8)}…
+          <button class="btn btn-secondary btn-sm" style="margin-left:4px;" onclick="copyToClipboard('${t.id}')">📋</button>
+        </td>
+        <td>${t.displayName||''}</td>
+      </tr>`
+    ).join('') || '<tr><td colspan="2" style="color:var(--text-muted);">Sin equipos</td></tr>';
+  } catch(e) { alert(e.message); }
+}
+
+async function bulkCreateTeams() {
+  const fileInput = document.getElementById('file-teams');
+  if (!fileInput?.files[0]) { alert('Seleccioná un archivo primero'); return; }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  try {
+    const resp = await fetch('/api/bulk/teams', { method:'POST', headers: authHeaders(), body: formData });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail); }
+    const report = await resp.json();
+    document.getElementById('teams-bulk-result').style.display = 'block';
+    const color = report.errors > 0 ? 'var(--error)' : 'var(--success)';
+    document.getElementById('teams-bulk-summary').innerHTML =
+      `<span style="color:${color};font-weight:600;">Total: ${report.total} | ✅ OK: ${report.success} | ❌ Errores: ${report.errors}</span>`;
+    document.getElementById('tbl-bulk-teams').innerHTML = (report.rows||[]).map(r =>
+      `<tr>
+        <td>${r.fila||''}</td>
+        <td>${r.nombre||''}</td>
+        <td style="background:${statusColors[r.teams?.status]||'#fff'};font-size:.82rem;">${r.teams?.status||''} ${r.teams?.detalle ? '— '+r.teams.detalle : ''}</td>
+      </tr>`
+    ).join('');
+    loadTeams();
+  } catch(e) { alert(e.message); }
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const el = document.createElement('div');
+    el.textContent = '✅ Copiado: ' + text.slice(0,16) + '…';
+    el.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#1a2332;color:#fff;padding:10px 16px;border-radius:8px;font-size:.85rem;z-index:9999;';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2000);
+  });
+}
+
 // ── Util ──────────────────────────────────────────────────────────────────────
-async function apiFetch(url, method = 'GET', body = null) {
-  const opts = { method, headers: { ...authHeaders() } };
-  if (body) { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
+async function apiFetch(url, optsOrMethod = 'GET', legacyBody = null) {
+  let method, body, noContentType;
+  if (typeof optsOrMethod === 'object') {
+    // Options-object form: apiFetch(url, {method, body, noContentType})
+    method = optsOrMethod.method || 'GET';
+    body   = optsOrMethod.body ?? null;
+    noContentType = optsOrMethod.noContentType || false;
+  } else {
+    // Legacy form: apiFetch(url, 'POST', body)
+    method = optsOrMethod;
+    body   = legacyBody;
+    noContentType = false;
+  }
+  const headers = {...authHeaders()};
+  if (body && !noContentType && !(body instanceof FormData)) headers['Content-Type'] = 'application/json';
+  const opts = {method, headers};
+  if (body) opts.body = (body instanceof FormData) ? body : (typeof body === 'string' ? body : JSON.stringify(body));
   const resp = await fetch(url, opts);
   if (resp.status === 401) { showLogin('Sesión expirada'); throw new Error('No autenticado'); }
   if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-    throw new Error(err.detail || resp.statusText);
+    const err = await resp.json().catch(()=>({detail:resp.statusText}));
+    throw new Error(err.detail||resp.statusText);
   }
   return resp.json();
 }
 </script>
+
+<!-- Floating real-time log -->
+<div id="portal-log-card" style="
+  display:none;
+  position:fixed;
+  bottom:20px;right:20px;
+  width:380px;max-width:calc(100vw - 40px);
+  background:#1e293b;
+  color:#e2e8f0;
+  border-radius:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.35);
+  z-index:9999;
+  font-size:.78rem;
+  overflow:hidden;
+">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#0f172a;border-radius:10px 10px 0 0;">
+    <span style="font-weight:600;letter-spacing:.03em;">🔎 Log en tiempo real</span>
+    <div style="display:flex;gap:6px;">
+      <button onclick="document.getElementById('portal-error-log').innerHTML=''" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:.72rem;">Limpiar</button>
+      <button onclick="document.getElementById('portal-log-card').style.display='none'" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:.72rem;">✕</button>
+    </div>
+  </div>
+  <div id="portal-error-log" style="max-height:200px;overflow-y:auto;padding:10px 12px;font-family:'Courier New',monospace;line-height:1.6;"></div>
+</div>
 </body>
 </html>

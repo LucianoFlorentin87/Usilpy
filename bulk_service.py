@@ -19,6 +19,9 @@ from openpyxl.utils import get_column_letter
 
 import canvas_service
 import graph_service
+from config import get_settings
+
+settings = get_settings()
 
 
 # ---------------------------------------------------------------------------
@@ -35,6 +38,215 @@ def _read_sheet(file_bytes: bytes, filename: str) -> pd.DataFrame:
 def _normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     return df
+
+
+# ---------------------------------------------------------------------------
+# Cursos
+# ---------------------------------------------------------------------------
+# Columnas esperadas:
+#   nombre, sis_id, semestre, crear_en_canvas (si/no), nombre_equipo_teams (opcional)
+
+async def _process_course_row(row: dict) -> dict:
+    result = {
+        "fila": row.get("_fila", ""),
+        "nombre": row.get("nombre", ""),
+        "sis_id": row.get("sis_id", ""),
+        "canvas": {"status": "omitido", "detalle": ""},
+        "teams": {"status": "omitido", "detalle": ""},
+    }
+
+    nombre = row.get("nombre", "").strip()
+    sis_id = row.get("sis_id", "").strip()
+    semestre = row.get("semestre", settings.semestre_actual).strip()
+
+    if not nombre:
+        result["canvas"] = {"status": "error", "detalle": "Falta columna 'nombre'"}
+        return result
+
+    crear_canvas = row.get("crear_en_canvas", "si").strip().lower() not in ("no", "false", "0")
+
+    # Canvas — auto-create enrollment term if semestre is given
+    term_id: int | None = None
+    if crear_canvas and semestre:
+        try:
+            term = await canvas_service.get_or_create_term(semestre)
+            term_id = term.get("id")
+        except Exception:
+            pass  # term creation failure is non-fatal; course will be created without term
+
+    if crear_canvas:
+        try:
+            existing = await canvas_service.get_course_by_sis_id(sis_id) if sis_id else None
+            if existing:
+                result["canvas"] = {"status": "existente", "detalle": f"id={existing.get('id')}"}
+            else:
+                course = await canvas_service.create_course(nombre, sis_id or nombre, semestre, term_id=term_id)
+                result["canvas"] = {"status": "ok", "detalle": f"id={course.get('id')}"}
+        except Exception as exc:
+            result["canvas"] = {"status": "error", "detalle": str(exc)[:120]}
+
+    # Teams
+    team_name = row.get("nombre_equipo_teams", "").strip() or f"{semestre} - {nombre}"
+    if row.get("nombre_equipo_teams", "").strip() or row.get("crear_en_teams", "").strip().lower() in ("si", "true", "1"):
+        try:
+            existing_team = await graph_service.find_team_by_display_name(team_name)
+            if existing_team:
+                result["teams"] = {"status": "existente", "detalle": team_name}
+            else:
+                team = await graph_service.create_team(team_name, f"Equipo académico: {nombre} ({semestre})")
+                result["teams"] = {"status": "ok", "detalle": f"id={team.get('id', '')[:8]}…"}
+        except Exception as exc:
+            result["teams"] = {"status": "error", "detalle": str(exc)[:120]}
+
+    return result
+
+
+async def process_courses_sheet(file_bytes: bytes, filename: str) -> dict:
+    df = _normalize_cols(_read_sheet(file_bytes, filename))
+    rows = df.to_dict(orient="records")
+    for i, r in enumerate(rows, start=2):
+        r["_fila"] = i
+
+    results = []
+    for r in rows:
+        try:
+            res = await _process_course_row(r)
+        except Exception as exc:
+            res = {"error_global": str(exc)}
+        results.append(res)
+
+    ok = sum(1 for r in results if r.get("canvas", {}).get("status") == "ok")
+    errors = sum(1 for r in results if r.get("canvas", {}).get("status") == "error"
+                 or r.get("teams", {}).get("status") == "error")
+
+    return {"tipo": "cursos", "total": len(results), "success": ok, "errors": errors, "rows": results}
+
+
+# ---------------------------------------------------------------------------
+# Usuarios Canvas (solo Canvas)
+# ---------------------------------------------------------------------------
+
+async def process_canvas_users_sheet(file_bytes: bytes, filename: str) -> dict:
+    df = _normalize_cols(_read_sheet(file_bytes, filename))
+    rows = df.to_dict(orient="records")
+    results = []
+    for i, row in enumerate(rows, start=2):
+        r = {"fila": i, "email": row.get("email", ""), "nombre": row.get("nombre", ""),
+             "canvas": {"status": "omitido", "detalle": ""}}
+        if row.get("email"):
+            try:
+                user = await canvas_service.create_user(
+                    name=row.get("nombre", row["email"]),
+                    email=row["email"],
+                    sis_id=row.get("sis_id", ""),
+                )
+                r["canvas"] = {"status": "ok", "detalle": f"id={user.get('id')}"}
+            except Exception as exc:
+                msg = str(exc)
+                r["canvas"] = {"status": "existente" if "unique_id" in msg.lower() or "already" in msg.lower() else "error", "detalle": msg[:120]}
+        results.append(r)
+
+    ok = sum(1 for r in results if r.get("canvas", {}).get("status") == "ok")
+    errors = sum(1 for r in results if r.get("canvas", {}).get("status") == "error")
+    return {"tipo": "canvas_usuarios", "total": len(results), "success": ok, "errors": errors, "rows": results}
+
+
+# ---------------------------------------------------------------------------
+# Usuarios Azure AD (solo Azure)
+# ---------------------------------------------------------------------------
+
+async def process_azure_users_sheet(file_bytes: bytes, filename: str) -> dict:
+    df = _normalize_cols(_read_sheet(file_bytes, filename))
+    rows = df.to_dict(orient="records")
+    results = []
+    for i, row in enumerate(rows, start=2):
+        r = {"fila": i, "upn": row.get("upn", row.get("email", "")), "nombre": row.get("nombre", ""),
+             "azure": {"status": "omitido", "detalle": ""}, "teams": {"status": "omitido", "detalle": ""}}
+        upn = row.get("upn", row.get("email", "")).strip()
+        if upn:
+            try:
+                nickname = upn.split("@")[0]
+                password = row.get("password", "Temporal@2024!")
+                az_user = await graph_service.create_user(
+                    display_name=row.get("nombre", nickname),
+                    mail_nickname=nickname,
+                    upn=upn,
+                    password=password,
+                )
+                r["azure"] = {"status": "ok", "detalle": f"id={az_user.get('id', '')[:8]}…"}
+                if row.get("grupo_id") and az_user.get("id"):
+                    await graph_service.add_member_to_group(row["grupo_id"], az_user["id"])
+                    r["teams"] = {"status": "ok", "detalle": "agregado al grupo"}
+            except Exception as exc:
+                msg = str(exc)
+                r["azure"] = {"status": "existente" if "already exists" in msg.lower() else "error", "detalle": msg[:120]}
+        results.append(r)
+
+    ok = sum(1 for r in results if r.get("azure", {}).get("status") == "ok")
+    errors = sum(1 for r in results if r.get("azure", {}).get("status") == "error")
+    return {"tipo": "azure_usuarios", "total": len(results), "success": ok, "errors": errors, "rows": results}
+
+
+# ---------------------------------------------------------------------------
+# Inscripciones Canvas (solo Canvas)
+# ---------------------------------------------------------------------------
+
+async def process_canvas_enrollments_sheet(file_bytes: bytes, filename: str) -> dict:
+    df = _normalize_cols(_read_sheet(file_bytes, filename))
+    rows = df.to_dict(orient="records")
+    results = []
+    for i, row in enumerate(rows, start=2):
+        r = {"fila": i, "email": row.get("email_usuario", row.get("email", "")),
+             "curso": row.get("curso_id", row.get("curso_canvas_id", "")),
+             "canvas": {"status": "omitido", "detalle": ""}}
+        email = r["email"].strip()
+        curso_id = r["curso"].strip()
+        if email and curso_id:
+            try:
+                enr = await canvas_service.enroll_user(
+                    course_id=curso_id,
+                    user_id=email,
+                    role=row.get("rol", row.get("rol_canvas", "StudentEnrollment")),
+                )
+                r["canvas"] = {"status": "ok", "detalle": f"enrollment id={enr.get('id')}"}
+            except Exception as exc:
+                r["canvas"] = {"status": "error", "detalle": str(exc)[:120]}
+        results.append(r)
+
+    ok = sum(1 for r in results if r.get("canvas", {}).get("status") == "ok")
+    errors = sum(1 for r in results if r.get("canvas", {}).get("status") == "error")
+    return {"tipo": "canvas_inscripciones", "total": len(results), "success": ok, "errors": errors, "rows": results}
+
+
+# ---------------------------------------------------------------------------
+# Teams (crear equipos masivamente)
+# ---------------------------------------------------------------------------
+
+async def process_teams_sheet(file_bytes: bytes, filename: str) -> dict:
+    df = _normalize_cols(_read_sheet(file_bytes, filename))
+    rows = df.to_dict(orient="records")
+    results = []
+    for i, row in enumerate(rows, start=2):
+        nombre = row.get("nombre", "").strip()
+        desc = row.get("descripcion", row.get("description", "")).strip()
+        r = {"fila": i, "nombre": nombre, "teams": {"status": "omitido", "detalle": ""}}
+        if nombre:
+            try:
+                existing = await graph_service.find_team_by_display_name(nombre)
+                if existing:
+                    r["teams"] = {"status": "existente", "detalle": f"id={existing.get('id','')[:8]}..."}
+                else:
+                    team = await graph_service.create_team(nombre, desc)
+                    r["teams"] = {"status": "ok", "detalle": f"id={team.get('id','')[:8]}..."}
+            except Exception as exc:
+                r["teams"] = {"status": "error", "detalle": str(exc)[:120]}
+        else:
+            r["teams"] = {"status": "error", "detalle": "Columna 'nombre' vacia"}
+        results.append(r)
+
+    ok = sum(1 for r in results if r["teams"]["status"] == "ok")
+    errors = sum(1 for r in results if r["teams"]["status"] == "error")
+    return {"tipo": "teams", "total": len(results), "success": ok, "errors": errors, "rows": results}
 
 
 # ---------------------------------------------------------------------------

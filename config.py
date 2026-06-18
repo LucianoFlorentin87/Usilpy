@@ -14,12 +14,22 @@ class Settings(BaseSettings):
 
     # Teams
     teams_default_team_id: str = ""
+    teams_base_url: str = "https://teams.microsoft.com"
+    teams_webhook_url: str = ""
+
+    # OneDrive (Excel de matriculación)
+    onedrive_file_id: str = ""
+    onedrive_drive_id: str = ""   # optional; required for app-only auth
 
     # Email
     smtp_host: str = "smtp.office365.com"
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    admin_email: str = ""
+
+    # Webhook (para integración con sistema académico externo)
+    webhook_api_key: str = ""   # key estática que el sistema académico envía en X-API-Key
 
     # App
     app_secret_key: str = "change_this_in_production"
@@ -27,18 +37,22 @@ class Settings(BaseSettings):
 
     # Auth
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 480  # 8 horas
-    # Usuario admin local por defecto (cambiar en .env)
+    jwt_expire_minutes: int = 480
     admin_username: str = "admin"
-    admin_password_hash: str = ""  # generado con passlib, vacío = sin login local
-    # Azure AD OAuth2 redirect
+    admin_password_hash: str = ""
     azure_redirect_uri: str = "http://localhost:8000/api/auth/azure/callback"
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # Matriculación automática
+    semestre_actual: str = "2025-2"
+    cron_hora: str = "07:00"   # HH:MM UTC
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "ignore",
+    }
 
 
-@lru_cache
 def get_settings() -> Settings:
     return Settings()

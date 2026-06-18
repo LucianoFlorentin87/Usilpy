@@ -7,6 +7,52 @@ BASE = settings.canvas_base_url.rstrip("/")
 HEADERS = {"Authorization": f"Bearer {settings.canvas_api_token}"}
 
 
+# ── Enrollment Terms (Períodos) ───────────────────────────────────────────────
+
+async def get_terms(per_page: int = 100) -> list[dict]:
+    """List all enrollment terms in the account."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{BASE}/api/v1/accounts/self/terms",
+            headers=HEADERS,
+            params={"per_page": per_page},
+        )
+        resp.raise_for_status()
+        return resp.json().get("enrollment_terms", [])
+
+
+async def find_term_by_name(name: str) -> dict | None:
+    """Find an enrollment term by exact name. Returns None if not found."""
+    terms = await get_terms()
+    name_lower = name.strip().lower()
+    return next((t for t in terms if t.get("name", "").strip().lower() == name_lower), None)
+
+
+async def create_term(name: str, start_at: str = "", end_at: str = "") -> dict:
+    """Create an enrollment term. start_at/end_at are ISO 8601 strings (optional)."""
+    payload: dict = {"enrollment_term": {"name": name}}
+    if start_at:
+        payload["enrollment_term"]["start_at"] = start_at
+    if end_at:
+        payload["enrollment_term"]["end_at"] = end_at
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{BASE}/api/v1/accounts/self/terms",
+            headers=HEADERS,
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def get_or_create_term(name: str) -> dict:
+    """Find term by name or create it if it doesn't exist."""
+    existing = await find_term_by_name(name)
+    if existing:
+        return existing
+    return await create_term(name)
+
+
 async def get_courses(per_page: int = 50) -> list[dict]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -53,6 +99,55 @@ async def create_user(name: str, email: str, sis_id: str = "") -> dict:
         return resp.json()
 
 
+async def find_user_by_sis_id(sis_id: str) -> dict | None:
+    """Look up a Canvas user by SIS user ID. Returns None if not found."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{BASE}/api/v1/users/sis_user_id:{sis_id}",
+            headers=HEADERS,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def get_course_by_sis_id(sis_id: str) -> dict | None:
+    """Look up a Canvas course by SIS course ID. Returns None if not found."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{BASE}/api/v1/courses/sis_course_id:{sis_id}",
+            headers=HEADERS,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def create_course(name: str, sis_id: str, semestre: str = "", term_id: int | None = None) -> dict:
+    course_data: dict = {
+        "name": name,
+        "course_code": sis_id,
+        "sis_course_id": sis_id,
+        "is_public": False,
+    }
+    if term_id:
+        course_data["enrollment_term_id"] = term_id
+    elif semestre:
+        course_data["term_name"] = semestre
+
+    payload = {"course": course_data}
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{BASE}/api/v1/accounts/self/courses",
+            headers=HEADERS,
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
 async def enroll_user(course_id: str, user_id: str, role: str = "StudentEnrollment") -> dict:
     payload = {
         "enrollment": {
@@ -78,5 +173,19 @@ async def get_enrollments(course_id: str) -> list[dict]:
             headers=HEADERS,
             params={"per_page": 100},
         )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def search_users(query: str, per_page: int = 20) -> list[dict]:
+    """Search Canvas users by name or email (account-level search)."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{BASE}/api/v1/accounts/self/users",
+            headers=HEADERS,
+            params={"search_term": query, "per_page": per_page},
+        )
+        if resp.status_code in (400, 404):
+            return []
         resp.raise_for_status()
         return resp.json()
