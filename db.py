@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import re
 from typing import Any
+from urllib.parse import urlparse, urlunparse, quote, unquote
 
 import asyncpg
 
@@ -25,6 +26,21 @@ def _pg(sql: str) -> str:
     return re.sub(r"\?", _replace, sql)
 
 
+def _parse_db_url(url: str) -> dict:
+    """Parse DATABASE_URL into kwargs for asyncpg, handling special chars in password."""
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    parsed = urlparse(url)
+    password = unquote(parsed.password or "")
+    return {
+        "host": parsed.hostname,
+        "port": parsed.port or 5432,
+        "user": parsed.username,
+        "password": password,
+        "database": (parsed.path or "").lstrip("/"),
+    }
+
+
 async def init_pool() -> None:
     global _pool
     url = os.environ.get("DATABASE_URL", "")
@@ -33,10 +49,8 @@ async def init_pool() -> None:
             "DATABASE_URL env var not set. "
             "Create a PostgreSQL database and set DATABASE_URL."
         )
-    # Render's postgres:// URLs need postgresql://
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
-    _pool = await asyncpg.create_pool(url, min_size=1, max_size=10)
+    kwargs = _parse_db_url(url)
+    _pool = await asyncpg.create_pool(**kwargs, min_size=1, max_size=10)
 
 
 def get_pool() -> asyncpg.Pool:
