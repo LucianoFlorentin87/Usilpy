@@ -174,58 +174,63 @@
     /* ── Login screen ── */
     #login-screen {
       position: fixed; inset: 0; z-index: 1000;
-      display: flex; align-items: center; justify-content: center;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
       background: #060e24;
       overflow: hidden;
     }
     #login-screen.hidden { display: none !important; }
-
-    /* Tech background: gradient + animated grid */
-    #login-screen::before {
-      content: '';
+    #login-bg {
       position: absolute; inset: 0;
-      background:
-        linear-gradient(135deg, #060e24 0%, #0d2157 40%, #0a3d8f 70%, #1a5cb0 100%);
+      background: url('https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1920&q=80') center/cover no-repeat;
       z-index: 0;
     }
-    #login-screen::after {
+    #login-bg::after {
       content: '';
       position: absolute; inset: 0;
-      background-image:
-        linear-gradient(rgba(43,130,255,.07) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(43,130,255,.07) 1px, transparent 1px);
-      background-size: 48px 48px;
-      z-index: 1;
+      background: linear-gradient(to bottom, rgba(4,12,40,.55) 0%, rgba(4,12,40,.72) 100%);
     }
-    .login-glow {
-      position: absolute; border-radius: 50%; filter: blur(80px); z-index: 1; pointer-events: none;
+    .login-logo {
+      position: relative; z-index: 2;
+      text-align: center; margin-bottom: 36px;
     }
-    .login-glow-1 { width: 400px; height: 400px; background: rgba(43,130,255,.18); top: -80px; left: -80px; }
-    .login-glow-2 { width: 500px; height: 500px; background: rgba(80,200,255,.10); bottom: -120px; right: -80px; }
-    .login-glow-3 { width: 250px; height: 250px; background: rgba(120,80,255,.12); top: 40%; left: 20%; }
-
+    .login-logo svg { width: 90px; height: 90px; filter: drop-shadow(0 4px 16px rgba(0,0,0,.5)); }
+    .login-logo h2 {
+      color: #fff; font-size: 1.5rem; font-weight: 800; margin: 12px 0 2px;
+      text-shadow: 0 2px 12px rgba(0,0,0,.5);
+    }
+    .login-logo .subtitle {
+      color: rgba(255,255,255,.75); font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 2.5px; text-transform: uppercase;
+    }
     .login-card {
       position: relative; z-index: 2;
-      background: rgba(255,255,255,.97);
-      backdrop-filter: blur(20px);
-      border-radius: 20px;
-      padding: 44px 40px 40px;
-      width: 100%; max-width: 420px;
-      box-shadow: 0 32px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.08);
+      width: 100%; max-width: 400px;
+      padding: 0 24px;
     }
-    .login-logo { text-align: center; margin-bottom: 28px; }
-    .login-logo .usil-mark { margin: 0 auto 14px; width: 80px; height: 80px; }
-    .login-logo .usil-mark svg { width: 80px; height: 80px; }
-    .login-logo h2 { font-size: 1.35rem; font-weight: 800; color: #0d2157; margin: 0 0 3px; }
-    .login-logo .subtitle { font-size: 0.72rem; color: #2B52CC; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin: 0; }
-    .login-divider-top { height: 1px; background: linear-gradient(90deg,transparent,#dde3f0,transparent); margin: 0 0 26px; }
-    .login-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
-    .login-field label { font-size: 0.78rem; font-weight: 700; color: #3a4a6b; letter-spacing: .4px; text-transform: uppercase; }
-    .login-field input { padding: 12px 14px; border: 1.5px solid #dde3f0; border-radius: 9px; font-size: 0.9rem; outline: none; transition: border-color .15s, box-shadow .15s; background: #f5f8ff; color: #1a1a2e; }
-    .login-field input:focus { border-color: #2B52CC; box-shadow: 0 0 0 3px rgba(43,82,204,.13); background: #fff; }
-    #login-error { color: #dc3545; font-size: 0.8rem; min-height: 18px; margin-bottom: 8px; }
-    .btn-login { width: 100%; padding: 14px; font-size: 0.95rem; font-weight: 800; border-radius: 9px; text-align: center; background: linear-gradient(135deg,#1e3fa0,#2B52CC); color: #fff; border: none; cursor: pointer; letter-spacing: .5px; transition: opacity .15s, transform .1s; box-shadow: 0 4px 16px rgba(43,82,204,.35); }
-    .btn-login:hover { opacity: .92; }
+    .login-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+    .login-field label {
+      font-size: 0.82rem; font-weight: 700; color: #fff;
+      letter-spacing: 1px; text-transform: uppercase;
+      text-shadow: 0 1px 6px rgba(0,0,0,.4);
+    }
+    .login-field input {
+      padding: 14px 16px; border: 2px solid rgba(255,255,255,.25);
+      border-radius: 10px; font-size: 0.95rem; outline: none;
+      background: rgba(255,255,255,.12); color: #fff;
+      backdrop-filter: blur(8px);
+      transition: border-color .2s, background .2s;
+    }
+    .login-field input::placeholder { color: rgba(255,255,255,.45); }
+    .login-field input:focus { border-color: rgba(255,255,255,.7); background: rgba(255,255,255,.18); }
+    #login-error { color: #ff8080; font-size: 0.82rem; min-height: 18px; margin-bottom: 8px; }
+    .btn-login {
+      width: 100%; padding: 15px; font-size: 1rem; font-weight: 800;
+      border-radius: 10px; text-align: center;
+      background: #2B52CC; color: #fff; border: none; cursor: pointer;
+      letter-spacing: .5px; transition: background .15s, transform .1s;
+      box-shadow: 0 6px 24px rgba(43,82,204,.5);
+    }
+    .btn-login:hover { background: #1e3fa0; }
     .btn-login:active { transform: scale(.98); }
 
     /* ── Topbar user chip ── */
@@ -240,31 +245,27 @@
 
 <!-- ═══════════════════════════════ LOGIN ════════════════════════════════ -->
 <div id="login-screen">
-  <!-- tech glows -->
-  <div class="login-glow login-glow-1"></div>
-  <div class="login-glow login-glow-2"></div>
-  <div class="login-glow login-glow-3"></div>
+  <div id="login-bg"></div>
+
+  <!-- Logo flotante -->
+  <div class="login-logo">
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Outer ring -->
+      <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+      <!-- U -->
+      <path d="M14 28 L14 58 Q14 72 28 72 Q42 72 42 58 L42 28" stroke="white" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- S (overlapping) -->
+      <path d="M38 66 Q38 74 50 74 Q62 74 62 64 Q62 56 50 53 Q38 50 38 40 Q38 30 50 30 Q62 30 62 38" stroke="white" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <!-- I -->
+      <line x1="67" y1="30" x2="67" y2="74" stroke="white" stroke-width="5" stroke-linecap="round"/>
+      <!-- L -->
+      <path d="M74 30 L74 74 L88 74" stroke="white" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h2>Gestión Académica</h2>
+    <p class="subtitle">USIL Paraguay</p>
+  </div>
+
   <div class="login-card">
-    <div class="login-logo">
-      <!-- USIL monogram SVG recreation -->
-      <div class="usil-mark">
-        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="40" cy="40" r="40" fill="#2B52CC"/>
-          <!-- U -->
-          <path d="M13 22 L13 46 Q13 56 23 56 Q33 56 33 46 L33 22" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-          <!-- S -->
-          <path d="M37 52 Q37 57 44 57 Q51 57 51 51 Q51 46 44 44 Q37 42 37 36 Q37 30 44 30 Q51 30 51 35" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-          <!-- I -->
-          <line x1="55" y1="30" x2="55" y2="57" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
-          <!-- L -->
-          <path d="M60 30 L60 57 L70 57" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- decorative circle -->
-          <circle cx="40" cy="40" r="26" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
-        </svg>
-      </div>
-      <h2>Gestión Académica</h2>
-      <p class="subtitle">USIL Paraguay</p>
-    </div>
     <div class="login-divider-top"></div>
     <div class="login-field">
       <label>Usuario</label>
@@ -277,7 +278,7 @@
                onkeydown="if(event.key==='Enter') doLogin()"
                style="width:100%;padding-right:42px;" />
         <button type="button" id="pw-toggle" onclick="togglePassword()"
-          style="position:absolute;right:0;top:0;height:100%;width:40px;background:none;border:none;cursor:pointer;font-size:1.1rem;color:#aaa;transition:color .15s;"
+          style="position:absolute;right:0;top:0;height:100%;width:40px;background:none;border:none;cursor:pointer;font-size:1.1rem;color:rgba(255,255,255,.6);transition:color .15s;"
           title="Mostrar/ocultar contraseña">👁</button>
       </div>
     </div>
