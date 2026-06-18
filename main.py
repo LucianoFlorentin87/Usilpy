@@ -1170,3 +1170,64 @@ async def formulario_inscripcion(
 
     from fastapi.responses import HTMLResponse
     return HTMLResponse(content=html)
+
+
+# ---------------------------------------------------------------------------
+# Gestión masiva endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/gestion/crear-cursos")
+async def gestion_crear_cursos(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Upload Excel with materias → creates Canvas courses + Teams teams → returns Excel with IDs"""
+    import bulk_service as _bulk
+    data = await file.read()
+    excel_bytes = await _bulk.process_cursos_ids(data, file.filename)
+    from fastapi.responses import Response
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=cursos_ids.xlsx"}
+    )
+
+
+@app.post("/api/gestion/matricular")
+async def gestion_matricular(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Upload planilla Excel → create users + enroll in Canvas + Teams + send emails"""
+    import bulk_service as _bulk
+    data = await file.read()
+    summary, excel_bytes = await _bulk.process_matriculacion_planilla(data, file.filename)
+    import base64
+    summary["excel_b64"] = base64.b64encode(excel_bytes).decode()
+    return summary
+
+
+@app.get("/api/gestion/cron")
+async def gestion_get_cron(_user=Depends(_require_admin)):
+    from scheduler import get_next_run, scheduler
+    job = scheduler.get_job("matriculacion_diaria")
+    trigger_info = ""
+    if job and job.trigger:
+        trigger_info = str(job.trigger)
+    return {
+        "cron_hora": settings.cron_hora,
+        "next_run": get_next_run(),
+        "trigger": trigger_info,
+    }
+
+
+@app.patch("/api/gestion/cron")
+async def gestion_update_cron(body: dict, _user=Depends(_require_admin)):
+    """Update cron schedule. Body: {"cron_hora": "HH:MM"}"""
+    from scheduler import scheduler
+    from apscheduler.triggers.cron import CronTrigger
+    cron_hora = body.get("cron_hora", "07:00")
+    try:
+        hora, minuto = cron_hora.split(":")
+        hora_int, minuto_int = int(hora), int(minuto)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Formato inválido. Use HH:MM")
+    trigger = CronTrigger(hour=hora_int, minute=minuto_int, timezone="UTC")
+    scheduler.reschedule_job("matriculacion_diaria", trigger=trigger)
+    settings.cron_hora = cron_hora
+    from scheduler import get_next_run
+    return {"ok": True, "cron_hora": cron_hora, "next_run": get_next_run()}

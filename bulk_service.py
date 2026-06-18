@@ -493,3 +493,380 @@ def build_report_excel(report: dict) -> bytes:
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# process_cursos_ids
+# ---------------------------------------------------------------------------
+
+def _normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
+    df.columns = [
+        c.strip().lower()
+         .replace(" ", "_")
+         .replace("á","a").replace("é","e").replace("í","i")
+         .replace("ó","o").replace("ú","u")
+        for c in df.columns
+    ]
+    return df
+
+
+async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
+    """Reads Excel with columns materia, semestre (optional), programa (optional).
+    Creates Canvas course + Teams team for each row.
+    Returns bytes of Excel with IDs and statuses."""
+    df = pd.read_excel(io.BytesIO(file_bytes))
+    df = _normalize_cols(df)
+
+    if "materia" not in df.columns:
+        raise ValueError("El Excel debe tener una columna 'materia'")
+
+    rows_out = []
+
+    for _, row in df.iterrows():
+        materia = str(row.get("materia", "")).strip()
+        semestre = str(row.get("semestre", settings.semestre_actual)).strip() if "semestre" in df.columns else settings.semestre_actual
+        if not semestre or semestre == "nan":
+            semestre = settings.semestre_actual
+
+        canvas_course_id = ""
+        canvas_status = "error"
+        teams_team_id = ""
+        teams_status = "error"
+
+        # Canvas
+        try:
+            term_id = await canvas_service.get_or_create_term(semestre)
+            sis_id = f"USIL-{semestre}-{materia[:60]}"
+            existing = await canvas_service.get_course_by_sis_id(sis_id)
+            if existing:
+                canvas_course_id = str(existing.get("id", ""))
+                canvas_status = "existente"
+            else:
+                created = await canvas_service.create_course(
+                    name=f"{semestre} - {materia}",
+                    sis_course_id=sis_id,
+                    enrollment_term_id=term_id,
+                )
+                canvas_course_id = str(created.get("id", ""))
+                canvas_status = "creado"
+        except Exception:
+            canvas_status = "error"
+
+        # Teams
+        try:
+            team_name = f"{semestre} - {materia}"
+            existing_team = await graph_service.find_team_by_display_name(team_name)
+            if existing_team:
+                teams_team_id = existing_team.get("id", "")
+                teams_status = "existente"
+            else:
+                new_team = await graph_service.create_team(team_name)
+                teams_team_id = new_team.get("id", "")
+                teams_status = "creado"
+        except Exception:
+            teams_status = "error"
+
+        rows_out.append({
+            "Materia": materia,
+            "Semestre": semestre,
+            "ID Canvas": canvas_course_id,
+            "ID Ms": teams_team_id,
+            "Estado Canvas": canvas_status,
+            "Estado Teams": teams_status,
+        })
+
+    # Build output Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Cursos"
+
+    headers = ["Materia", "Semestre", "ID Canvas", "ID Ms", "Estado Canvas", "Estado Teams"]
+    header_fill = PatternFill("solid", fgColor="1F4E79")
+    header_font = Font(color="FFFFFF", bold=True)
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    row_colors = {
+        "creado":    "C6EFCE",
+        "existente": "FFEB9C",
+        "error":     "FFC7CE",
+    }
+
+    for row_idx, r in enumerate(rows_out, 2):
+        ws.cell(row=row_idx, column=1, value=r["Materia"])
+        ws.cell(row=row_idx, column=2, value=r["Semestre"])
+        ws.cell(row=row_idx, column=3, value=r["ID Canvas"])
+        ws.cell(row=row_idx, column=4, value=r["ID Ms"])
+        canvas_st = r["Estado Canvas"]
+        teams_st = r["Estado Teams"]
+        ws.cell(row=row_idx, column=5, value=canvas_st)
+        ws.cell(row=row_idx, column=6, value=teams_st)
+
+        for col_idx in range(1, 7):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            if col_idx == 5:
+                color = row_colors.get(canvas_st, "FFFFFF")
+            elif col_idx == 6:
+                color = row_colors.get(teams_st, "FFFFFF")
+            else:
+                if canvas_st == "error" or teams_st == "error":
+                    color = row_colors["error"]
+                elif canvas_st == "creado" or teams_st == "creado":
+                    color = row_colors["creado"]
+                else:
+                    color = row_colors["existente"]
+            cell.fill = PatternFill("solid", fgColor=color)
+
+    for col_idx in range(1, 7):
+        ws.column_dimensions[get_column_letter(col_idx)].width = 35
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# process_matriculacion_planilla
+# ---------------------------------------------------------------------------
+
+async def process_matriculacion_planilla(file_bytes: bytes, filename: str) -> tuple[dict, bytes]:
+    """Reads planilla Excel with columns Materia, ID Canvas, ID Ms, Alumno, SIS, Correo.
+    Creates users, enrolls them in Canvas and Teams, sends emails.
+    Returns (summary_dict, excel_bytes)."""
+    import email_service
+
+    df = pd.read_excel(io.BytesIO(file_bytes))
+    df = _normalize_cols(df)
+
+    # Expected normalized columns: materia, id_canvas, id_ms, alumno, sis, correo
+    required = {"materia", "id_canvas", "alumno", "sis", "correo"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Faltan columnas: {missing}")
+
+    semestre = settings.semestre_actual
+
+    # user cache keyed by cedula to avoid duplicate creation
+    canvas_user_cache: dict[str, dict] = {}
+    azure_user_cache: dict[str, dict] = {}
+    password_cache: dict[str, str] = {}
+
+    rows_out = []
+    total = 0
+    nuevos = 0
+    existentes_count = 0
+    inscripciones_canvas = 0
+    inscripciones_teams = 0
+    errores = 0
+
+    # Track emails to send: {correo: {"alumno": ..., "cedula": ..., "is_new": ..., "password": ..., "materias": [...]}}
+    email_map: dict[str, dict] = {}
+
+    for _, row in df.iterrows():
+        total += 1
+        materia = str(row.get("materia", "")).strip()
+        canvas_id = str(row.get("id_canvas", "")).strip()
+        teams_id = str(row.get("id_ms", "")).strip() if "id_ms" in df.columns else ""
+        alumno = str(row.get("alumno", "")).strip()
+        cedula = str(row.get("sis", "")).strip()
+        correo = str(row.get("correo", "")).strip()
+
+        canvas_estado = "ok"
+        teams_estado = "ok"
+        email_enviado = "no"
+        is_new = False
+
+        try:
+            # --- Canvas user ---
+            if cedula in canvas_user_cache:
+                canvas_user = canvas_user_cache[cedula]
+            else:
+                canvas_user = await canvas_service.find_user_by_sis_id(cedula)
+                if canvas_user:
+                    canvas_user_cache[cedula] = canvas_user
+                else:
+                    parts = alumno.split()
+                    first_initial = parts[0][0].upper() if parts else "X"
+                    last_initial = parts[-1][0].lower() if len(parts) > 1 else "x"
+                    password = f"{cedula}-{first_initial}{last_initial}"
+                    password_cache[cedula] = password
+                    try:
+                        canvas_user = await canvas_service.create_user(alumno, correo, sis_id=cedula)
+                        canvas_user_cache[cedula] = canvas_user
+                        is_new = True
+                    except Exception:
+                        canvas_user = None
+                        canvas_estado = "error"
+                        errores += 1
+
+            # --- Azure user ---
+            if cedula in azure_user_cache:
+                azure_user = azure_user_cache[cedula]
+            else:
+                azure_user = await graph_service.get_user_by_upn(correo)
+                if azure_user:
+                    azure_user_cache[cedula] = azure_user
+                else:
+                    parts = alumno.split()
+                    first_initial = parts[0][0].upper() if parts else "X"
+                    last_initial = parts[-1][0].lower() if len(parts) > 1 else "x"
+                    password = password_cache.get(cedula, f"{cedula}-{first_initial}{last_initial}")
+                    password_cache[cedula] = password
+                    try:
+                        azure_user = await graph_service.create_user(
+                            alumno,
+                            correo.split("@")[0],
+                            correo,
+                            password,
+                        )
+                        azure_user_cache[cedula] = azure_user
+                        is_new = True
+                    except Exception:
+                        azure_user = None
+
+            # --- Enroll in Canvas ---
+            if canvas_user and canvas_id:
+                try:
+                    await canvas_service.enroll_user(canvas_id, canvas_user["id"], "StudentEnrollment")
+                    inscripciones_canvas += 1
+                except Exception:
+                    canvas_estado = "error"
+                    errores += 1
+            elif not canvas_user:
+                canvas_estado = "error"
+
+            # --- Add to Teams ---
+            if azure_user and teams_id:
+                try:
+                    await graph_service.add_member_to_team(teams_id, azure_user["id"])
+                    inscripciones_teams += 1
+                except Exception:
+                    teams_estado = "error"
+
+            # --- Track for email ---
+            if correo not in email_map:
+                email_map[correo] = {
+                    "alumno": alumno,
+                    "cedula": cedula,
+                    "is_new": is_new,
+                    "password": password_cache.get(cedula, ""),
+                    "materias": [],
+                }
+            else:
+                if is_new:
+                    email_map[correo]["is_new"] = True
+                    if not email_map[correo]["password"]:
+                        email_map[correo]["password"] = password_cache.get(cedula, "")
+            email_map[correo]["materias"].append(materia)
+
+            if is_new:
+                nuevos += 1
+            else:
+                existentes_count += 1
+
+        except Exception:
+            canvas_estado = "error"
+            errores += 1
+
+        rows_out.append({
+            "Alumno": alumno,
+            "Cedula": cedula,
+            "Materia": materia,
+            "ID Canvas": canvas_id,
+            "ID Ms": teams_id,
+            "Canvas Estado": canvas_estado,
+            "Teams Estado": teams_estado,
+            "Email Enviado": email_enviado,
+        })
+
+    # --- Send emails ---
+    emails_enviados = 0
+    # Build correo->cedula mapping for marking rows
+    correo_to_cedula: dict[str, str] = {info["correo"] if "correo" in info else correo: info.get("cedula","") for correo, info in email_map.items()}
+    for correo, info in email_map.items():
+        try:
+            if info["is_new"]:
+                await email_service.send_welcome_email(
+                    correo,
+                    info["alumno"],
+                    info["password"],
+                    canvas_url="",
+                    teams_url="",
+                    cursos=info["materias"],
+                    semestre=semestre,
+                )
+            else:
+                await email_service.send_enrollment_confirmation(
+                    correo,
+                    info["alumno"],
+                    cursos=info["materias"],
+                    semestre=semestre,
+                )
+            emails_enviados += 1
+            cedula = info.get("cedula", "")
+            for r in rows_out:
+                if r["Cedula"] == cedula:
+                    r["Email Enviado"] = "si"
+        except Exception:
+            pass
+
+    summary = {
+        "total": total,
+        "nuevos": nuevos,
+        "existentes": existentes_count,
+        "inscripciones_canvas": inscripciones_canvas,
+        "inscripciones_teams": inscripciones_teams,
+        "errores": errores,
+        "emails_enviados": emails_enviados,
+        "rows": rows_out,
+    }
+
+    # Build Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Matriculación"
+
+    headers = ["Alumno", "Cedula", "Materia", "ID Canvas", "ID Ms", "Canvas Estado", "Teams Estado", "Email Enviado"]
+    header_fill = PatternFill("solid", fgColor="1F4E79")
+    header_font = Font(color="FFFFFF", bold=True)
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    status_colors = {
+        "ok":    "C6EFCE",
+        "error": "FFC7CE",
+        "si":    "C6EFCE",
+        "no":    "FFEB9C",
+    }
+
+    for row_idx, r in enumerate(rows_out, 2):
+        ws.cell(row=row_idx, column=1, value=r["Alumno"])
+        ws.cell(row=row_idx, column=2, value=r["Cedula"])
+        ws.cell(row=row_idx, column=3, value=r["Materia"])
+        ws.cell(row=row_idx, column=4, value=r["ID Canvas"])
+        ws.cell(row=row_idx, column=5, value=r["ID Ms"])
+        canvas_st = r["Canvas Estado"]
+        teams_st = r["Teams Estado"]
+        email_st = r["Email Enviado"]
+        ws.cell(row=row_idx, column=6, value=canvas_st)
+        ws.cell(row=row_idx, column=7, value=teams_st)
+        ws.cell(row=row_idx, column=8, value=email_st)
+
+        ws.cell(row=row_idx, column=6).fill = PatternFill("solid", fgColor=status_colors.get(canvas_st, "FFFFFF"))
+        ws.cell(row=row_idx, column=7).fill = PatternFill("solid", fgColor=status_colors.get(teams_st, "FFFFFF"))
+        ws.cell(row=row_idx, column=8).fill = PatternFill("solid", fgColor=status_colors.get(email_st, "FFFFFF"))
+
+    for col_idx in range(1, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = 25
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    excel_bytes = buf.getvalue()
+
+    return summary, excel_bytes

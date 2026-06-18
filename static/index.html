@@ -247,6 +247,17 @@
     </div>
   </div>
 
+  <!-- Gestión masiva -->
+  <div class="nav-group" id="nav-gestion-group">
+    <div class="nav-group-label">Gestión masiva</div>
+    <div class="nav-item" data-panel="crear-cursos" onclick="showPanel('crear-cursos', this)">
+      <span class="icon">🏫</span> Crear cursos y equipos
+    </div>
+    <div class="nav-item" data-panel="matriculacion-masiva" onclick="showPanel('matriculacion-masiva', this)">
+      <span class="icon">🎓</span> Matricular alumnos
+    </div>
+  </div>
+
   <!-- Administración del sistema -->
   <div class="nav-group" id="nav-admin-group">
     <div class="nav-group-label">Administración</div>
@@ -255,6 +266,9 @@
     </div>
     <div class="nav-item" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)">
       <span class="icon">⏳</span> Inscripciones pendientes
+    </div>
+    <div class="nav-item" data-panel="cron-config" onclick="showPanel('cron-config', this)">
+      <span class="icon">⏰</span> Configurar cron
     </div>
   </div>
 </nav>
@@ -729,6 +743,71 @@
       </div>
     </div><!-- /panel-matriculacion -->
 
+
+    <!-- ══════════ PANEL: CREAR CURSOS ══════════ -->
+    <div id="panel-crear-cursos" class="panel">
+      <div class="card">
+        <h3>Crear cursos y equipos</h3>
+        <p>Subí un Excel con las materias del semestre. El sistema creará los cursos en Canvas y los equipos en Teams, y te dará un Excel con los IDs para usar en la matriculación.</p>
+
+        <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:20px;">
+          <strong>Formato esperado:</strong> columnas <code>materia</code> · <code>semestre</code> (opcional) · <code>programa</code> (opcional)
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;">
+          <div>
+            <label>Archivo Excel (.xlsx)</label><br>
+            <input type="file" id="cursos-file" accept=".xlsx,.xls">
+          </div>
+          <button class="btn btn-primary" onclick="crearCursos()">&#9654; Crear cursos y equipos</button>
+          <a id="cursos-download-btn" style="display:none;" class="btn btn-success" download="cursos_ids.xlsx">&#11015; Descargar Excel con IDs</a>
+        </div>
+
+        <div id="cursos-status" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: MATRICULACIÓN MASIVA ══════════ -->
+    <div id="panel-matriculacion-masiva" class="panel">
+      <div class="card">
+        <h3>Matriculación masiva de alumnos</h3>
+        <p>Subí la planilla con los alumnos y los IDs de cursos/equipos. El sistema creará los usuarios que no existan, los matriculará y enviará los correos correspondientes.</p>
+
+        <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:20px;">
+          <strong>Formato esperado:</strong> columnas <code>Materia</code> · <code>ID Canvas</code> · <code>ID Ms</code> · <code>Alumno</code> · <code>SIS</code> · <code>Correo</code>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;">
+          <div>
+            <label>Planilla Excel (.xlsx)</label><br>
+            <input type="file" id="matriculacion-file" accept=".xlsx,.xls">
+          </div>
+          <button class="btn btn-primary" onclick="ejecutarMatriculacion()">&#9654; Ejecutar matriculación</button>
+          <a id="matriculacion-download-btn" style="display:none;" class="btn btn-success" download="resultado_matriculacion.xlsx">&#11015; Descargar resultado</a>
+        </div>
+
+        <div id="matriculacion-status" style="display:none;"></div>
+        <div id="matriculacion-resumen" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: CRON CONFIG ══════════ -->
+    <div id="panel-cron-config" class="panel">
+      <div class="card">
+        <h3>Configurar ejecución automática (Cron)</h3>
+        <p>Configurá el horario de la matriculación automática diaria. El horario está en UTC.</p>
+
+        <div style="max-width:400px;">
+          <label>Horario de ejecución (UTC)</label>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:8px;">
+            <input type="time" id="cron-hora-input" style="padding:8px;border:1px solid #ddd;border-radius:4px;font-size:16px;">
+            <button class="btn btn-primary" onclick="guardarCron()">Guardar</button>
+          </div>
+          <div id="cron-next-run" style="margin-top:12px;color:#666;"></div>
+          <div id="cron-status" style="margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>
 
     <!-- ══════════ PANEL: AUDITORÍA ══════════ -->
     <div class="panel" id="panel-auditoria">
@@ -1324,6 +1403,9 @@ const panelTitles = {
   'azure-users':    ['Usuarios Azure AD', 'Azure AD'],
   'azure-groups':   ['Grupos Azure AD',   'Azure AD'],
   'teams':          ['Equipos Teams',     'Microsoft Teams'],
+  'crear-cursos':        ['Crear cursos y equipos', 'Gestión masiva'],
+  'matriculacion-masiva':['Matriculación masiva',   'Gestión masiva'],
+  'cron-config':         ['Configurar cron',        'Administración'],
 };
 
 function showPanel(id, el) {
@@ -1336,6 +1418,7 @@ function showPanel(id, el) {
   document.getElementById('topbar-badge').textContent = badge;
   if (id === 'system-users') loadSystemUsers();
   if (id === 'portal-academico') portalCargarMisEnvios();
+  if (id === 'cron-config') cargarCronConfig();
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -3164,6 +3247,133 @@ async function apiFetch(url, optsOrMethod = 'GET', legacyBody = null) {
     throw new Error(err.detail||resp.statusText);
   }
   return resp.json();
+}
+
+// ── Crear cursos y equipos ────────────────────────────────────────────────────
+async function crearCursos() {
+  const file = document.getElementById('cursos-file').files[0];
+  if (!file) { alert('Seleccioná un archivo Excel'); return; }
+
+  const statusEl = document.getElementById('cursos-status');
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">&#9203; Procesando cursos y equipos... esto puede tardar varios minutos.</div>';
+  document.getElementById('cursos-download-btn').style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch('/api/gestion/crear-cursos', { method:'POST', headers:{'Authorization':'Bearer '+getToken()}, body:fd });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Error'); }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const btn = document.getElementById('cursos-download-btn');
+    btn.href = url;
+    btn.style.display = 'inline-block';
+    statusEl.innerHTML = '<div style="padding:12px;background:#d4edda;border-radius:6px;">&#9989; Procesamiento completado. Descargá el Excel con los IDs.</div>';
+  } catch(e) {
+    statusEl.innerHTML = `<div style="padding:12px;background:#f8d7da;border-radius:6px;">&#10060; Error: ${e.message}</div>`;
+  }
+}
+
+// ── Matriculación masiva ──────────────────────────────────────────────────────
+async function ejecutarMatriculacion() {
+  const file = document.getElementById('matriculacion-file').files[0];
+  if (!file) { alert('Seleccioná un archivo Excel'); return; }
+
+  const statusEl = document.getElementById('matriculacion-status');
+  const resumenEl = document.getElementById('matriculacion-resumen');
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">&#9203; Procesando planilla... esto puede tardar varios minutos dependiendo de la cantidad de alumnos.</div>';
+  resumenEl.style.display = 'none';
+  document.getElementById('matriculacion-download-btn').style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch('/api/gestion/matricular', { method:'POST', headers:{'Authorization':'Bearer '+getToken()}, body:fd });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Error'); }
+
+    const data = await resp.json();
+
+    if (data.excel_b64) {
+      const byteChars = atob(data.excel_b64);
+      const byteArr = new Uint8Array(byteChars.length);
+      for(let i=0;i<byteChars.length;i++) byteArr[i]=byteChars.charCodeAt(i);
+      const blob = new Blob([byteArr], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      const btn = document.getElementById('matriculacion-download-btn');
+      btn.href = URL.createObjectURL(blob);
+      btn.style.display = 'inline-block';
+    }
+
+    statusEl.innerHTML = '<div style="padding:12px;background:#d4edda;border-radius:6px;">&#9989; Matriculación completada.</div>';
+    resumenEl.style.display = 'block';
+    resumenEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:16px;">
+        <div style="background:#fff;border-radius:8px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+          <div style="font-size:2em;font-weight:700;color:#1a3f6f;">${data.total||0}</div>
+          <div style="color:#666;font-size:.85em;">Total filas</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+          <div style="font-size:2em;font-weight:700;color:#28a745;">${data.nuevos||0}</div>
+          <div style="color:#666;font-size:.85em;">Usuarios nuevos</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+          <div style="font-size:2em;font-weight:700;color:#fd7e14;">${data.existentes||0}</div>
+          <div style="color:#666;font-size:.85em;">Ya existían</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+          <div style="font-size:2em;font-weight:700;color:#17a2b8;">${data.inscripciones_canvas||0}</div>
+          <div style="color:#666;font-size:.85em;">Inscr. Canvas</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+          <div style="font-size:2em;font-weight:700;color:#6f42c1;">${data.inscripciones_teams||0}</div>
+          <div style="color:#666;font-size:.85em;">Inscr. Teams</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+          <div style="font-size:2em;font-weight:700;color:#dc3545;">${data.errores||0}</div>
+          <div style="color:#666;font-size:.85em;">Errores</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+          <div style="font-size:2em;font-weight:700;color:#20c997;">${data.emails_enviados||0}</div>
+          <div style="color:#666;font-size:.85em;">Emails enviados</div>
+        </div>
+      </div>`;
+  } catch(e) {
+    statusEl.innerHTML = `<div style="padding:12px;background:#f8d7da;border-radius:6px;">&#10060; Error: ${e.message}</div>`;
+  }
+}
+
+// ── Cron config ───────────────────────────────────────────────────────────────
+async function cargarCronConfig() {
+  try {
+    const resp = await fetch('/api/gestion/cron', {headers:{'Authorization':'Bearer '+getToken()}});
+    const data = await resp.json();
+    if (data.cron_hora) document.getElementById('cron-hora-input').value = data.cron_hora;
+    if (data.next_run) {
+      document.getElementById('cron-next-run').textContent = `Próxima ejecución: ${new Date(data.next_run).toLocaleString()}`;
+    }
+  } catch(e) {}
+}
+
+async function guardarCron() {
+  const hora = document.getElementById('cron-hora-input').value;
+  if (!hora) return;
+  const statusEl = document.getElementById('cron-status');
+  try {
+    const resp = await fetch('/api/gestion/cron', {
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+getToken(),'Content-Type':'application/json'},
+      body: JSON.stringify({cron_hora: hora})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      statusEl.innerHTML = '<span style="color:green">&#9989; Guardado correctamente</span>';
+      if (data.next_run) document.getElementById('cron-next-run').textContent = `Próxima ejecución: ${new Date(data.next_run).toLocaleString()}`;
+    }
+  } catch(e) {
+    statusEl.innerHTML = `<span style="color:red">&#10060; ${e.message}</span>`;
+  }
 }
 </script>
 
