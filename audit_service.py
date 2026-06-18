@@ -13,7 +13,9 @@ import aiosqlite
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
-DB_PATH = "audit.db"
+import os
+
+DB_PATH = os.environ.get("DB_PATH", "audit.db")
 
 _CREATE_AUDIT = """
 CREATE TABLE IF NOT EXISTS audit_log (
