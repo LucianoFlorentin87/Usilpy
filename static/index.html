@@ -2691,27 +2691,36 @@ async function portalEliminarInscripcion(idx) {
 function portalPreviewFormulario() {
   const apellido = document.getElementById('pf-apellido').value.trim();
   const nombre   = document.getElementById('pf-nombre').value.trim();
+  if (!apellido && !nombre) { _portalLog('Completá los datos del alumno primero', 'warn'); return; }
   const cedula   = document.getElementById('pf-cedula').value.trim();
   const email    = document.getElementById('pf-email').value.trim();
   const semestre = document.getElementById('pf-semestre').value.trim() || _getSemestreActual();
   const programa = document.getElementById('pf-programa').value;
   const carreraVal = document.getElementById('pf-carrera').value;
   const carreraLabel = carreraVal ? (MALLAS[carreraVal]?.label || carreraVal) : '';
-  const user     = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
-  if (!apellido && !nombre) { _portalLog('Completá los datos del alumno primero', 'warn'); return; }
-  const cursos = _portalMateriasSeleccionadas.map(m => ({
+  let username = 'académico';
+  try { username = JSON.parse(atob(localStorage.getItem('token').split('.')[1]))?.username || 'académico'; } catch(e) {}
+  const cursos = (_portalMateriasSeleccionadas||[]).map(m => ({
     nombre: m.name, dia: m.dia||'', hora_inicio: m.hora_inicio||'', hora_fin: m.hora_fin||''
   }));
-  _imprimirFormulario({
+  const win = window.open('', '_blank');
+  if (!win) { _portalLog('El browser bloqueó la ventana emergente. Permitir popups para este sitio.', 'warn'); return; }
+  _imprimirFormularioEn(win, {
     nombre: `${nombre} ${apellido}`.trim(),
     cedula, email, semestre, programa, carrera: carreraLabel,
     received_at: new Date().toISOString(),
-    source: `parseo:${user?.username||'académico'}`,
+    source: `parseo:${username}`,
     cursos,
   });
 }
 
 function _imprimirFormulario(a) {
+  const win = window.open('', '_blank');
+  if (!win) { _portalLog('El browser bloqueó la ventana emergente. Permitir popups para este sitio.', 'warn'); return; }
+  _imprimirFormularioEn(win, a);
+}
+
+function _imprimirFormularioEn(win, a) {
   const academico = (a.source||'').replace('parseo:','');
   const cursos = (a.cursos||[]).map(c => typeof c === 'string'
     ? {nombre: c, dia:'', hora_inicio:'', hora_fin:''}
@@ -2721,7 +2730,6 @@ function _imprimirFormulario(a) {
     `<tr><td>${i+1}</td><td>${c.nombre}</td><td>${c.dia||'—'}</td><td>${c.hora_inicio&&c.hora_fin ? c.hora_inicio+' a '+c.hora_fin : '—'}</td></tr>`
   ).join('');
 
-  // Grilla semanal
   const dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const franjas = [...new Set(cursos.filter(c=>c.hora_inicio&&c.hora_fin).map(c=>c.hora_inicio+'|'+c.hora_fin))].sort();
   const grilla = franjas.length ? `
@@ -2788,8 +2796,6 @@ ${grilla}
   <div>Sello / Firma académica</div>
 </div>
 </body></html>`;
-  const win = window.open('', '_blank');
-  if (!win) { _portalLog('El browser bloqueó la ventana emergente. Permitir popups para este sitio.', 'warn'); return; }
   win.document.open();
   win.document.write(html);
   win.document.close();
@@ -2798,7 +2804,9 @@ ${grilla}
 function verFormulario(idx) {
   const a = _misInscripcionesData[idx];
   if (!a) { _portalLog('Datos no encontrados', 'error'); return; }
-  _imprimirFormulario(a);
+  const win = window.open('', '_blank');
+  if (!win) { _portalLog('El browser bloqueó la ventana emergente. Permitir popups para este sitio.', 'warn'); return; }
+  _imprimirFormularioEn(win, a);
 }
 
 // ── Parseo de planilla académica ─────────────────────────────────────────────
