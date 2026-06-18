@@ -304,6 +304,14 @@
     </div>
   </div>
 
+  <!-- Portal académico (visible para admin también) -->
+  <div class="nav-group" id="nav-portal-group">
+    <div class="nav-group-label">Portal académico</div>
+    <div class="nav-item" data-panel="portal-academico" onclick="showPanel('portal-academico', this)">
+      <span class="icon">📝</span> Carga de inscripciones
+    </div>
+  </div>
+
   <!-- Administración del sistema -->
   <div class="nav-group" id="nav-admin-group">
     <div class="nav-group-label">Administración</div>
@@ -1358,7 +1366,6 @@ function _applyRoleVisibility(role) {
   if (role === 'admin') {
     // Admin ve todo
     allGroups.forEach(g => g.style.display = '');
-    document.getElementById('panel-portal-academico')?.style && (document.getElementById('panel-portal-academico').style.display = 'none');
   } else if (role === 'academico') {
     // Académico: solo su portal
     allGroups.forEach(g => g.style.display = 'none');
