@@ -510,6 +510,62 @@ def _normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _build_plantilla(headers: list[str], rows: list[list], sheet_name: str) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet_name
+    header_fill = PatternFill("solid", fgColor="1F4E79")
+    header_font = Font(color="FFFFFF", bold=True)
+    for ci, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=ci, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+    for ri, row in enumerate(rows, 2):
+        for ci, val in enumerate(row, 1):
+            ws.cell(row=ri, column=ci, value=val)
+    for ci in range(1, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(ci)].width = 32
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def build_plantilla_cursos() -> bytes:
+    return _build_plantilla(
+        headers=["materia", "semestre", "programa"],
+        rows=[
+            ["Matemática I", "2025-2", "Ingeniería en Sistemas"],
+            ["Administración", "2025-2", "Administración de Empresas"],
+            ["Comunicación", "2025-2", ""],
+        ],
+        sheet_name="Crear cursos",
+    )
+
+
+def build_plantilla_canvas() -> bytes:
+    return _build_plantilla(
+        headers=["SIS User ID", "Course ID", "Rol"],
+        rows=[
+            ["3406399", "1573", "StudentEnrollment"],
+            ["5405805", "1573", "StudentEnrollment"],
+            ["glezcano@usil.edu.py", "1539", "StudentEnrollment"],
+        ],
+        sheet_name="Inscripciones Canvas",
+    )
+
+
+def build_plantilla_teams() -> bytes:
+    return _build_plantilla(
+        headers=["Correo", "Group ID"],
+        rows=[
+            ["glezcano@usil.edu.py", "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"],
+            ["lflorentin@usil.edu.py", "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"],
+        ],
+        sheet_name="Inscripciones Teams",
+    )
+
+
 async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
     """Reads Excel with columns materia, semestre (optional), programa (optional).
     Creates Canvas course + Teams team for each row.
