@@ -193,7 +193,7 @@
       position: relative; z-index: 2;
       text-align: center; margin-bottom: 36px;
     }
-    .login-logo svg { width: 90px; height: 90px; filter: drop-shadow(0 4px 16px rgba(0,0,0,.5)); }
+    .login-logo img { width: 120px; height: 120px; object-fit: contain; filter: drop-shadow(0 4px 20px rgba(0,0,0,.6)); }
     .login-logo h2 {
       color: #fff; font-size: 1.5rem; font-weight: 800; margin: 12px 0 2px;
       text-shadow: 0 2px 12px rgba(0,0,0,.5);
@@ -249,18 +249,7 @@
 
   <!-- Logo flotante -->
   <div class="login-logo">
-    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Outer ring -->
-      <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
-      <!-- U -->
-      <path d="M14 28 L14 58 Q14 72 28 72 Q42 72 42 58 L42 28" stroke="white" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <!-- S (overlapping) -->
-      <path d="M38 66 Q38 74 50 74 Q62 74 62 64 Q62 56 50 53 Q38 50 38 40 Q38 30 50 30 Q62 30 62 38" stroke="white" stroke-width="5" fill="none" stroke-linecap="round"/>
-      <!-- I -->
-      <line x1="67" y1="30" x2="67" y2="74" stroke="white" stroke-width="5" stroke-linecap="round"/>
-      <!-- L -->
-      <path d="M74 30 L74 74 L88 74" stroke="white" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
+    <img src="/static/logo_usil.png" alt="USIL Paraguay">
     <h2>Gestión Académica</h2>
     <p class="subtitle">USIL Paraguay</p>
   </div>
