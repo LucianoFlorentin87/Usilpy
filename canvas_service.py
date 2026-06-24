@@ -189,3 +189,89 @@ async def search_users(query: str, per_page: int = 20) -> list[dict]:
             return []
         resp.raise_for_status()
         return resp.json()
+
+
+async def get_all_courses(per_page: int = 100) -> list[dict]:
+    """Fetch all courses from the account with pagination."""
+    courses = []
+    url = f"{BASE}/api/v1/accounts/self/courses"
+    params = {"per_page": per_page, "include[]": ["total_students", "term"]}
+    async with httpx.AsyncClient(timeout=60) as client:
+        while url:
+            resp = await client.get(url, headers=HEADERS, params=params)
+            resp.raise_for_status()
+            courses.extend(resp.json())
+            link = resp.headers.get("Link", "")
+            url = None
+            params = {}
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    url = part.split(";")[0].strip().strip("<>")
+    return courses
+
+
+async def get_course_enrollments(course_id: int | str, per_page: int = 100) -> list[dict]:
+    """Fetch all student enrollments for a course with pagination."""
+    enrollments = []
+    url = f"{BASE}/api/v1/courses/{course_id}/enrollments"
+    params = {"per_page": per_page, "type[]": "StudentEnrollment", "state[]": ["active", "invited", "completed"]}
+    async with httpx.AsyncClient(timeout=60) as client:
+        while url:
+            resp = await client.get(url, headers=HEADERS, params=params)
+            if resp.status_code == 404:
+                break
+            resp.raise_for_status()
+            enrollments.extend(resp.json())
+            link = resp.headers.get("Link", "")
+            url = None
+            params = {}
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    url = part.split(";")[0].strip().strip("<>")
+    return enrollments
+
+
+async def get_course_grades(course_id: int | str) -> list[dict]:
+    """Fetch final grades for all students in a course via enrollments."""
+    enrollments = await get_course_enrollments(course_id)
+    grades = []
+    for e in enrollments:
+        grades_data = e.get("grades", {})
+        grades.append({
+            "course_id": course_id,
+            "user_id": e.get("user_id"),
+            "user_name": e.get("user", {}).get("name", ""),
+            "sis_user_id": e.get("sis_user_id") or e.get("user", {}).get("sis_user_id", ""),
+            "login_id": e.get("user", {}).get("login_id", ""),
+            "current_score": grades_data.get("current_score"),
+            "final_score": grades_data.get("final_score"),
+            "current_grade": grades_data.get("current_grade"),
+            "final_grade": grades_data.get("final_grade"),
+            "enrollment_state": e.get("enrollment_state", ""),
+        })
+    return grades
+
+
+async def get_course_attendance(course_id: int | str) -> list[dict]:
+    """Fetch attendance records via Canvas Roll Call API (if enabled)."""
+    attendances = []
+    url = f"{BASE}/api/v1/courses/{course_id}/attendances"
+    params = {"per_page": 100}
+    async with httpx.AsyncClient(timeout=60) as client:
+        while url:
+            resp = await client.get(url, headers=HEADERS, params=params)
+            if resp.status_code in (404, 401, 403):
+                break
+            resp.raise_for_status()
+            data = resp.json()
+            if not data:
+                break
+            attendances.extend(data)
+            link = resp.headers.get("Link", "")
+            url = None
+            params = {}
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    url = part.split(";")[0].strip().strip("<>")
+    return attendances
+
