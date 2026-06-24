@@ -599,7 +599,8 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
 
         # Canvas
         try:
-            term_id = await canvas_service.get_or_create_term(semestre)
+            term_obj = await canvas_service.get_or_create_term(semestre)
+            term_id = term_obj.get("id") if isinstance(term_obj, dict) else None
             sis_id = f"USIL-{semestre}-{materia[:60]}"
             existing = await canvas_service.get_course_by_sis_id(sis_id)
             if existing:
@@ -608,8 +609,8 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
             else:
                 created = await canvas_service.create_course(
                     name=f"{semestre} - {materia}",
-                    sis_course_id=sis_id,
-                    enrollment_term_id=term_id,
+                    sis_id=sis_id,
+                    term_id=term_id,
                 )
                 canvas_course_id = str(created.get("id", ""))
                 canvas_status = "creado"

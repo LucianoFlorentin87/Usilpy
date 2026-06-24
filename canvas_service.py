@@ -1,10 +1,13 @@
 import httpx
 from config import get_settings
 
-settings = get_settings()
 
-BASE = settings.canvas_base_url.rstrip("/")
-HEADERS = {"Authorization": f"Bearer {settings.canvas_api_token}"}
+def _base() -> str:
+    return get_settings().canvas_base_url.rstrip("/")
+
+
+def _headers() -> dict:
+    return {"Authorization": f"Bearer {get_settings().canvas_api_token}"}
 
 
 # ── Enrollment Terms (Períodos) ───────────────────────────────────────────────
@@ -13,8 +16,8 @@ async def get_terms(per_page: int = 100) -> list[dict]:
     """List all enrollment terms in the account."""
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{BASE}/api/v1/accounts/self/terms",
-            headers=HEADERS,
+            f"{_base()}/api/v1/accounts/self/terms",
+            headers=_headers(),
             params={"per_page": per_page},
         )
         resp.raise_for_status()
@@ -37,8 +40,8 @@ async def create_term(name: str, start_at: str = "", end_at: str = "") -> dict:
         payload["enrollment_term"]["end_at"] = end_at
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{BASE}/api/v1/accounts/self/terms",
-            headers=HEADERS,
+            f"{_base()}/api/v1/accounts/self/terms",
+            headers=_headers(),
             json=payload,
         )
         resp.raise_for_status()
@@ -56,8 +59,8 @@ async def get_or_create_term(name: str) -> dict:
 async def get_courses(per_page: int = 50) -> list[dict]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{BASE}/api/v1/courses",
-            headers=HEADERS,
+            f"{_base()}/api/v1/courses",
+            headers=_headers(),
             params={"per_page": per_page, "enrollment_type": "teacher"},
         )
         resp.raise_for_status()
@@ -67,8 +70,8 @@ async def get_courses(per_page: int = 50) -> list[dict]:
 async def get_users(per_page: int = 50) -> list[dict]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{BASE}/api/v1/accounts/self/users",
-            headers=HEADERS,
+            f"{_base()}/api/v1/accounts/self/users",
+            headers=_headers(),
             params={"per_page": per_page},
         )
         resp.raise_for_status()
@@ -91,8 +94,8 @@ async def create_user(name: str, email: str, sis_id: str = "") -> dict:
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{BASE}/api/v1/accounts/self/users",
-            headers=HEADERS,
+            f"{_base()}/api/v1/accounts/self/users",
+            headers=_headers(),
             json=payload,
         )
         resp.raise_for_status()
@@ -103,8 +106,8 @@ async def find_user_by_sis_id(sis_id: str) -> dict | None:
     """Look up a Canvas user by SIS user ID. Returns None if not found."""
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{BASE}/api/v1/users/sis_user_id:{sis_id}",
-            headers=HEADERS,
+            f"{_base()}/api/v1/users/sis_user_id:{sis_id}",
+            headers=_headers(),
         )
         if resp.status_code == 404:
             return None
@@ -116,8 +119,8 @@ async def get_course_by_sis_id(sis_id: str) -> dict | None:
     """Look up a Canvas course by SIS course ID. Returns None if not found."""
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{BASE}/api/v1/courses/sis_course_id:{sis_id}",
-            headers=HEADERS,
+            f"{_base()}/api/v1/courses/sis_course_id:{sis_id}",
+            headers=_headers(),
         )
         if resp.status_code == 404:
             return None
@@ -140,8 +143,8 @@ async def create_course(name: str, sis_id: str, semestre: str = "", term_id: int
     payload = {"course": course_data}
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{BASE}/api/v1/accounts/self/courses",
-            headers=HEADERS,
+            f"{_base()}/api/v1/accounts/self/courses",
+            headers=_headers(),
             json=payload,
         )
         resp.raise_for_status()
@@ -158,8 +161,8 @@ async def enroll_user(course_id: str, user_id: str, role: str = "StudentEnrollme
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{BASE}/api/v1/courses/{course_id}/enrollments",
-            headers=HEADERS,
+            f"{_base()}/api/v1/courses/{course_id}/enrollments",
+            headers=_headers(),
             json=payload,
         )
         resp.raise_for_status()
@@ -169,8 +172,8 @@ async def enroll_user(course_id: str, user_id: str, role: str = "StudentEnrollme
 async def get_enrollments(course_id: str) -> list[dict]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{BASE}/api/v1/courses/{course_id}/enrollments",
-            headers=HEADERS,
+            f"{_base()}/api/v1/courses/{course_id}/enrollments",
+            headers=_headers(),
             params={"per_page": 100},
         )
         resp.raise_for_status()
@@ -181,8 +184,8 @@ async def search_users(query: str, per_page: int = 20) -> list[dict]:
     """Search Canvas users by name or email (account-level search)."""
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{BASE}/api/v1/accounts/self/users",
-            headers=HEADERS,
+            f"{_base()}/api/v1/accounts/self/users",
+            headers=_headers(),
             params={"search_term": query, "per_page": per_page},
         )
         if resp.status_code in (400, 404):
@@ -194,11 +197,11 @@ async def search_users(query: str, per_page: int = 20) -> list[dict]:
 async def get_all_courses(per_page: int = 100) -> list[dict]:
     """Fetch all courses from the account with pagination."""
     courses = []
-    url = f"{BASE}/api/v1/accounts/self/courses"
+    url = f"{_base()}/api/v1/accounts/self/courses"
     params = {"per_page": per_page, "include[]": ["total_students", "term"]}
     async with httpx.AsyncClient(timeout=60) as client:
         while url:
-            resp = await client.get(url, headers=HEADERS, params=params)
+            resp = await client.get(url, headers=_headers(), params=params)
             resp.raise_for_status()
             courses.extend(resp.json())
             link = resp.headers.get("Link", "")
@@ -213,11 +216,11 @@ async def get_all_courses(per_page: int = 100) -> list[dict]:
 async def get_course_enrollments(course_id: int | str, per_page: int = 100) -> list[dict]:
     """Fetch all student enrollments for a course with pagination."""
     enrollments = []
-    url = f"{BASE}/api/v1/courses/{course_id}/enrollments"
+    url = f"{_base()}/api/v1/courses/{course_id}/enrollments"
     params = {"per_page": per_page, "type[]": "StudentEnrollment", "state[]": ["active", "invited", "completed"]}
     async with httpx.AsyncClient(timeout=60) as client:
         while url:
-            resp = await client.get(url, headers=HEADERS, params=params)
+            resp = await client.get(url, headers=_headers(), params=params)
             if resp.status_code == 404:
                 break
             resp.raise_for_status()
@@ -255,11 +258,11 @@ async def get_course_grades(course_id: int | str) -> list[dict]:
 async def get_course_attendance(course_id: int | str) -> list[dict]:
     """Fetch attendance records via Canvas Roll Call API (if enabled)."""
     attendances = []
-    url = f"{BASE}/api/v1/courses/{course_id}/attendances"
+    url = f"{_base()}/api/v1/courses/{course_id}/attendances"
     params = {"per_page": 100}
     async with httpx.AsyncClient(timeout=60) as client:
         while url:
-            resp = await client.get(url, headers=HEADERS, params=params)
+            resp = await client.get(url, headers=_headers(), params=params)
             if resp.status_code in (404, 401, 403):
                 break
             resp.raise_for_status()
