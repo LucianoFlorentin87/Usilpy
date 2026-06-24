@@ -106,6 +106,23 @@ async def root():
     return FileResponse("static/index.html")
 
 
+@app.get("/api/canvas-ping")
+async def canvas_ping():
+    """Diagnóstico público de Canvas — sin auth."""
+    import canvas_service as _cs
+    from config import get_settings
+    s = get_settings()
+    result = {"canvas_base_url": s.canvas_base_url or "(vacío)", "canvas_api_token": "configurado" if s.canvas_api_token else "(vacío)"}
+    try:
+        acct_id = await _cs._account_id()
+        result["account_id"] = acct_id
+        terms = await _cs.get_terms()
+        result["canvas_conexion"] = f"OK — {len(terms)} periodos"
+    except Exception as exc:
+        result["canvas_conexion"] = f"ERROR: {exc}"
+    return result
+
+
 @app.get("/api/diagnostico")
 async def diagnostico(_: dict = Depends(get_current_user)):
     """Diagnóstico de variables de entorno y conectividad real con Canvas y Azure."""

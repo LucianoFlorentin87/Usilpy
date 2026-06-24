@@ -1,6 +1,8 @@
 import httpx
 from config import get_settings
 
+_account_id_cache: str | None = None
+
 
 def _base() -> str:
     return get_settings().canvas_base_url.rstrip("/")
@@ -10,13 +12,29 @@ def _headers() -> dict:
     return {"Authorization": f"Bearer {get_settings().canvas_api_token}"}
 
 
+async def _account_id() -> str:
+    """Discover the root account ID dynamically."""
+    global _account_id_cache
+    if _account_id_cache:
+        return _account_id_cache
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{_base()}/api/v1/accounts", headers=_headers())
+        resp.raise_for_status()
+        accounts = resp.json()
+        if accounts:
+            _account_id_cache = str(accounts[0]["id"])
+            return _account_id_cache
+    return "self"
+
+
 # ── Enrollment Terms (Períodos) ───────────────────────────────────────────────
 
 async def get_terms(per_page: int = 100) -> list[dict]:
     """List all enrollment terms in the account."""
+    acct = await _account_id()
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{_base()}/api/v1/accounts/self/terms",
+            f"{_base()}/api/v1/accounts/{acct}/terms",
             headers=_headers(),
             params={"per_page": per_page},
         )
@@ -38,9 +56,10 @@ async def create_term(name: str, start_at: str = "", end_at: str = "") -> dict:
         payload["enrollment_term"]["start_at"] = start_at
     if end_at:
         payload["enrollment_term"]["end_at"] = end_at
+    acct = await _account_id()
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{_base()}/api/v1/accounts/self/terms",
+            f"{_base()}/api/v1/accounts/{acct}/terms",
             headers=_headers(),
             json=payload,
         )
@@ -68,9 +87,10 @@ async def get_courses(per_page: int = 50) -> list[dict]:
 
 
 async def get_users(per_page: int = 50) -> list[dict]:
+    acct = await _account_id()
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{_base()}/api/v1/accounts/self/users",
+            f"{_base()}/api/v1/accounts/{acct}/users",
             headers=_headers(),
             params={"per_page": per_page},
         )
@@ -92,9 +112,10 @@ async def create_user(name: str, email: str, sis_id: str = "") -> dict:
             "skip_confirmation": True,
         },
     }
+    acct = await _account_id()
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{_base()}/api/v1/accounts/self/users",
+            f"{_base()}/api/v1/accounts/{acct}/users",
             headers=_headers(),
             json=payload,
         )
@@ -141,9 +162,10 @@ async def create_course(name: str, sis_id: str, semestre: str = "", term_id: int
         course_data["term_name"] = semestre
 
     payload = {"course": course_data}
+    acct = await _account_id()
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{_base()}/api/v1/accounts/self/courses",
+            f"{_base()}/api/v1/accounts/{acct}/courses",
             headers=_headers(),
             json=payload,
         )
@@ -182,9 +204,10 @@ async def get_enrollments(course_id: str) -> list[dict]:
 
 async def search_users(query: str, per_page: int = 20) -> list[dict]:
     """Search Canvas users by name or email (account-level search)."""
+    acct = await _account_id()
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{_base()}/api/v1/accounts/self/users",
+            f"{_base()}/api/v1/accounts/{acct}/users",
             headers=_headers(),
             params={"search_term": query, "per_page": per_page},
         )
@@ -197,7 +220,8 @@ async def search_users(query: str, per_page: int = 20) -> list[dict]:
 async def get_all_courses(per_page: int = 100) -> list[dict]:
     """Fetch all courses from the account with pagination."""
     courses = []
-    url = f"{_base()}/api/v1/accounts/self/courses"
+    acct = await _account_id()
+    url = f"{_base()}/api/v1/accounts/{acct}/courses"
     params = {"per_page": per_page, "include[]": ["total_students", "term"]}
     async with httpx.AsyncClient(timeout=60) as client:
         while url:
