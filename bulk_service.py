@@ -845,12 +845,14 @@ async def process_matriculacion_planilla(file_bytes: bytes, filename: str) -> tu
     for correo, info in email_map.items():
         try:
             if info["is_new"]:
+                from config import get_settings as _gs
+                _s = _gs()
                 await email_service.send_welcome_email(
                     correo,
                     info["alumno"],
                     info["password"],
-                    canvas_url="",
-                    teams_url="",
+                    canvas_url=_s.canvas_base_url,
+                    teams_url=_s.teams_base_url,
                     cursos=info["materias"],
                     semestre=semestre,
                 )

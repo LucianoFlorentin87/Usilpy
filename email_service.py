@@ -61,12 +61,55 @@ def _base_html(title: str, content: str) -> str:
 
 
 async def _send(to: str, subject: str, html: str) -> bool:
+    # ── Transporte 1: Microsoft Graph API (preferido) ─────────────────────────
+    if settings.email_sender:
+        try:
+            import httpx, msal
+            app = msal.ConfidentialClientApplication(
+                settings.azure_client_id,
+                authority=f"https://login.microsoftonline.com/{settings.azure_tenant_id}",
+                client_credential=settings.azure_client_secret,
+            )
+            result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+            if "access_token" not in result:
+                raise RuntimeError(result.get("error_description", "Token error"))
+            headers = {
+                "Authorization": f"Bearer {result['access_token']}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "message": {
+                    "subject": subject,
+                    "body": {"contentType": "HTML", "content": html},
+                    "toRecipients": [{"emailAddress": {"address": to}}],
+                },
+                "saveToSentItems": False,
+            }
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.post(
+                    f"https://graph.microsoft.com/v1.0/users/{settings.email_sender}/sendMail",
+                    headers=headers,
+                    json=payload,
+                )
+            if resp.status_code == 202:
+                logger.info("Email (Graph) enviado a %s — %s", to, subject)
+                return True
+            logger.warning("Graph sendMail HTTP %d para %s: %s", resp.status_code, to, resp.text[:200])
+            return False
+        except Exception as exc:
+            logger.error("Error Graph email a %s: %s", to, exc)
+            return False
+
+    # ── Transporte 2: SMTP (fallback) ─────────────────────────────────────────
+    if not settings.smtp_user:
+        logger.warning("Email omitido (sin EMAIL_SENDER ni SMTP_USER): %s", to)
+        return False
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = settings.smtp_user
     msg["To"] = to
     msg.attach(MIMEText(html, "html", "utf-8"))
-
     try:
         await aiosmtplib.send(
             msg,
@@ -76,10 +119,10 @@ async def _send(to: str, subject: str, html: str) -> bool:
             password=settings.smtp_password,
             start_tls=True,
         )
-        logger.info("Email enviado a %s — %s", to, subject)
+        logger.info("Email (SMTP) enviado a %s — %s", to, subject)
         return True
     except Exception as exc:
-        logger.error("Error enviando email a %s: %s", to, exc)
+        logger.error("Error SMTP email a %s: %s", to, exc)
         return False
 
 

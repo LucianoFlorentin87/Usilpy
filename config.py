@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     admin_email: str = ""
+    email_sender: str = ""        # UPN de la cuenta que envía emails via Graph (ej: noreply@usil.edu.py)
 
     # Webhook (para integración con sistema académico externo)
     webhook_api_key: str = ""   # key estática que el sistema académico envía en X-API-Key
