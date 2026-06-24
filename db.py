@@ -70,12 +70,12 @@ async def init_pool() -> None:
     # Log sanitized URL for diagnosis (hide password)
     safe = re.sub(r"(:)[^@]+(@)", r"\1***\2", url)
     logger.info("DB init_pool — raw url (sanitized): %s", safe)
-    logger.info("DB init_pool — called from:\n%s", "".join(_tb.format_stack()))
+    logger.debug("DB init_pool — called from:\n%s", "".join(_tb.format_stack()))
     kwargs = _parse_db_url(url)
     logger.info("DB init_pool — parsed host=%s port=%s user=%s db=%s",
                 kwargs["host"], kwargs["port"], kwargs["user"], kwargs["database"])
     _pool = await asyncpg.create_pool(**kwargs, min_size=1, max_size=10,
-                                      ssl="require")
+                                      ssl="require", statement_cache_size=0)
 
 
 def get_pool() -> asyncpg.Pool:

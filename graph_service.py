@@ -150,7 +150,8 @@ async def get_teams(top: int = 50) -> list[dict]:
 
 async def find_team_by_display_name(name: str) -> dict | None:
     """Find a Teams team by exact display name. Returns None if not found."""
-    filter_q = f"displayName eq '{name}' and resourceProvisioningOptions/Any(x:x eq 'Team')"
+    safe = name.replace("'", "''")
+    filter_q = f"displayName eq '{safe}' and resourceProvisioningOptions/Any(x:x eq 'Team')"
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.get(
             f"{GRAPH_BASE}/groups",
@@ -230,3 +231,103 @@ async def add_member_to_team(team_id: str, user_id: str) -> bool:
         if resp.status_code == 409:
             return True  # already a member
         return resp.status_code in (200, 201, 204)
+
+
+# ── Email via Microsoft Graph ─────────────────────────────────────────────────
+
+async def send_welcome_email(to_email: str, nombre: str, canvas_url: str, username: str) -> bool:
+    """
+    Envía email de bienvenida al alumno recién creado usando Microsoft Graph API.
+    Requiere que la app tenga permiso Mail.Send y que EMAIL_SENDER esté configurado.
+    Retorna True si se envió correctamente, False si no.
+    """
+    sender = settings.email_sender
+    if not sender:
+        logger.warning("EMAIL_SENDER no configurado — email de bienvenida omitido para %s", to_email)
+        return False
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head><meta charset="UTF-8"></head>
+    <body style="font-family: 'Segoe UI', Arial, sans-serif; background:#f0f4f8; margin:0; padding:0;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8; padding:32px 0;">
+        <tr><td align="center">
+          <table width="560" cellpadding="0" cellspacing="0" style="background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,.08);">
+            <!-- Header -->
+            <tr>
+              <td style="background:#0d1b2e; padding:28px 36px; text-align:center;">
+                <div style="font-size:22px; font-weight:800; color:#fff; letter-spacing:.5px;">Gestión Académica</div>
+                <div style="font-size:12px; color:#5c7a9e; text-transform:uppercase; letter-spacing:1px; margin-top:4px;">USIL Paraguay</div>
+              </td>
+            </tr>
+            <!-- Body -->
+            <tr>
+              <td style="padding:36px;">
+                <p style="font-size:16px; color:#1e293b; margin:0 0 8px;">Hola, <strong>{nombre}</strong> 👋</p>
+                <p style="font-size:14px; color:#64748b; margin:0 0 24px; line-height:1.6;">
+                  Tu cuenta en <strong>Canvas LMS</strong> ha sido creada exitosamente.
+                  A continuación encontrás tus datos de acceso.
+                </p>
+
+                <!-- Credentials box -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:20px 24px; margin-bottom:24px;">
+                  <div style="margin-bottom:12px;">
+                    <div style="font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px;">Usuario</div>
+                    <div style="font-size:15px; font-weight:600; color:#1e293b;">{username}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px;">Contraseña</div>
+                    <div style="font-size:14px; color:#64748b;">Usá la opción <em>"¿Olvidé mi contraseña?"</em> en Canvas para establecer tu contraseña.</div>
+                  </div>
+                </div>
+
+                <!-- CTA button -->
+                <div style="text-align:center; margin-bottom:28px;">
+                  <a href="{canvas_url}" style="display:inline-block; background:#2563eb; color:#fff; text-decoration:none; font-size:15px; font-weight:700; padding:14px 32px; border-radius:10px; letter-spacing:.3px;">
+                    Acceder a Canvas LMS →
+                  </a>
+                </div>
+
+                <p style="font-size:13px; color:#94a3b8; line-height:1.6; margin:0;">
+                  Si tenés alguna duda, respondé este email o contactá al Departamento de Tecnología de USIL Paraguay.
+                </p>
+              </td>
+            </tr>
+            <!-- Footer -->
+            <tr>
+              <td style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:18px 36px; text-align:center;">
+                <div style="font-size:12px; color:#94a3b8;">© USIL Paraguay · Departamento de Tecnología</div>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>
+    </body>
+    </html>
+    """
+
+    payload = {
+        "message": {
+            "subject": f"Bienvenido/a a USIL Paraguay — Tu cuenta Canvas está lista, {nombre.split()[0]}",
+            "body": {"contentType": "HTML", "content": html_body},
+            "toRecipients": [{"emailAddress": {"address": to_email}}],
+        },
+        "saveToSentItems": False,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(
+                f"{GRAPH_BASE}/users/{sender}/sendMail",
+                headers=_headers(),
+                json=payload,
+            )
+            if resp.status_code == 202:
+                logger.info("Email de bienvenida enviado a %s", to_email)
+                return True
+            logger.warning("Graph sendMail → HTTP %d para %s: %s", resp.status_code, to_email, resp.text[:200])
+            return False
+    except Exception as exc:
+        logger.error("Error enviando email a %s: %s", to_email, exc)
+        return False

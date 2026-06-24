@@ -1,11 +1,17 @@
 import io
+import logging
 import os
+import time
+from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request, Query, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from starlette.middleware.base import BaseHTTPMiddleware
 from jose import JWTError
 from pydantic import BaseModel
 
@@ -23,12 +29,40 @@ from scheduler import lifespan, get_next_run
 
 app = FastAPI(title="Gestión Académica Universitaria", version="2.0.0", lifespan=lifespan)
 
+# ── Security headers ───────────────────────────────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# ── CORS ───────────────────────────────────────────────────────────────────────
+_settings_cors = auth_service.settings  # reuse already-imported settings reference later
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] or [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+# ── Simple in-process rate limiter for login ──────────────────────────────────
+_login_attempts: dict = defaultdict(list)
+_LOGIN_MAX = 10       # attempts
+_LOGIN_WINDOW = 300   # seconds (5 min)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -98,7 +132,15 @@ class LoginRequest(BaseModel):
 
 
 @app.post("/api/auth/login")
-async def login(body: LoginRequest):
+async def login(body: LoginRequest, request: Request):
+    # Rate limiting: max _LOGIN_MAX attempts per IP per _LOGIN_WINDOW seconds
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < _LOGIN_WINDOW]
+    if len(_login_attempts[ip]) >= _LOGIN_MAX:
+        raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 5 minutos.")
+    _login_attempts[ip].append(now)
+
     # Try DB users first (async)
     db_user = await user_service.get_user_by_username(body.username)
     if db_user:
@@ -138,13 +180,24 @@ async def azure_login():
 @app.get("/api/auth/azure/callback")
 async def azure_callback(code: str = "", state: str = "", error: str = ""):
     if error:
-        return RedirectResponse(f"/?auth_error={error}")
+        # Never reflect external error strings — use a fixed safe message
+        return RedirectResponse("/?auth_error=azure_login_failed")
     try:
         user = await auth_service.exchange_azure_code(code, state)
-    except Exception as exc:
-        return RedirectResponse(f"/?auth_error={str(exc)[:60]}")
+    except Exception:
+        return RedirectResponse("/?auth_error=azure_login_failed")
     token = auth_service.create_access_token(user)
-    return RedirectResponse(f"/#token={token}")
+    # Return token in JSON body via a short-lived server-set cookie to avoid URL exposure
+    response = RedirectResponse("/#azure_ok")
+    response.set_cookie(
+        "azure_token", token,
+        httponly=False,  # JS reads it once then clears it; kept non-httponly intentionally for SPA auth flow
+        secure=True,
+        samesite="strict",
+        max_age=60,      # 1-minute window to consume; cleared by JS after read
+        path="/",
+    )
+    return response
 
 
 @app.get("/api/auth/me")
@@ -166,7 +219,9 @@ async def list_terms(_: dict = Depends(get_current_user)):
     try:
         return await canvas_service.get_terms()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/canvas/terms")
@@ -174,7 +229,9 @@ async def create_term(payload: dict, _: dict = Depends(get_current_user)):
     try:
         return await canvas_service.get_or_create_term(payload["name"])
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.get("/api/canvas/courses")
@@ -182,7 +239,9 @@ async def list_courses(_: dict = Depends(get_current_user)):
     try:
         return await canvas_service.get_courses()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.get("/api/canvas/users")
@@ -190,7 +249,9 @@ async def list_canvas_users(_: dict = Depends(get_current_user)):
     try:
         return await canvas_service.get_users()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/canvas/users")
@@ -202,7 +263,9 @@ async def create_canvas_user(payload: dict, _: dict = Depends(get_current_user))
             sis_id=payload.get("sis_id", ""),
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/canvas/courses/{course_id}/enrollments")
@@ -214,7 +277,9 @@ async def enroll(course_id: str, payload: dict, _: dict = Depends(get_current_us
             role=payload.get("role", "StudentEnrollment"),
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +291,9 @@ async def list_azure_users(_: dict = Depends(get_current_user)):
     try:
         return await graph_service.get_users()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/azure/users")
@@ -239,7 +306,9 @@ async def create_azure_user(payload: dict, _: dict = Depends(get_current_user)):
             password=payload["password"],
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.get("/api/azure/groups")
@@ -247,7 +316,9 @@ async def list_groups(_: dict = Depends(get_current_user)):
     try:
         return await graph_service.get_groups()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/azure/groups")
@@ -258,7 +329,9 @@ async def create_group(payload: dict, _: dict = Depends(get_current_user)):
             description=payload.get("description", ""),
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +343,9 @@ async def list_teams(_: dict = Depends(get_current_user)):
     try:
         return await graph_service.get_teams()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/teams")
@@ -281,7 +356,9 @@ async def create_team_endpoint(payload: dict, _: dict = Depends(get_current_user
             description=payload.get("description", ""),
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/teams/members")
@@ -294,7 +371,9 @@ async def add_team_member_endpoint(payload: dict, _: dict = Depends(get_current_
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 # ---------------------------------------------------------------------------
@@ -303,6 +382,9 @@ async def add_team_member_endpoint(payload: dict, _: dict = Depends(get_current_
 
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 TEMPLATE_PATH = "plantilla_carga_masiva.xlsx"
+
+
+_MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
 def _validate_file(file: UploadFile) -> None:
@@ -314,10 +396,17 @@ def _validate_file(file: UploadFile) -> None:
         )
 
 
+async def _read_validated(file: UploadFile) -> bytes:
+    data = await _read_validated(file)
+    if len(data) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (máx 20 MB)")
+    return data
+
+
 @app.post("/api/bulk/usuarios")
 async def bulk_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_users_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -328,7 +417,7 @@ async def bulk_usuarios(file: UploadFile = File(...), _: dict = Depends(get_curr
 @app.post("/api/bulk/inscripciones")
 async def bulk_inscripciones(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_enrollments_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -337,7 +426,7 @@ async def bulk_inscripciones(file: UploadFile = File(...), _: dict = Depends(get
 
 
 @app.get("/api/bulk/template")
-async def bulk_template():
+async def bulk_template(_: dict = Depends(get_current_user)):
     if not os.path.exists(TEMPLATE_PATH):
         raise HTTPException(status_code=404, detail="Plantilla no encontrada en el servidor")
     return FileResponse(
@@ -348,7 +437,7 @@ async def bulk_template():
 
 
 @app.get("/api/bulk/template/{tipo}")
-async def bulk_template_tipo(tipo: str):
+async def bulk_template_tipo(tipo: str, _: dict = Depends(get_current_user)):
     """Genera y devuelve una plantilla Excel vacía según el tipo solicitado."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
@@ -391,7 +480,7 @@ async def bulk_template_tipo(tipo: str):
 @app.post("/api/bulk/cursos")
 async def bulk_cursos(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_courses_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -402,7 +491,7 @@ async def bulk_cursos(file: UploadFile = File(...), _: dict = Depends(get_curren
 @app.post("/api/bulk/canvas/usuarios")
 async def bulk_canvas_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_canvas_users_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -413,7 +502,7 @@ async def bulk_canvas_usuarios(file: UploadFile = File(...), _: dict = Depends(g
 @app.post("/api/bulk/azure/usuarios")
 async def bulk_azure_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_azure_users_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -424,7 +513,7 @@ async def bulk_azure_usuarios(file: UploadFile = File(...), _: dict = Depends(ge
 @app.post("/api/bulk/canvas/inscripciones")
 async def bulk_canvas_inscripciones(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_canvas_enrollments_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -435,7 +524,7 @@ async def bulk_canvas_inscripciones(file: UploadFile = File(...), _: dict = Depe
 @app.post("/api/bulk/teams")
 async def bulk_teams(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_teams_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -504,7 +593,7 @@ async def matriculacion_upload(
     if ext not in {".xlsx", ".xls"}:
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
     import uuid
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     ejecucion_id = str(uuid.uuid4())
     matriculacion_service._init_progress_placeholder(ejecucion_id)
     background_tasks.add_task(
@@ -526,7 +615,7 @@ async def matriculacion_upload_dry_run(
     if ext not in {".xlsx", ".xls"}:
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
     import uuid
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     ejecucion_id = str(uuid.uuid4())
     matriculacion_service._init_progress_placeholder(ejecucion_id)
     background_tasks.add_task(
@@ -719,7 +808,7 @@ async def upload_pending(
 ):
     """Portal académico: carga un Excel con inscripciones a la cola pendiente."""
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     import io
     import pandas as pd
     buf = io.BytesIO(file_bytes)
@@ -943,7 +1032,7 @@ async def parsear_planilla(
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in {".xlsx", ".xls"}:
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         result = parseo_service.parsear_planilla(file_bytes, semestre=semestre)
         return JSONResponse(content=result)
@@ -1115,8 +1204,9 @@ async def formulario_inscripcion(
     academico = source.replace("parseo:", "") if "parseo:" in source else source
     fecha    = (first.get("received_at") or "")[:10]
 
+    from html import escape as _he
     cursos_html = "".join(
-        f"<tr><td>{i+1}</td><td>{r.get('curso_nombre') or ''}</td><td>{r.get('rol','StudentEnrollment').replace('Enrollment','')}</td><td>{r.get('estado','')}</td></tr>"
+        f"<tr><td>{i+1}</td><td>{_he(r.get('curso_nombre') or '')}</td><td>{_he(r.get('rol','StudentEnrollment').replace('Enrollment',''))}</td><td>{_he(r.get('estado',''))}</td></tr>"
         for i, r in enumerate(rows)
     )
 
@@ -1124,7 +1214,7 @@ async def formulario_inscripcion(
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Formulario de Inscripción — {nombre}</title>
+<title>Formulario de Inscripción — {_he(nombre)}</title>
 <style>
   body {{ font-family: Arial, sans-serif; margin: 40px; color: #333; }}
   h1 {{ color: #1a3c6b; border-bottom: 2px solid #1a3c6b; padding-bottom: 8px; }}
@@ -1149,12 +1239,12 @@ async def formulario_inscripcion(
 <h1>Formulario de Inscripción</h1>
 <button class="btn-print no-print" onclick="window.print()">🖨️ Imprimir</button>
 <table class="info">
-  <tr><td>Nombre completo</td><td>{nombre}</td></tr>
-  <tr><td>Cédula de identidad</td><td>{cedula}</td></tr>
-  <tr><td>Correo electrónico</td><td>{email or '—'}</td></tr>
-  <tr><td>Período / Semestre</td><td>{sem}</td></tr>
-  <tr><td>Fecha de inscripción</td><td>{fecha}</td></tr>
-  <tr><td>Registrado por</td><td>{academico}</td></tr>
+  <tr><td>Nombre completo</td><td>{_he(nombre)}</td></tr>
+  <tr><td>Cédula de identidad</td><td>{_he(cedula)}</td></tr>
+  <tr><td>Correo electrónico</td><td>{_he(email) if email else '—'}</td></tr>
+  <tr><td>Período / Semestre</td><td>{_he(sem)}</td></tr>
+  <tr><td>Fecha de inscripción</td><td>{_he(fecha)}</td></tr>
+  <tr><td>Registrado por</td><td>{_he(academico)}</td></tr>
 </table>
 <h2 style="color:#1a3c6b;font-size:16px;">Cursos inscriptos</h2>
 <table class="cursos">
@@ -1170,3 +1260,220 @@ async def formulario_inscripcion(
 
     from fastapi.responses import HTMLResponse
     return HTMLResponse(content=html)
+
+
+# ---------------------------------------------------------------------------
+# Gestión masiva endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/gestion/plantilla-cursos")
+async def plantilla_cursos(_user=Depends(_require_admin)):
+    from fastapi.responses import Response
+    import bulk_service as _bulk
+    excel_bytes = _bulk.build_plantilla_cursos()
+    return Response(content=excel_bytes,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=plantilla_crear_cursos.xlsx"})
+
+
+@app.get("/api/gestion/plantilla-canvas")
+async def plantilla_canvas(_user=Depends(_require_admin)):
+    from fastapi.responses import Response
+    import bulk_service as _bulk
+    excel_bytes = _bulk.build_plantilla_canvas()
+    return Response(content=excel_bytes,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=plantilla_inscripciones_canvas.xlsx"})
+
+
+@app.get("/api/gestion/plantilla-teams")
+async def plantilla_teams(_user=Depends(_require_admin)):
+    from fastapi.responses import Response
+    import bulk_service as _bulk
+    excel_bytes = _bulk.build_plantilla_teams()
+    return Response(content=excel_bytes,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=plantilla_inscripciones_teams.xlsx"})
+
+
+@app.post("/api/gestion/crear-cursos")
+async def gestion_crear_cursos(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Upload Excel with materias → creates Canvas courses + Teams teams → returns Excel with IDs"""
+    import bulk_service as _bulk
+    data = await _read_validated(file)
+    excel_bytes = await _bulk.process_cursos_ids(data, file.filename)
+    from fastapi.responses import Response
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=cursos_ids.xlsx"}
+    )
+
+
+@app.post("/api/gestion/matricular")
+async def gestion_matricular(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Upload planilla Excel → create users + enroll in Canvas + Teams + send emails"""
+    import bulk_service as _bulk
+    data = await _read_validated(file)
+    summary, excel_bytes = await _bulk.process_matriculacion_planilla(data, file.filename)
+    import base64
+    summary["excel_b64"] = base64.b64encode(excel_bytes).decode()
+    return summary
+
+
+@app.post("/api/gestion/inscribir-canvas")
+async def gestion_inscribir_canvas(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Upload Excel SIS User ID|Course ID|Rol → inscribe en Canvas → returns Excel con Resultado"""
+    import bulk_service as _bulk
+    from fastapi.responses import Response
+    data = await _read_validated(file)
+    excel_bytes = await _bulk.process_canvas_enrollment_file(data, file.filename)
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=resultado_canvas.xlsx"}
+    )
+
+
+@app.post("/api/gestion/inscribir-teams")
+async def gestion_inscribir_teams(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Upload Excel Correo|Group ID → agrega a equipos Teams → returns Excel con Resultado"""
+    import bulk_service as _bulk
+    from fastapi.responses import Response
+    data = await _read_validated(file)
+    excel_bytes = await _bulk.process_teams_enrollment_file(data, file.filename)
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=resultado_teams.xlsx"}
+    )
+
+
+@app.post("/api/sync/canvas")
+async def sync_canvas(_user=Depends(_require_admin)):
+    """Trigger manual Canvas sync — cursos, alumnos, matriculas, notas, asistencias."""
+    import sync_service
+    await sync_service.init_db()
+    result = await sync_service.run_sync("manual")
+    return result
+
+
+@app.get("/api/sync/estado")
+async def sync_estado(_user=Depends(_require_admin)):
+    """Last sync log + summary counts."""
+    import db as _db
+    import sync_service
+    await sync_service.init_db()
+    last = await _db.fetchrow(
+        "SELECT * FROM sync_log ORDER BY id DESC LIMIT 1"
+    )
+    totals = await _db.fetchrow("""
+        SELECT
+            (SELECT COUNT(*) FROM sync_cursos)          AS total_cursos,
+            (SELECT COUNT(*) FROM sync_alumnos)         AS total_alumnos,
+            (SELECT COUNT(*) FROM sync_matriculaciones) AS total_matriculaciones,
+            (SELECT COUNT(*) FROM sync_calificaciones)  AS total_calificaciones,
+            (SELECT COUNT(*) FROM sync_asistencias)     AS total_asistencias
+    """)
+    return {"ultima_sync": dict(last) if last else None, "totales": dict(totals) if totals else {}}
+
+
+@app.get("/api/sync/alumnos")
+async def sync_get_alumnos(q: str = "", limit: int = 50, _user=Depends(_require_admin)):
+    import db as _db
+    import sync_service
+    await sync_service.init_db()
+    if q:
+        rows = await _db.fetch(
+            "SELECT * FROM sync_alumnos WHERE nombre ILIKE ? OR email ILIKE ? OR sis_user_id ILIKE ? LIMIT ?",
+            f"%{q}%", f"%{q}%", f"%{q}%", limit
+        )
+    else:
+        rows = await _db.fetch("SELECT * FROM sync_alumnos ORDER BY nombre LIMIT ?", limit)
+    return rows
+
+
+@app.get("/api/sync/alumno/{canvas_user_id}")
+async def sync_get_alumno(canvas_user_id: int, _user=Depends(_require_admin)):
+    import db as _db
+    import sync_service
+    await sync_service.init_db()
+    alumno = await _db.fetchrow("SELECT * FROM sync_alumnos WHERE canvas_user_id = ?", canvas_user_id)
+    if not alumno:
+        raise HTTPException(status_code=404, detail="Alumno no encontrado")
+    cursos = await _db.fetch("""
+        SELECT c.canvas_course_id, c.nombre, c.semestre, m.estado,
+               cal.nota_actual, cal.nota_final, cal.letra_actual,
+               (SELECT COUNT(*) FROM sync_asistencias a
+                WHERE a.canvas_course_id = c.canvas_course_id AND a.canvas_user_id = ? AND a.estado = 'present') AS presentes,
+               (SELECT COUNT(*) FROM sync_asistencias a
+                WHERE a.canvas_course_id = c.canvas_course_id AND a.canvas_user_id = ?) AS total_clases
+        FROM sync_matriculaciones m
+        JOIN sync_cursos c ON c.canvas_course_id = m.canvas_course_id
+        LEFT JOIN sync_calificaciones cal ON cal.canvas_course_id = m.canvas_course_id AND cal.canvas_user_id = m.canvas_user_id
+        WHERE m.canvas_user_id = ?
+        ORDER BY c.semestre DESC, c.nombre
+    """, canvas_user_id, canvas_user_id, canvas_user_id)
+    return {"alumno": dict(alumno), "cursos": cursos}
+
+
+@app.get("/api/sync/calificaciones/{canvas_course_id}")
+async def sync_get_calificaciones(canvas_course_id: int, _user=Depends(_require_admin)):
+    import db as _db
+    import sync_service
+    await sync_service.init_db()
+    rows = await _db.fetch("""
+        SELECT a.nombre, a.email, a.sis_user_id, c.nota_actual, c.nota_final, c.letra_actual, c.letra_final, c.ultima_sync
+        FROM sync_calificaciones c
+        JOIN sync_alumnos a ON a.canvas_user_id = c.canvas_user_id
+        WHERE c.canvas_course_id = ?
+        ORDER BY a.nombre
+    """, canvas_course_id)
+    return rows
+
+
+@app.get("/api/sync/asistencias/{canvas_course_id}")
+async def sync_get_asistencias(canvas_course_id: int, _user=Depends(_require_admin)):
+    import db as _db
+    import sync_service
+    await sync_service.init_db()
+    rows = await _db.fetch("""
+        SELECT a.nombre, a.email, a.sis_user_id, s.fecha_clase, s.estado
+        FROM sync_asistencias s
+        JOIN sync_alumnos a ON a.canvas_user_id = s.canvas_user_id
+        WHERE s.canvas_course_id = ?
+        ORDER BY s.fecha_clase DESC, a.nombre
+    """, canvas_course_id)
+    return rows
+
+
+@app.get("/api/gestion/cron")
+async def gestion_get_cron(_user=Depends(_require_admin)):
+    from scheduler import get_next_run, scheduler
+    job = scheduler.get_job("matriculacion_diaria")
+    trigger_info = ""
+    if job and job.trigger:
+        trigger_info = str(job.trigger)
+    return {
+        "cron_hora": settings.cron_hora,
+        "next_run": get_next_run(),
+        "trigger": trigger_info,
+    }
+
+
+@app.patch("/api/gestion/cron")
+async def gestion_update_cron(body: dict, _user=Depends(_require_admin)):
+    """Update cron schedule. Body: {"cron_hora": "HH:MM"}"""
+    from scheduler import scheduler
+    from apscheduler.triggers.cron import CronTrigger
+    cron_hora = body.get("cron_hora", "07:00")
+    try:
+        hora, minuto = cron_hora.split(":")
+        hora_int, minuto_int = int(hora), int(minuto)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Formato inválido. Use HH:MM")
+    trigger = CronTrigger(hour=hora_int, minute=minuto_int, timezone="UTC")
+    scheduler.reschedule_job("matriculacion_diaria", trigger=trigger)
+    settings.cron_hora = cron_hora
+    from scheduler import get_next_run
+    return {"ok": True, "cron_hora": cron_hora, "next_run": get_next_run()}

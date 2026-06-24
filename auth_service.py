@@ -118,9 +118,9 @@ def build_azure_login_url() -> str:
         "scope": "openid profile email User.Read",
         "state": state,
     }
+    from urllib.parse import urlencode
     base = AZURE_AUTHORIZE_URL.format(tenant=settings.azure_tenant_id)
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    return f"{base}?{query}"
+    return f"{base}?{urlencode(params)}"
 
 
 async def exchange_azure_code(code: str, state: str) -> dict:

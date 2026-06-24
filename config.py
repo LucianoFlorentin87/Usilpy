@@ -27,12 +27,14 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     admin_email: str = ""
+    email_sender: str = ""        # UPN de la cuenta que envía emails via Graph (ej: noreply@usil.edu.py)
 
     # Webhook (para integración con sistema académico externo)
     webhook_api_key: str = ""   # key estática que el sistema académico envía en X-API-Key
 
     # App
     app_secret_key: str = "change_this_in_production"
+    allowed_origins: str = ""   # comma-separated, e.g. "https://myapp.onrender.com,http://localhost:8000"
     debug: bool = False
 
     # Auth
@@ -56,3 +58,12 @@ class Settings(BaseSettings):
 
 def get_settings() -> Settings:
     return Settings()
+
+
+def validate_settings(s: Settings) -> None:
+    """Raise on insecure startup configuration."""
+    if s.app_secret_key == "change_this_in_production" and not s.debug:
+        raise RuntimeError(
+            "APP_SECRET_KEY must be set to a strong random value before deploying. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
