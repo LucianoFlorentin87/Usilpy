@@ -10,17 +10,15 @@
     @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap');
 
     :root {
-      --bg: #f4f6f9;
-      --sidebar-bg: #0d1b2e;
-      --sidebar-hover: #162236;
-      --sidebar-active: #1a3a6b;
-      --accent: #2563eb;
-      --accent-dark: #1d4ed8;
-      --accent-light: #dbeafe;
+      --bg: #f5f6fa;
+      --sidebar-bg: #ffffff;
+      --accent: #7c3aed;
+      --accent-dark: #6d28d9;
+      --accent-light: #f3f0ff;
       --surface: #ffffff;
-      --border: #e2e8f0;
-      --text: #0d1b2e;
-      --text-muted: #64748b;
+      --border: #e8e8ed;
+      --text: #1a1a2e;
+      --text-muted: #6b7280;
       --success-bg: #ecfdf5; --success: #065f46; --success-border: #6ee7b7;
       --warn-bg: #fffbeb;   --warn: #92400e;   --warn-border: #fcd34d;
       --error-bg: #fef2f2;  --error: #991b1b;  --error-border: #fca5a5;
@@ -28,32 +26,31 @@
     }
     body { font-family: 'Lato', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; margin: 0; padding: 0; }
 
-    /* ── Sidebar (icon-only, fixed) ── */
-    #sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 68px; background: var(--sidebar-bg); display: flex; flex-direction: column; z-index: 500; overflow: visible; }
-    .sidebar-logo { height: 64px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #1a2d44; flex-shrink: 0; }
-    .sidebar-logo img { width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,.4)); }
-    .sidebar-nav { flex: 1; padding: 10px 0; display: flex; flex-direction: column; gap: 4px; align-items: center; overflow: visible; }
-    .sidebar-group { position: relative; display: flex; justify-content: center; width: 100%; padding: 3px 0; }
-    .sidebar-icon-btn { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; transition: all .18s; color: #fff; border: none; opacity: .8; flex-shrink: 0; }
-    .sidebar-icon-btn:hover { opacity: 1; transform: scale(1.08); box-shadow: 0 4px 16px rgba(0,0,0,.35); }
-    .sidebar-group.has-active .sidebar-icon-btn { opacity: 1; box-shadow: 0 0 0 2px rgba(255,255,255,.4); }
-    /* Submenu flyout — positioned from sidebar edge */
-    .sidebar-submenu { position: fixed; left: 68px; background: #fff; border-radius: 0 14px 14px 0; box-shadow: 4px 0 24px rgba(0,0,0,.15); min-width: 200px; padding: 12px 0; z-index: 600; opacity: 0; pointer-events: none; transform: translateX(-8px); transition: opacity .18s, transform .18s; border-left: 3px solid transparent; }
-    .sidebar-group:hover .sidebar-submenu { opacity: 1; pointer-events: all; transform: translateX(0); }
-    .submenu-title { font-size: .68rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .08em; padding: 0 16px 10px; }
-    .submenu-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; color: #374151; font-size: .85rem; font-weight: 500; transition: background .12s; white-space: nowrap; }
-    .submenu-item:hover { background: #f3f4f6; }
-    .submenu-item.active { background: #eff6ff; color: #2563eb; font-weight: 700; }
-    .submenu-item .si-icon { font-size: .9rem; width: 22px; text-align: center; flex-shrink: 0; }
-    /* Legacy nav-item (hidden) */
+    /* ── Sidebar ── */
+    #sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; background: #fff; border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 500; overflow: hidden; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; gap: 12px; }
+    .sidebar-brand img { width: 36px; height: 36px; object-fit: contain; border-radius: 8px; }
+    .sidebar-brand-fallback { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg,#7c3aed,#4f46e5); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 1rem; flex-shrink: 0; }
+    .sidebar-brand-text { line-height: 1.2; }
+    .sidebar-brand-name { font-size: .95rem; font-weight: 800; color: var(--text); }
+    .sidebar-brand-sub  { font-size: .68rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+    .sidebar-nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+    .nav-section-label { font-size: .68rem; font-weight: 700; color: #aab1be; text-transform: uppercase; letter-spacing: .1em; padding: 8px 8px 6px; margin-top: 8px; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; color: var(--text-muted); font-size: .875rem; font-weight: 500; border-radius: 10px; transition: all .15s; }
+    .nav-item:hover { background: var(--accent-light); color: var(--accent); }
+    .nav-item.active { background: var(--accent); color: #fff; font-weight: 700; box-shadow: 0 4px 12px rgba(124,58,237,.3); }
+    .nav-item .nav-icon { width: 20px; text-align: center; font-size: 1rem; flex-shrink: 0; }
+    .nav-badge { margin-left: auto; background: #ef4444; color: #fff; border-radius: 99px; padding: 1px 7px; font-size: .7rem; font-weight: 700; }
+    /* Legacy sidebar-group (hidden - not used in new design) */
+    .sidebar-group { display: none; }
+    .sidebar-submenu { display: none; }
     .nav-group { display: none; }
-    .nav-item { display: none; }
 
     /* ── Main content ── */
-    #main { position: fixed; left: 68px; right: 0; top: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden; }
-    #topbar { background: #fff; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; border-bottom: 1px solid var(--border); box-shadow: 0 1px 0 rgba(0,0,0,.04); }
-    #topbar h2 { font-size: 1.05rem; font-weight: 700; color: var(--text); letter-spacing: .01em; }
-    #topbar .badge { background: #eff6ff; color: #2563eb; font-size: 0.68rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; letter-spacing: .04em; text-transform: uppercase; border: 1px solid #bfdbfe; }
+    #main { position: fixed; left: 240px; right: 0; top: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden; }
+    #topbar { background: #fff; padding: 0 28px; height: 56px; display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; border-bottom: 1px solid var(--border); gap: 12px; }
+    #topbar h2 { display: none; }
+    #topbar .badge { background: var(--accent-light); color: var(--accent); font-size: 0.68rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; letter-spacing: .04em; text-transform: uppercase; border: 1px solid #d8b4fe; }
     #content { flex: 1; overflow-y: auto; padding: 24px; }
 
     /* ── Panels ── */
@@ -65,16 +62,16 @@
     .card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 16px; color: var(--text); }
 
     /* ── Buttons ── */
-    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 99px; border: none; cursor: pointer; font-size: 0.84rem; font-weight: 700; transition: all .18s; letter-spacing: .01em; font-family: 'Lato', sans-serif; }
-    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(37,99,235,.25); }
-    .btn-primary:hover { background: var(--accent-dark); box-shadow: 0 4px 12px rgba(37,99,235,.35); transform: translateY(-1px); }
-    .btn-secondary { background: var(--surface); color: var(--text); border: 1.5px solid var(--border); }
+    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 10px; border: 1.5px solid transparent; cursor: pointer; font-size: 0.84rem; font-weight: 600; transition: all .15s; letter-spacing: .01em; font-family: 'Lato', sans-serif; }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 8px rgba(124,58,237,.25); }
+    .btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); transform: translateY(-1px); }
+    .btn-secondary { background: #fff; color: var(--text); border-color: var(--border); }
     .btn-secondary:hover { background: var(--bg); border-color: #94a3b8; }
-    .btn-success { background: #059669; color: #fff; box-shadow: 0 2px 8px rgba(5,150,105,.2); }
-    .btn-success:hover { background: #047857; transform: translateY(-1px); }
-    .btn-warn { background: #d97706; color: #fff; }
+    .btn-success { background: #059669; color: #fff; border-color: #059669; box-shadow: 0 2px 8px rgba(5,150,105,.2); }
+    .btn-success:hover { background: #047857; border-color: #047857; transform: translateY(-1px); }
+    .btn-warn { background: #d97706; color: #fff; border-color: #d97706; }
     .btn-warn:hover { background: #b45309; }
-    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger { background: #dc2626; color: #fff; border-color: #dc2626; }
     .btn-danger:hover { background: #b91c1c; }
     .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
@@ -129,18 +126,18 @@
     .stat-info    { background: #f0fdf4; color: #166534; }
 
     /* ── KPI Cards ── */
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
-    .kpi-card { border-radius: 14px; padding: 20px 22px; position: relative; overflow: hidden; border: none; }
-    .kpi-card::after { content: ''; position: absolute; right: -12px; top: -12px; width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,.12); pointer-events: none; }
-    .kpi-card .kpi-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; opacity: .85; }
-    .kpi-card .kpi-value { font-size: 2.2rem; font-weight: 700; line-height: 1; }
-    .kpi-card .kpi-sub { font-size: 0.75rem; margin-top: 4px; opacity: .75; }
-    .kpi-card .kpi-icon { position: absolute; right: 16px; bottom: 16px; font-size: 1.6rem; opacity: .22; }
-    .kpi-blue  { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; }
-    .kpi-green { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
-    .kpi-amber { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; }
-    .kpi-red   { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
-    .kpi-dark  { background: linear-gradient(135deg, #1e3a5f, #0d1b2e); color: #fff; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .kpi-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: flex; align-items: center; gap: 16px; }
+    .kpi-card .kpi-icon-box { width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+    .kpi-card .kpi-body { flex: 1; min-width: 0; }
+    .kpi-card .kpi-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+    .kpi-card .kpi-value { font-size: 1.9rem; font-weight: 700; line-height: 1; color: var(--text); }
+    .kpi-card .kpi-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; }
+    .kpi-blue  .kpi-icon-box { background: #eff6ff; }
+    .kpi-green .kpi-icon-box { background: #ecfdf5; }
+    .kpi-amber .kpi-icon-box { background: #fffbeb; }
+    .kpi-red   .kpi-icon-box { background: #fef2f2; }
+    .kpi-dark  .kpi-icon-box { background: var(--accent-light); }
 
     /* ── Chart ── */
     .chart-container { position: relative; height: 220px; }
@@ -251,9 +248,9 @@
 
     /* ── Topbar user chip ── */
     #user-chip { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
-    #user-chip .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; border: 2px solid #3b82f6; }
-    #user-chip .user-name { color: var(--text); font-weight: 700; font-size: .8rem; letter-spacing: .02em; }
-    #btn-logout { background: none; border: 1px solid var(--border); border-radius: 99px; padding: 5px 14px; font-size: 0.78rem; cursor: pointer; color: var(--text-muted); font-family: 'Lato', sans-serif; font-weight: 700; transition: all .18s; }
+    #user-chip .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; }
+    #user-chip .user-name { color: var(--text); font-weight: 600; font-size: .85rem; }
+    #btn-logout { background: none; border: 1.5px solid var(--border); border-radius: 10px; padding: 6px 14px; font-size: 0.78rem; cursor: pointer; color: var(--text-muted); font-family: 'Lato', sans-serif; font-weight: 600; transition: all .18s; }
     #btn-logout:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
   </style>
 </head>
@@ -294,91 +291,70 @@
 
 <!-- ═══════════════════════════════ SIDEBAR ═══════════════════════════════ -->
 <nav id="sidebar">
-  <!-- Logo -->
-  <div class="sidebar-logo">
-    <img src="/static/logo_usil.png" alt="USIL" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-    <div style="display:none;width:38px;height:38px;border-radius:8px;background:#2563eb;color:#fff;font-weight:800;font-size:1.1rem;align-items:center;justify-content:center;">U</div>
+
+  <!-- Brand -->
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-fallback" id="sidebar-logo-fallback">U</div>
+    <img src="/static/logo_usil.png" alt="USIL" id="sidebar-logo-img"
+      style="width:36px;height:36px;object-fit:contain;display:none;"
+      onload="this.style.display='block';document.getElementById('sidebar-logo-fallback').style.display='none'">
+    <div class="sidebar-brand-text">
+      <div class="sidebar-brand-name">Gestión Académica</div>
+      <div class="sidebar-brand-sub">USIL Paraguay</div>
+    </div>
   </div>
 
+  <!-- Nav -->
   <div class="sidebar-nav">
 
-    <!-- Reportes -->
-    <div class="sidebar-group" id="sbg-reportes">
-      <div class="sidebar-icon-btn" style="background:#3b82f6;" title="Reportes">📊</div>
-      <div class="sidebar-submenu">
-        <div class="submenu-title">Reportes</div>
-        <div class="submenu-item active" data-panel="dashboard" onclick="showPanel('dashboard', this)">
-          <span class="si-icon">📊</span> Dashboard
-        </div>
-        <div class="submenu-item" data-panel="auditoria" onclick="showPanel('auditoria', this)">
-          <span class="si-icon">📋</span> Auditoría
-        </div>
-      </div>
+    <div class="nav-section-label">Navegación</div>
+
+    <div class="nav-item active" data-panel="dashboard" onclick="showPanel('dashboard', this)">
+      <span class="nav-icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item" data-panel="auditoria" onclick="showPanel('auditoria', this)">
+      <span class="nav-icon">📋</span> Auditoría
     </div>
 
-    <!-- Gestión masiva -->
-    <div class="sidebar-group" id="sbg-gestion" style="display:none;">
-      <div class="sidebar-icon-btn" style="background:#f59e0b;" title="Gestión masiva">🏫</div>
-      <div class="sidebar-submenu">
-        <div class="submenu-title">Gestión masiva</div>
-        <div class="submenu-item" data-panel="crear-cursos" onclick="showPanel('crear-cursos', this)">
-          <span class="si-icon">➕</span> Crear cursos y equipos
-        </div>
-        <div class="submenu-item" data-panel="matriculacion-masiva" onclick="showPanel('matriculacion-masiva', this)">
-          <span class="si-icon">👥</span> Matricular alumnos
-        </div>
-      </div>
+    <div class="nav-section-label" id="nav-section-gestion" style="display:none;">Gestión masiva</div>
+    <div class="nav-item" id="nav-crear-cursos" data-panel="crear-cursos" onclick="showPanel('crear-cursos', this)" style="display:none;">
+      <span class="nav-icon">🏫</span> Crear cursos y equipos
+    </div>
+    <div class="nav-item" id="nav-matriculacion" data-panel="matriculacion-masiva" onclick="showPanel('matriculacion-masiva', this)" style="display:none;">
+      <span class="nav-icon">👥</span> Matricular alumnos
     </div>
 
-    <!-- Portal académico -->
-    <div class="sidebar-group" id="sbg-portal" style="display:none;">
-      <div class="sidebar-icon-btn" style="background:#10b981;" title="Portal académico">✏️</div>
-      <div class="sidebar-submenu">
-        <div class="submenu-title">Portal académico</div>
-        <div class="submenu-item" data-panel="portal-academico" onclick="showPanel('portal-academico', this)">
-          <span class="si-icon">📝</span> Carga de inscripciones
-        </div>
-      </div>
+    <div class="nav-section-label" id="nav-section-portal" style="display:none;">Portal académico</div>
+    <div class="nav-item" id="nav-portal" data-panel="portal-academico" onclick="showPanel('portal-academico', this)" style="display:none;">
+      <span class="nav-icon">✏️</span> Carga de inscripciones
     </div>
 
-    <!-- Base de datos -->
-    <div class="sidebar-group" id="sbg-sync" style="display:none;">
-      <div class="sidebar-icon-btn" style="background:#8b5cf6;" title="Base de datos">🗄️</div>
-      <div class="sidebar-submenu">
-        <div class="submenu-title">Base de datos</div>
-        <div class="submenu-item" data-panel="sync-panel" onclick="showPanel('sync-panel', this)">
-          <span class="si-icon">🔄</span> Sincronizar Canvas
-        </div>
-        <div class="submenu-item" data-panel="sync-alumnos" onclick="showPanel('sync-alumnos', this)">
-          <span class="si-icon">👤</span> Alumnos
-        </div>
-      </div>
+    <div class="nav-section-label" id="nav-section-sync" style="display:none;">Base de datos</div>
+    <div class="nav-item" id="nav-sync" data-panel="sync-panel" onclick="showPanel('sync-panel', this)" style="display:none;">
+      <span class="nav-icon">🔄</span> Sincronizar Canvas
+    </div>
+    <div class="nav-item" id="nav-alumnos" data-panel="sync-alumnos" onclick="showPanel('sync-alumnos', this)" style="display:none;">
+      <span class="nav-icon">🎓</span> Alumnos
     </div>
 
-    <!-- Administración -->
-    <div class="sidebar-group" id="sbg-admin" style="display:none;">
-      <div class="sidebar-icon-btn" style="background:#ef4444;" title="Administración">⚙️</div>
-      <div class="sidebar-submenu">
-        <div class="submenu-title">Administración</div>
-        <div class="submenu-item" data-panel="system-users" onclick="showPanel('system-users', this)">
-          <span class="si-icon">👤</span> Usuarios del sistema
-        </div>
-        <div class="submenu-item" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)">
-          <span class="si-icon">⏳</span> Inscripciones pendientes
-        </div>
-        <div class="submenu-item" data-panel="cron-config" onclick="showPanel('cron-config', this)">
-          <span class="si-icon">⏰</span> Configurar cron
-        </div>
-      </div>
+    <div class="nav-section-label" id="nav-section-admin" style="display:none;">Administración</div>
+    <div class="nav-item" id="nav-users" data-panel="system-users" onclick="showPanel('system-users', this)" style="display:none;">
+      <span class="nav-icon">👤</span> Usuarios del sistema
+    </div>
+    <div class="nav-item" id="nav-pending" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)" style="display:none;">
+      <span class="nav-icon">⏳</span> Inscripciones pendientes
+    </div>
+    <div class="nav-item" id="nav-cron" data-panel="cron-config" onclick="showPanel('cron-config', this)" style="display:none;">
+      <span class="nav-icon">⏰</span> Configurar cron
     </div>
 
-  </div><!-- /sidebar-nav -->
+  </div>
 
-  <!-- Hidden legacy nav-groups for JS compatibility -->
-  <div id="nav-gestion-group" class="nav-group"></div>
-  <div id="nav-portal-group" class="nav-group"></div>
-  <div id="nav-sync-group" class="nav-group"></div>
-  <div id="nav-admin-group" class="nav-group"></div>
+  <!-- Hidden legacy refs for JS compat -->
+  <div id="nav-gestion-group" style="display:none;"></div>
+  <div id="nav-portal-group" style="display:none;"></div>
+  <div id="nav-sync-group" style="display:none;"></div>
+  <div id="nav-admin-group" style="display:none;"></div>
 </nav>
 
 <!-- ═══════════════════════════════ MAIN ═══════════════════════════════════ -->
@@ -666,34 +642,44 @@
       <!-- KPI row -->
       <div class="kpi-grid" id="kpi-grid">
         <div class="kpi-card kpi-blue">
-          <div class="kpi-label">Procesados hoy</div>
-          <div class="kpi-value" id="kpi-procesados">—</div>
-          <div class="kpi-sub">alumnos</div>
-          <div class="kpi-icon">👥</div>
+          <div class="kpi-icon-box">👥</div>
+          <div class="kpi-body">
+            <div class="kpi-label">Procesados hoy</div>
+            <div class="kpi-value" id="kpi-procesados">—</div>
+            <div class="kpi-sub">alumnos</div>
+          </div>
         </div>
         <div class="kpi-card kpi-green">
-          <div class="kpi-label">Creados hoy</div>
-          <div class="kpi-value" id="kpi-creados">—</div>
-          <div class="kpi-sub">usuarios nuevos</div>
-          <div class="kpi-icon">✅</div>
+          <div class="kpi-icon-box">✅</div>
+          <div class="kpi-body">
+            <div class="kpi-label">Creados hoy</div>
+            <div class="kpi-value" id="kpi-creados">—</div>
+            <div class="kpi-sub">usuarios nuevos</div>
+          </div>
         </div>
         <div class="kpi-card kpi-amber">
-          <div class="kpi-label">Inscripciones</div>
-          <div class="kpi-value" id="kpi-inscritos">—</div>
-          <div class="kpi-sub">realizadas</div>
-          <div class="kpi-icon">📚</div>
+          <div class="kpi-icon-box">📚</div>
+          <div class="kpi-body">
+            <div class="kpi-label">Inscripciones</div>
+            <div class="kpi-value" id="kpi-inscritos">—</div>
+            <div class="kpi-sub">realizadas</div>
+          </div>
         </div>
         <div class="kpi-card kpi-red">
-          <div class="kpi-label">Errores hoy</div>
-          <div class="kpi-value" id="kpi-errores">—</div>
-          <div class="kpi-sub">requieren revisión</div>
-          <div class="kpi-icon">⚠️</div>
+          <div class="kpi-icon-box">⚠️</div>
+          <div class="kpi-body">
+            <div class="kpi-label">Errores hoy</div>
+            <div class="kpi-value" id="kpi-errores">—</div>
+            <div class="kpi-sub">requieren revisión</div>
+          </div>
         </div>
         <div class="kpi-card kpi-dark">
-          <div class="kpi-label">Próxima ejecución</div>
-          <div id="kpi-proxima" style="font-size:0.9rem;font-weight:700;margin-top:6px;">—</div>
-          <div class="kpi-sub" id="kpi-semestre">—</div>
-          <div class="kpi-icon">🕐</div>
+          <div class="kpi-icon-box">🕐</div>
+          <div class="kpi-body">
+            <div class="kpi-label">Próxima ejecución</div>
+            <div class="kpi-value" style="font-size:1rem;" id="kpi-proxima">—</div>
+            <div class="kpi-sub" id="kpi-semestre">—</div>
+          </div>
         </div>
       </div>
 
@@ -1562,17 +1548,6 @@
 
 <script>
 // ── Auth ─────────────────────────────────────────────────────────────────────
-// ── Sidebar submenu positioning ──────────────────────────────────────────────
-document.querySelectorAll('.sidebar-group').forEach(group => {
-  const btn = group.querySelector('.sidebar-icon-btn');
-  const menu = group.querySelector('.sidebar-submenu');
-  if (!btn || !menu) return;
-  group.addEventListener('mouseenter', () => {
-    const rect = btn.getBoundingClientRect();
-    menu.style.top = rect.top + 'px';
-  });
-});
-
 const TOKEN_KEY = 'ga_token';
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
 function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
@@ -1592,29 +1567,29 @@ function showApp(user) {
   document.getElementById('user-name-label').textContent = user.name || user.sub || '';
   _applyRoleVisibility(user.role || 'viewer');
   if (user.role === 'academico') {
-    const el = document.querySelector('.submenu-item[data-panel="portal-academico"]');
-    showPanel('portal-academico', el);
+    showPanel('portal-academico', document.querySelector('[data-panel="portal-academico"]'));
   } else {
-    const el = document.querySelector('.submenu-item[data-panel="dashboard"]');
-    showPanel('dashboard', el);
+    showPanel('dashboard', document.querySelector('[data-panel="dashboard"]'));
     loadDashboard();
   }
 }
 
 function _applyRoleVisibility(role) {
-  const sbGestion = document.getElementById('sbg-gestion');
-  const sbPortal  = document.getElementById('sbg-portal');
-  const sbSync    = document.getElementById('sbg-sync');
-  const sbAdmin   = document.getElementById('sbg-admin');
+  const gestion = ['nav-section-gestion','nav-crear-cursos','nav-matriculacion'];
+  const portal  = ['nav-section-portal','nav-portal'];
+  const sync    = ['nav-section-sync','nav-sync','nav-alumnos'];
+  const admin   = ['nav-section-admin','nav-users','nav-pending','nav-cron'];
+
+  function show(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = ''; }); }
+  function hide(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 
   if (role === 'admin') {
-    [sbGestion, sbPortal, sbSync, sbAdmin].forEach(g => g && (g.style.display = ''));
+    show([...gestion, ...portal, ...sync, ...admin]);
   } else if (role === 'academico') {
-    [sbGestion, sbSync, sbAdmin].forEach(g => g && (g.style.display = 'none'));
-    if (sbPortal) sbPortal.style.display = '';
+    hide([...gestion, ...sync, ...admin]);
+    show(portal);
   } else {
-    // Viewer: solo Reportes
-    [sbGestion, sbPortal, sbSync, sbAdmin].forEach(g => g && (g.style.display = 'none'));
+    hide([...gestion, ...portal, ...sync, ...admin]);
   }
 }
 
@@ -1703,17 +1678,11 @@ const panelTitles = {
 
 function showPanel(id, el) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.submenu-item').forEach(n => n.classList.remove('active'));
-  document.querySelectorAll('.sidebar-group').forEach(g => g.classList.remove('has-active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const panelEl = document.getElementById('panel-' + id);
   if (panelEl) panelEl.classList.add('active');
-  if (el && el.classList.contains('submenu-item')) {
-    el.classList.add('active');
-    const grp = el.closest('.sidebar-group');
-    if (grp) grp.classList.add('has-active');
-  }
+  if (el) el.classList.add('active');
   const [title, badge] = panelTitles[id] || [id, ''];
-  document.getElementById('topbar-title').textContent = title;
   document.getElementById('topbar-badge').textContent = badge;
   if (id === 'system-users') loadSystemUsers();
   if (id === 'portal-academico') portalCargarMisEnvios();
