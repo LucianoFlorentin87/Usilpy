@@ -108,9 +108,28 @@ async def root():
 
 @app.get("/api/diagnostico")
 async def diagnostico(_: dict = Depends(get_current_user)):
-    """Diagnóstico de variables de entorno (sin exponer valores sensibles)."""
+    """Diagnóstico de variables de entorno y conectividad real con Canvas y Azure."""
     from config import get_settings
+    import canvas_service as _cs
+    import graph_service as _gs
     s = get_settings()
+
+    # Test Canvas connectivity
+    canvas_test = "no probado"
+    try:
+        terms = await _cs.get_terms()
+        canvas_test = f"✓ OK — {len(terms)} períodos encontrados"
+    except Exception as exc:
+        canvas_test = f"✗ ERROR: {exc}"
+
+    # Test Azure/Teams connectivity
+    azure_test = "no probado"
+    try:
+        token = _gs._get_token()
+        azure_test = "✓ OK — token obtenido"
+    except Exception as exc:
+        azure_test = f"✗ ERROR: {exc}"
+
     return {
         "canvas_base_url":    s.canvas_base_url or "(vacío)",
         "canvas_api_token":   "✓ configurado" if s.canvas_api_token else "(vacío)",
@@ -119,6 +138,8 @@ async def diagnostico(_: dict = Depends(get_current_user)):
         "azure_client_secret":"✓ configurado" if s.azure_client_secret else "(vacío)",
         "admin_username":     s.admin_username or "(vacío)",
         "semestre_actual":    s.semestre_actual,
+        "canvas_conexion":    canvas_test,
+        "azure_conexion":     azure_test,
     }
 
 
