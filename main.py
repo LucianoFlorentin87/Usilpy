@@ -1259,6 +1259,99 @@ async def gestion_inscribir_teams(file: UploadFile = File(...), _user=Depends(_r
     )
 
 
+@app.post("/api/sync/canvas")
+async def sync_canvas(_user=Depends(_require_admin)):
+    """Trigger manual Canvas sync — cursos, alumnos, matriculas, notas, asistencias."""
+    import sync_service
+    await sync_service.init_db()
+    result = await sync_service.run_sync("manual")
+    return result
+
+
+@app.get("/api/sync/estado")
+async def sync_estado(_user=Depends(_require_admin)):
+    """Last sync log + summary counts."""
+    import sync_service
+    await sync_service.init_db()
+    last = await db.fetchrow(
+        "SELECT * FROM sync_log ORDER BY id DESC LIMIT 1"
+    )
+    totals = await db.fetchrow("""
+        SELECT
+            (SELECT COUNT(*) FROM sync_cursos)        AS total_cursos,
+            (SELECT COUNT(*) FROM sync_alumnos)       AS total_alumnos,
+            (SELECT COUNT(*) FROM sync_matriculaciones) AS total_matriculaciones,
+            (SELECT COUNT(*) FROM sync_calificaciones) AS total_calificaciones,
+            (SELECT COUNT(*) FROM sync_asistencias)   AS total_asistencias
+    """)
+    return {"ultima_sync": dict(last) if last else None, "totales": dict(totals) if totals else {}}
+
+
+@app.get("/api/sync/alumnos")
+async def sync_get_alumnos(q: str = "", limit: int = 50, _user=Depends(_require_admin)):
+    import sync_service
+    await sync_service.init_db()
+    if q:
+        rows = await db.fetch(
+            "SELECT * FROM sync_alumnos WHERE nombre ILIKE ? OR email ILIKE ? OR sis_user_id ILIKE ? LIMIT ?",
+            f"%{q}%", f"%{q}%", f"%{q}%", limit
+        )
+    else:
+        rows = await db.fetch("SELECT * FROM sync_alumnos ORDER BY nombre LIMIT ?", limit)
+    return rows
+
+
+@app.get("/api/sync/alumno/{canvas_user_id}")
+async def sync_get_alumno(canvas_user_id: int, _user=Depends(_require_admin)):
+    import sync_service
+    await sync_service.init_db()
+    alumno = await db.fetchrow("SELECT * FROM sync_alumnos WHERE canvas_user_id = ?", canvas_user_id)
+    if not alumno:
+        raise HTTPException(status_code=404, detail="Alumno no encontrado")
+    cursos = await db.fetch("""
+        SELECT c.canvas_course_id, c.nombre, c.semestre, m.estado,
+               cal.nota_actual, cal.nota_final, cal.letra_actual,
+               (SELECT COUNT(*) FROM sync_asistencias a
+                WHERE a.canvas_course_id = c.canvas_course_id AND a.canvas_user_id = ? AND a.estado = 'present') AS presentes,
+               (SELECT COUNT(*) FROM sync_asistencias a
+                WHERE a.canvas_course_id = c.canvas_course_id AND a.canvas_user_id = ?) AS total_clases
+        FROM sync_matriculaciones m
+        JOIN sync_cursos c ON c.canvas_course_id = m.canvas_course_id
+        LEFT JOIN sync_calificaciones cal ON cal.canvas_course_id = m.canvas_course_id AND cal.canvas_user_id = m.canvas_user_id
+        WHERE m.canvas_user_id = ?
+        ORDER BY c.semestre DESC, c.nombre
+    """, canvas_user_id, canvas_user_id, canvas_user_id)
+    return {"alumno": dict(alumno), "cursos": cursos}
+
+
+@app.get("/api/sync/calificaciones/{canvas_course_id}")
+async def sync_get_calificaciones(canvas_course_id: int, _user=Depends(_require_admin)):
+    import sync_service
+    await sync_service.init_db()
+    rows = await db.fetch("""
+        SELECT a.nombre, a.email, a.sis_user_id, c.nota_actual, c.nota_final, c.letra_actual, c.letra_final, c.ultima_sync
+        FROM sync_calificaciones c
+        JOIN sync_alumnos a ON a.canvas_user_id = c.canvas_user_id
+        WHERE c.canvas_course_id = ?
+        ORDER BY a.nombre
+    """, canvas_course_id)
+    return rows
+
+
+@app.get("/api/sync/asistencias/{canvas_course_id}")
+async def sync_get_asistencias(canvas_course_id: int, _user=Depends(_require_admin)):
+    import sync_service
+    await sync_service.init_db()
+    rows = await db.fetch("""
+        SELECT a.nombre, a.email, a.sis_user_id, s.fecha_clase, s.estado
+        FROM sync_asistencias s
+        JOIN sync_alumnos a ON a.canvas_user_id = s.canvas_user_id
+        WHERE s.canvas_course_id = ?
+        ORDER BY s.fecha_clase DESC, a.nombre
+    """, canvas_course_id)
+    return rows
+
+
 @app.get("/api/gestion/cron")
 async def gestion_get_cron(_user=Depends(_require_admin)):
     from scheduler import get_next_run, scheduler

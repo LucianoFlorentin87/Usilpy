@@ -312,6 +312,17 @@
     </div>
   </div>
 
+  <!-- Base de datos Canvas -->
+  <div class="nav-group" id="nav-sync-group">
+    <div class="nav-group-label">Base de datos</div>
+    <div class="nav-item" data-panel="sync-panel" onclick="showPanel('sync-panel', this)">
+      <span class="icon">🗄️</span> Sincronizar Canvas
+    </div>
+    <div class="nav-item" data-panel="sync-alumnos" onclick="showPanel('sync-alumnos', this)">
+      <span class="icon">👥</span> Alumnos
+    </div>
+  </div>
+
   <!-- Administración del sistema -->
   <div class="nav-group" id="nav-admin-group">
     <div class="nav-group-label">Administración</div>
@@ -951,6 +962,68 @@
 
     </div>
 
+    <!-- ══════════ PANEL: SYNC CANVAS ══════════ -->
+    <div id="panel-sync-panel" class="panel">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span style="font-size:2rem;">🗄️</span>
+          <div>
+            <h3 style="margin:0;">Base de datos — Sincronización Canvas</h3>
+            <p style="margin:4px 0 0;color:#6b7280;font-size:.88rem;">Sincroniza cursos, alumnos, matriculaciones, calificaciones y asistencias desde Canvas hacia la base de datos local.</p>
+          </div>
+        </div>
+
+        <!-- Totales -->
+        <div id="sync-totales" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;"></div>
+
+        <!-- Última sync -->
+        <div id="sync-ultima" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:20px;font-size:.85rem;color:#475569;"></div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+          <button class="btn btn-primary" onclick="ejecutarSync()" style="display:flex;align-items:center;gap:6px;">
+            🔄 Sincronizar ahora
+          </button>
+          <button class="btn btn-secondary" onclick="cargarSyncEstado()" style="display:flex;align-items:center;gap:6px;">
+            📊 Actualizar estado
+          </button>
+        </div>
+
+        <div id="sync-progress" style="display:none;padding:12px;background:#fff3cd;border-radius:8px;">
+          ⏳ Sincronizando datos desde Canvas... esto puede tardar varios minutos dependiendo de la cantidad de cursos.
+        </div>
+        <div id="sync-result" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: ALUMNOS ══════════ -->
+    <div id="panel-sync-alumnos" class="panel">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span style="font-size:2rem;">👥</span>
+          <div>
+            <h3 style="margin:0;">Alumnos sincronizados</h3>
+            <p style="margin:4px 0 0;color:#6b7280;font-size:.88rem;">Datos de alumnos importados desde Canvas. Hacé clic en un alumno para ver sus cursos, notas y asistencias.</p>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:16px;">
+          <input type="text" id="sync-buscar-input" placeholder="Buscar por nombre, email o cédula..." style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;" oninput="syncBuscarAlumnos()">
+        </div>
+
+        <div id="sync-alumnos-tabla" style="overflow-x:auto;"></div>
+      </div>
+
+      <!-- Detalle alumno -->
+      <div id="sync-alumno-detalle" style="display:none;" class="card" style="margin-top:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 id="sync-detalle-nombre" style="margin:0;"></h3>
+          <button class="btn btn-secondary" onclick="document.getElementById('sync-alumno-detalle').style.display='none'">✕ Cerrar</button>
+        </div>
+        <div id="sync-detalle-info" style="margin-bottom:16px;font-size:.88rem;color:#6b7280;"></div>
+        <div id="sync-detalle-cursos"></div>
+      </div>
+    </div>
+
     <!-- ══════════ PANEL: CRON CONFIG ══════════ -->
     <div id="panel-cron-config" class="panel">
       <div class="card">
@@ -1565,6 +1638,8 @@ const panelTitles = {
   'crear-cursos':        ['Crear cursos y equipos', 'Gestión masiva'],
   'matriculacion-masiva':['Matriculación masiva',   'Gestión masiva'],
   'cron-config':         ['Configurar cron',        'Administración'],
+  'sync-panel':          ['Sincronización Canvas',  'Base de datos'],
+  'sync-alumnos':        ['Alumnos',                'Base de datos'],
 };
 
 function showPanel(id, el) {
@@ -1578,6 +1653,8 @@ function showPanel(id, el) {
   if (id === 'system-users') loadSystemUsers();
   if (id === 'portal-academico') portalCargarMisEnvios();
   if (id === 'cron-config') cargarCronConfig();
+  if (id === 'sync-panel') cargarSyncEstado();
+  if (id === 'sync-alumnos') syncBuscarAlumnos();
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -3522,6 +3599,147 @@ async function inscribirTeams() {
     _portalLog(`Error Teams: ${ex.message}`, 'error');
   }
 }
+
+// ── Sync Canvas ──────────────────────────────────────────────────────────────
+
+async function cargarSyncEstado() {
+  try {
+    const data = await apiFetch('/api/sync/estado');
+    const t = data.totales || {};
+    const cards = [
+      {label:'Cursos', valor: t.total_cursos||0, icon:'📘'},
+      {label:'Alumnos', valor: t.total_alumnos||0, icon:'👤'},
+      {label:'Matriculaciones', valor: t.total_matriculaciones||0, icon:'📋'},
+      {label:'Calificaciones', valor: t.total_calificaciones||0, icon:'📊'},
+      {label:'Asistencias', valor: t.total_asistencias||0, icon:'✅'},
+    ];
+    document.getElementById('sync-totales').innerHTML = cards.map(c =>
+      `<div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:1.5rem;">${c.icon}</div>
+        <div style="font-size:1.4rem;font-weight:700;color:#0369a1;">${c.valor.toLocaleString()}</div>
+        <div style="font-size:.78rem;color:#64748b;">${c.label}</div>
+      </div>`
+    ).join('');
+    const ul = data.ultima_sync;
+    if (ul) {
+      const fecha = ul.completado_en ? new Date(ul.completado_en).toLocaleString('es') : '—';
+      document.getElementById('sync-ultima').innerHTML =
+        `<strong>Última sincronización:</strong> ${fecha} ·
+         Duración: ${ul.duracion_seg||0}s ·
+         Cursos: ${ul.cursos_procesados||0} ·
+         Alumnos: ${ul.alumnos_procesados||0} ·
+         Errores: <span style="color:${ul.errores>0?'#dc2626':'#16a34a'}">${ul.errores||0}</span>`;
+    } else {
+      document.getElementById('sync-ultima').innerHTML = 'Sin sincronizaciones previas. Hacé clic en <strong>Sincronizar ahora</strong> para iniciar.';
+    }
+  } catch(ex) {
+    document.getElementById('sync-ultima').innerHTML = `<span style="color:#dc2626;">Error al cargar estado: ${ex.message}</span>`;
+  }
+}
+
+async function ejecutarSync() {
+  const progressEl = document.getElementById('sync-progress');
+  const resultEl = document.getElementById('sync-result');
+  progressEl.style.display = 'block';
+  resultEl.style.display = 'none';
+  _portalLog('Iniciando sincronización con Canvas...');
+  try {
+    const data = await apiFetch('/api/sync/canvas', 'POST');
+    progressEl.style.display = 'none';
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `
+      <div style="background:#d1fae5;border-radius:8px;padding:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <div>✅ <strong>Cursos:</strong> ${data.cursos}</div>
+        <div>👤 <strong>Alumnos:</strong> ${data.alumnos}</div>
+        <div>📋 <strong>Matriculaciones:</strong> ${data.matriculas}</div>
+        <div>📊 <strong>Calificaciones:</strong> ${data.calificaciones}</div>
+        <div>✅ <strong>Asistencias:</strong> ${data.asistencias}</div>
+        <div style="color:${data.errores>0?'#dc2626':'#16a34a'}">⚠ <strong>Errores:</strong> ${data.errores}</div>
+      </div>
+      <div style="margin-top:8px;font-size:.83rem;color:#64748b;">Tiempo total: ${data.duracion_seg}s</div>`;
+    _portalLog(`Sync completado — ${data.cursos} cursos, ${data.alumnos} alumnos, ${data.asistencias} asistencias`, 'info');
+    await cargarSyncEstado();
+  } catch(ex) {
+    progressEl.style.display = 'none';
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `<div style="background:#fee2e2;border-radius:8px;padding:12px;">❌ Error: ${ex.message}</div>`;
+    _portalLog(`Error en sync: ${ex.message}`, 'error');
+  }
+}
+
+async function syncBuscarAlumnos() {
+  const q = document.getElementById('sync-buscar-input').value.trim();
+  try {
+    const rows = await apiFetch(`/api/sync/alumnos?q=${encodeURIComponent(q)}&limit=100`);
+    const tabla = document.getElementById('sync-alumnos-tabla');
+    if (!rows.length) { tabla.innerHTML = '<p style="color:#9ca3af;padding:12px;">Sin resultados.</p>'; return; }
+    tabla.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+        <thead><tr style="background:#1e3a5f;color:#fff;">
+          <th style="padding:8px 12px;text-align:left;">Nombre</th>
+          <th style="padding:8px 12px;text-align:left;">Email</th>
+          <th style="padding:8px 12px;text-align:left;">Cédula SIS</th>
+          <th style="padding:8px 12px;text-align:left;">Canvas ID</th>
+          <th style="padding:8px 12px;text-align:left;"></th>
+        </tr></thead>
+        <tbody>${rows.map((r,i) => `
+          <tr style="background:${i%2?'#f8fafc':'#fff'};">
+            <td style="padding:7px 12px;">${r.nombre||'—'}</td>
+            <td style="padding:7px 12px;">${r.email||'—'}</td>
+            <td style="padding:7px 12px;">${r.sis_user_id||'—'}</td>
+            <td style="padding:7px 12px;">${r.canvas_user_id}</td>
+            <td style="padding:7px 12px;">
+              <button class="btn btn-secondary" style="padding:3px 10px;font-size:.78rem;" onclick="syncVerAlumno(${r.canvas_user_id},'${(r.nombre||'').replace(/'/g,"\\'")}')">Ver detalle</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(ex) {
+    document.getElementById('sync-alumnos-tabla').innerHTML = `<p style="color:#dc2626;">Error: ${ex.message}</p>`;
+  }
+}
+
+async function syncVerAlumno(uid, nombre) {
+  try {
+    const data = await apiFetch(`/api/sync/alumno/${uid}`);
+    const detalleEl = document.getElementById('sync-alumno-detalle');
+    document.getElementById('sync-detalle-nombre').textContent = data.alumno?.nombre || nombre;
+    document.getElementById('sync-detalle-info').innerHTML =
+      `Email: <strong>${data.alumno?.email||'—'}</strong> · Cédula: <strong>${data.alumno?.sis_user_id||'—'}</strong> · Canvas ID: <strong>${uid}</strong>`;
+    const cursos = data.cursos || [];
+    document.getElementById('sync-detalle-cursos').innerHTML = cursos.length ? `
+      <table style="width:100%;border-collapse:collapse;font-size:.83rem;">
+        <thead><tr style="background:#1e3a5f;color:#fff;">
+          <th style="padding:7px 10px;text-align:left;">Materia</th>
+          <th style="padding:7px 10px;text-align:left;">Semestre</th>
+          <th style="padding:7px 10px;text-align:center;">Nota actual</th>
+          <th style="padding:7px 10px;text-align:center;">Nota final</th>
+          <th style="padding:7px 10px;text-align:center;">Asistencias</th>
+          <th style="padding:7px 10px;text-align:center;">Estado</th>
+        </tr></thead>
+        <tbody>${cursos.map((c,i) => {
+          const pct = c.total_clases > 0 ? Math.round((c.presentes/c.total_clases)*100) : null;
+          const colorNota = c.nota_final >= 60 ? '#16a34a' : c.nota_final !== null ? '#dc2626' : '#9ca3af';
+          return `<tr style="background:${i%2?'#f8fafc':'#fff'};">
+            <td style="padding:6px 10px;">${c.nombre}</td>
+            <td style="padding:6px 10px;">${c.semestre||'—'}</td>
+            <td style="padding:6px 10px;text-align:center;">${c.nota_actual !== null ? c.nota_actual+'%' : '—'}</td>
+            <td style="padding:6px 10px;text-align:center;font-weight:700;color:${colorNota};">${c.nota_final !== null ? c.nota_final+'%' : '—'}</td>
+            <td style="padding:6px 10px;text-align:center;">${pct !== null ? pct+'% ('+c.presentes+'/'+c.total_clases+')' : '—'}</td>
+            <td style="padding:6px 10px;text-align:center;"><span style="background:${c.estado==='active'?'#d1fae5':'#f3f4f6'};padding:2px 8px;border-radius:10px;font-size:.78rem;">${c.estado||'—'}</span></td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>` : '<p style="color:#9ca3af;">Sin cursos registrados.</p>';
+    detalleEl.style.display = 'block';
+    detalleEl.scrollIntoView({behavior:'smooth'});
+  } catch(ex) {
+    alert('Error al cargar detalle: ' + ex.message);
+  }
+}
+
+// Cargar estado al entrar al panel
+const _origShowPanel = showPanel;
 
 // ── Crear cursos y equipos ────────────────────────────────────────────────────
 async function crearCursos() {
