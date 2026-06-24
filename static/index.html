@@ -26,7 +26,7 @@
       --error-bg: #fef2f2;  --error: #991b1b;  --error-border: #fca5a5;
       --skip-bg: #f8fafc;   --skip: #374151;   --skip-border: #cbd5e1;
     }
-    body { font-family: 'Lato', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; }
+    body { font-family: 'Lato', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; margin: 0; padding: 0; }
 
     /* ── Sidebar (icon-only, fixed) ── */
     #sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 68px; background: var(--sidebar-bg); display: flex; flex-direction: column; z-index: 500; overflow: visible; }
@@ -50,7 +50,7 @@
     .nav-item { display: none; }
 
     /* ── Main content ── */
-    #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; margin-left: 68px; }
+    #main { position: fixed; left: 68px; right: 0; top: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden; }
     #topbar { background: #fff; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; border-bottom: 1px solid var(--border); box-shadow: 0 1px 0 rgba(0,0,0,.04); }
     #topbar h2 { font-size: 1.05rem; font-weight: 700; color: var(--text); letter-spacing: .01em; }
     #topbar .badge { background: #eff6ff; color: #2563eb; font-size: 0.68rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; letter-spacing: .04em; text-transform: uppercase; border: 1px solid #bfdbfe; }
