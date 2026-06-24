@@ -18,6 +18,13 @@ from config import get_settings
 
 settings = get_settings()
 
+if settings.app_secret_key == "change_this_in_production":
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        "SECURITY: APP_SECRET_KEY is using the default insecure value. "
+        "Set APP_SECRET_KEY in environment variables before deploying."
+    )
+
 # ---------------------------------------------------------------------------
 # JWT
 # ---------------------------------------------------------------------------

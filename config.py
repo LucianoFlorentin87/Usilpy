@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 
     # App
     app_secret_key: str = "change_this_in_production"
+    allowed_origins: str = ""   # comma-separated, e.g. "https://myapp.onrender.com,http://localhost:8000"
     debug: bool = False
 
     # Auth

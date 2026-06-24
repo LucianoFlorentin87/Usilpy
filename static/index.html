@@ -1546,6 +1546,12 @@
 </div><!-- /main -->
 
 <script>
+// ── Security helpers ──────────────────────────────────────────────────────────
+function _esc(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 // ── Auth ─────────────────────────────────────────────────────────────────────
 const TOKEN_KEY = 'ga_token';
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
@@ -1634,13 +1640,20 @@ function doLogout() { fetch('/api/auth/logout', {method:'POST'}); showLogin('');
 
 (function handleFragment() {
   const hash = window.location.hash;
-  if (hash.startsWith('#token=')) { setToken(hash.slice(7)); window.history.replaceState(null,'','/'); }
-  if (hash.includes('auth_error=')) {
-    const msg = decodeURIComponent(hash.split('auth_error=')[1] || 'Error');
-    window.history.replaceState(null,'','/'); showLogin(msg); return;
+  // Azure SSO: token delivered via short-lived cookie to avoid URL exposure
+  if (hash === '#azure_ok') {
+    const match = document.cookie.match(/(?:^|;)\s*azure_token=([^;]+)/);
+    if (match) {
+      setToken(decodeURIComponent(match[1]));
+      // Consume the cookie immediately
+      document.cookie = 'azure_token=; max-age=0; path=/';
+    }
+    window.history.replaceState(null, '', '/');
   }
+  // Legacy fragment token (kept for backward compat)
+  if (hash.startsWith('#token=')) { setToken(hash.slice(7)); window.history.replaceState(null,'','/'); }
   const params = new URLSearchParams(window.location.search);
-  if (params.get('auth_error')) showLogin(decodeURIComponent(params.get('auth_error')));
+  if (params.get('auth_error')) showLogin('Error de autenticación. Intentá de nuevo.');
 })();
 
 (async function checkAuth() {
@@ -2186,7 +2199,7 @@ function renderResults(report) {
   const tbody = document.getElementById('results-tbody');
   tbody.innerHTML = '';
   (report.rows||[]).forEach(row => {
-    if (row.error_global) { tbody.innerHTML += `<tr><td colspan="9" style="color:var(--error)">${row.error_global}</td></tr>`; return; }
+    if (row.error_global) { tbody.innerHTML += `<tr><td colspan="9" style="color:var(--error)">${_esc(row.error_global)}</td></tr>`; return; }
     tbody.innerHTML += `<tr>
       <td>${row.fila||''}</td><td>${row.email||''}</td><td>${row.nombre||row.curso||''}</td>
       <td>${chip(row.canvas?.status)}</td><td><span class="detail-text" title="${row.canvas?.detalle||''}">${row.canvas?.detalle||''}</span></td>
@@ -2358,7 +2371,7 @@ async function loadSystemUsers() {
       </tr>`;
     }).join('');
   } catch(ex) {
-    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${ex.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${_esc(ex.message)}</td></tr>`;
   }
 }
 
@@ -2898,7 +2911,7 @@ async function portalCargarMisEnvios() {
       </td>
     </tr>`).join('');
   } catch(ex) {
-    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${ex.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${_esc(ex.message)}</td></tr>`;
   }
 }
 

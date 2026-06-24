@@ -1,11 +1,14 @@
 import io
 import os
+import time
+from collections import defaultdict
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request, Query, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from starlette.middleware.base import BaseHTTPMiddleware
 from jose import JWTError
 from pydantic import BaseModel
 
@@ -23,12 +26,40 @@ from scheduler import lifespan, get_next_run
 
 app = FastAPI(title="Gestión Académica Universitaria", version="2.0.0", lifespan=lifespan)
 
+# ── Security headers ───────────────────────────────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# ── CORS ───────────────────────────────────────────────────────────────────────
+_settings_cors = auth_service.settings  # reuse already-imported settings reference later
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] or [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+# ── Simple in-process rate limiter for login ──────────────────────────────────
+_login_attempts: dict = defaultdict(list)
+_LOGIN_MAX = 10       # attempts
+_LOGIN_WINDOW = 300   # seconds (5 min)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -98,7 +129,15 @@ class LoginRequest(BaseModel):
 
 
 @app.post("/api/auth/login")
-async def login(body: LoginRequest):
+async def login(body: LoginRequest, request: Request):
+    # Rate limiting: max _LOGIN_MAX attempts per IP per _LOGIN_WINDOW seconds
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < _LOGIN_WINDOW]
+    if len(_login_attempts[ip]) >= _LOGIN_MAX:
+        raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 5 minutos.")
+    _login_attempts[ip].append(now)
+
     # Try DB users first (async)
     db_user = await user_service.get_user_by_username(body.username)
     if db_user:
@@ -138,13 +177,23 @@ async def azure_login():
 @app.get("/api/auth/azure/callback")
 async def azure_callback(code: str = "", state: str = "", error: str = ""):
     if error:
-        return RedirectResponse(f"/?auth_error={error}")
+        # Never reflect external error strings — use a fixed safe message
+        return RedirectResponse("/?auth_error=azure_login_failed")
     try:
         user = await auth_service.exchange_azure_code(code, state)
-    except Exception as exc:
-        return RedirectResponse(f"/?auth_error={str(exc)[:60]}")
+    except Exception:
+        return RedirectResponse("/?auth_error=azure_login_failed")
     token = auth_service.create_access_token(user)
-    return RedirectResponse(f"/#token={token}")
+    # Return token in JSON body via a short-lived server-set cookie to avoid URL exposure
+    response = RedirectResponse("/#azure_ok")
+    response.set_cookie(
+        "azure_token", token,
+        httponly=False,  # JS needs to read it once then store in memory
+        secure=True,
+        samesite="lax",
+        max_age=60,      # 1-minute window to consume
+    )
+    return response
 
 
 @app.get("/api/auth/me")
@@ -337,7 +386,7 @@ async def bulk_inscripciones(file: UploadFile = File(...), _: dict = Depends(get
 
 
 @app.get("/api/bulk/template")
-async def bulk_template():
+async def bulk_template(_: dict = Depends(get_current_user)):
     if not os.path.exists(TEMPLATE_PATH):
         raise HTTPException(status_code=404, detail="Plantilla no encontrada en el servidor")
     return FileResponse(
@@ -348,7 +397,7 @@ async def bulk_template():
 
 
 @app.get("/api/bulk/template/{tipo}")
-async def bulk_template_tipo(tipo: str):
+async def bulk_template_tipo(tipo: str, _: dict = Depends(get_current_user)):
     """Genera y devuelve una plantilla Excel vacía según el tipo solicitado."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
