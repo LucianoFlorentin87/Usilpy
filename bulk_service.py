@@ -10,9 +10,12 @@ Columnas esperadas — Inscripciones:
 
 import io
 import asyncio
+import logging
 import secrets
 import string
 from typing import BinaryIO
+
+logger = logging.getLogger(__name__)
 
 import pandas as pd
 from openpyxl import Workbook
@@ -610,8 +613,9 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
                 )
                 canvas_course_id = str(created.get("id", ""))
                 canvas_status = "creado"
-        except Exception:
-            canvas_status = "error"
+        except Exception as exc:
+            logger.error("Canvas error creando curso '%s': %s", materia, exc)
+            canvas_status = f"error: {str(exc)[:120]}"
 
         # Teams
         try:
@@ -624,8 +628,9 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
                 new_team = await graph_service.create_team(team_name)
                 teams_team_id = new_team.get("id", "")
                 teams_status = "creado"
-        except Exception:
-            teams_status = "error"
+        except Exception as exc:
+            logger.error("Teams error creando equipo '%s': %s", materia, exc)
+            teams_status = f"error: {str(exc)[:120]}"
 
         rows_out.append({
             "Materia": materia,
