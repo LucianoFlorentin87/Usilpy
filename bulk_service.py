@@ -10,6 +10,8 @@ Columnas esperadas — Inscripciones:
 
 import io
 import asyncio
+import secrets
+import string
 from typing import BinaryIO
 
 import pandas as pd
@@ -166,7 +168,9 @@ async def process_azure_users_sheet(file_bytes: bytes, filename: str) -> dict:
         if upn:
             try:
                 nickname = upn.split("@")[0]
-                password = row.get("password", "Temporal@2024!")
+                _alphabet = string.ascii_letters + string.digits + "!@#$"
+                _default_pw = "".join(secrets.choice(_alphabet) for _ in range(16))
+                password = row.get("password") or _default_pw
                 az_user = await graph_service.create_user(
                     display_name=row.get("nombre", nickname),
                     mail_nickname=nickname,
@@ -283,7 +287,8 @@ async def _process_user_row(row: dict) -> dict:
     if row.get("upn_azure"):
         try:
             nickname = row["upn_azure"].split("@")[0]
-            temp_pw = "Temporal@2024!"
+            _az_alphabet = string.ascii_letters + string.digits + "!@#$"
+            temp_pw = "".join(secrets.choice(_az_alphabet) for _ in range(16))
             az_user = await graph_service.create_user(
                 display_name=row.get("nombre", nickname),
                 mail_nickname=nickname,

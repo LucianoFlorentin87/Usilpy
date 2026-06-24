@@ -1,7 +1,10 @@
 import io
+import logging
 import os
 import time
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request, Query, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, RedirectResponse
@@ -188,10 +191,11 @@ async def azure_callback(code: str = "", state: str = "", error: str = ""):
     response = RedirectResponse("/#azure_ok")
     response.set_cookie(
         "azure_token", token,
-        httponly=False,  # JS needs to read it once then store in memory
+        httponly=False,  # JS reads it once then clears it; kept non-httponly intentionally for SPA auth flow
         secure=True,
-        samesite="lax",
-        max_age=60,      # 1-minute window to consume
+        samesite="strict",
+        max_age=60,      # 1-minute window to consume; cleared by JS after read
+        path="/",
     )
     return response
 
@@ -215,7 +219,9 @@ async def list_terms(_: dict = Depends(get_current_user)):
     try:
         return await canvas_service.get_terms()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/canvas/terms")
@@ -223,7 +229,9 @@ async def create_term(payload: dict, _: dict = Depends(get_current_user)):
     try:
         return await canvas_service.get_or_create_term(payload["name"])
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.get("/api/canvas/courses")
@@ -231,7 +239,9 @@ async def list_courses(_: dict = Depends(get_current_user)):
     try:
         return await canvas_service.get_courses()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.get("/api/canvas/users")
@@ -239,7 +249,9 @@ async def list_canvas_users(_: dict = Depends(get_current_user)):
     try:
         return await canvas_service.get_users()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/canvas/users")
@@ -251,7 +263,9 @@ async def create_canvas_user(payload: dict, _: dict = Depends(get_current_user))
             sis_id=payload.get("sis_id", ""),
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/canvas/courses/{course_id}/enrollments")
@@ -263,7 +277,9 @@ async def enroll(course_id: str, payload: dict, _: dict = Depends(get_current_us
             role=payload.get("role", "StudentEnrollment"),
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +291,9 @@ async def list_azure_users(_: dict = Depends(get_current_user)):
     try:
         return await graph_service.get_users()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/azure/users")
@@ -288,7 +306,9 @@ async def create_azure_user(payload: dict, _: dict = Depends(get_current_user)):
             password=payload["password"],
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.get("/api/azure/groups")
@@ -296,7 +316,9 @@ async def list_groups(_: dict = Depends(get_current_user)):
     try:
         return await graph_service.get_groups()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/azure/groups")
@@ -307,7 +329,9 @@ async def create_group(payload: dict, _: dict = Depends(get_current_user)):
             description=payload.get("description", ""),
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 # ---------------------------------------------------------------------------
@@ -319,7 +343,9 @@ async def list_teams(_: dict = Depends(get_current_user)):
     try:
         return await graph_service.get_teams()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/teams")
@@ -330,7 +356,9 @@ async def create_team_endpoint(payload: dict, _: dict = Depends(get_current_user
             description=payload.get("description", ""),
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 @app.post("/api/teams/members")
@@ -343,7 +371,9 @@ async def add_team_member_endpoint(payload: dict, _: dict = Depends(get_current_
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.error("Upstream service error: %s", exc)
+
+        raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +382,9 @@ async def add_team_member_endpoint(payload: dict, _: dict = Depends(get_current_
 
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 TEMPLATE_PATH = "plantilla_carga_masiva.xlsx"
+
+
+_MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
 def _validate_file(file: UploadFile) -> None:
@@ -363,10 +396,17 @@ def _validate_file(file: UploadFile) -> None:
         )
 
 
+async def _read_validated(file: UploadFile) -> bytes:
+    data = await _read_validated(file)
+    if len(data) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (máx 20 MB)")
+    return data
+
+
 @app.post("/api/bulk/usuarios")
 async def bulk_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_users_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -377,7 +417,7 @@ async def bulk_usuarios(file: UploadFile = File(...), _: dict = Depends(get_curr
 @app.post("/api/bulk/inscripciones")
 async def bulk_inscripciones(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_enrollments_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -440,7 +480,7 @@ async def bulk_template_tipo(tipo: str, _: dict = Depends(get_current_user)):
 @app.post("/api/bulk/cursos")
 async def bulk_cursos(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_courses_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -451,7 +491,7 @@ async def bulk_cursos(file: UploadFile = File(...), _: dict = Depends(get_curren
 @app.post("/api/bulk/canvas/usuarios")
 async def bulk_canvas_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_canvas_users_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -462,7 +502,7 @@ async def bulk_canvas_usuarios(file: UploadFile = File(...), _: dict = Depends(g
 @app.post("/api/bulk/azure/usuarios")
 async def bulk_azure_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_azure_users_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -473,7 +513,7 @@ async def bulk_azure_usuarios(file: UploadFile = File(...), _: dict = Depends(ge
 @app.post("/api/bulk/canvas/inscripciones")
 async def bulk_canvas_inscripciones(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_canvas_enrollments_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -484,7 +524,7 @@ async def bulk_canvas_inscripciones(file: UploadFile = File(...), _: dict = Depe
 @app.post("/api/bulk/teams")
 async def bulk_teams(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         report = await bulk_service.process_teams_sheet(file_bytes, file.filename)
     except Exception as exc:
@@ -553,7 +593,7 @@ async def matriculacion_upload(
     if ext not in {".xlsx", ".xls"}:
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
     import uuid
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     ejecucion_id = str(uuid.uuid4())
     matriculacion_service._init_progress_placeholder(ejecucion_id)
     background_tasks.add_task(
@@ -575,7 +615,7 @@ async def matriculacion_upload_dry_run(
     if ext not in {".xlsx", ".xls"}:
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
     import uuid
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     ejecucion_id = str(uuid.uuid4())
     matriculacion_service._init_progress_placeholder(ejecucion_id)
     background_tasks.add_task(
@@ -768,7 +808,7 @@ async def upload_pending(
 ):
     """Portal académico: carga un Excel con inscripciones a la cola pendiente."""
     _validate_file(file)
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     import io
     import pandas as pd
     buf = io.BytesIO(file_bytes)
@@ -992,7 +1032,7 @@ async def parsear_planilla(
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in {".xlsx", ".xls"}:
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos .xlsx o .xls")
-    file_bytes = await file.read()
+    file_bytes = await _read_validated(file)
     try:
         result = parseo_service.parsear_planilla(file_bytes, semestre=semestre)
         return JSONResponse(content=result)
@@ -1164,8 +1204,9 @@ async def formulario_inscripcion(
     academico = source.replace("parseo:", "") if "parseo:" in source else source
     fecha    = (first.get("received_at") or "")[:10]
 
+    from html import escape as _he
     cursos_html = "".join(
-        f"<tr><td>{i+1}</td><td>{r.get('curso_nombre') or ''}</td><td>{r.get('rol','StudentEnrollment').replace('Enrollment','')}</td><td>{r.get('estado','')}</td></tr>"
+        f"<tr><td>{i+1}</td><td>{_he(r.get('curso_nombre') or '')}</td><td>{_he(r.get('rol','StudentEnrollment').replace('Enrollment',''))}</td><td>{_he(r.get('estado',''))}</td></tr>"
         for i, r in enumerate(rows)
     )
 
@@ -1173,7 +1214,7 @@ async def formulario_inscripcion(
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Formulario de Inscripción — {nombre}</title>
+<title>Formulario de Inscripción — {_he(nombre)}</title>
 <style>
   body {{ font-family: Arial, sans-serif; margin: 40px; color: #333; }}
   h1 {{ color: #1a3c6b; border-bottom: 2px solid #1a3c6b; padding-bottom: 8px; }}
@@ -1198,12 +1239,12 @@ async def formulario_inscripcion(
 <h1>Formulario de Inscripción</h1>
 <button class="btn-print no-print" onclick="window.print()">🖨️ Imprimir</button>
 <table class="info">
-  <tr><td>Nombre completo</td><td>{nombre}</td></tr>
-  <tr><td>Cédula de identidad</td><td>{cedula}</td></tr>
-  <tr><td>Correo electrónico</td><td>{email or '—'}</td></tr>
-  <tr><td>Período / Semestre</td><td>{sem}</td></tr>
-  <tr><td>Fecha de inscripción</td><td>{fecha}</td></tr>
-  <tr><td>Registrado por</td><td>{academico}</td></tr>
+  <tr><td>Nombre completo</td><td>{_he(nombre)}</td></tr>
+  <tr><td>Cédula de identidad</td><td>{_he(cedula)}</td></tr>
+  <tr><td>Correo electrónico</td><td>{_he(email) if email else '—'}</td></tr>
+  <tr><td>Período / Semestre</td><td>{_he(sem)}</td></tr>
+  <tr><td>Fecha de inscripción</td><td>{_he(fecha)}</td></tr>
+  <tr><td>Registrado por</td><td>{_he(academico)}</td></tr>
 </table>
 <h2 style="color:#1a3c6b;font-size:16px;">Cursos inscriptos</h2>
 <table class="cursos">
@@ -1259,7 +1300,7 @@ async def plantilla_teams(_user=Depends(_require_admin)):
 async def gestion_crear_cursos(file: UploadFile = File(...), _user=Depends(_require_admin)):
     """Upload Excel with materias → creates Canvas courses + Teams teams → returns Excel with IDs"""
     import bulk_service as _bulk
-    data = await file.read()
+    data = await _read_validated(file)
     excel_bytes = await _bulk.process_cursos_ids(data, file.filename)
     from fastapi.responses import Response
     return Response(
@@ -1273,7 +1314,7 @@ async def gestion_crear_cursos(file: UploadFile = File(...), _user=Depends(_requ
 async def gestion_matricular(file: UploadFile = File(...), _user=Depends(_require_admin)):
     """Upload planilla Excel → create users + enroll in Canvas + Teams + send emails"""
     import bulk_service as _bulk
-    data = await file.read()
+    data = await _read_validated(file)
     summary, excel_bytes = await _bulk.process_matriculacion_planilla(data, file.filename)
     import base64
     summary["excel_b64"] = base64.b64encode(excel_bytes).decode()
@@ -1285,7 +1326,7 @@ async def gestion_inscribir_canvas(file: UploadFile = File(...), _user=Depends(_
     """Upload Excel SIS User ID|Course ID|Rol → inscribe en Canvas → returns Excel con Resultado"""
     import bulk_service as _bulk
     from fastapi.responses import Response
-    data = await file.read()
+    data = await _read_validated(file)
     excel_bytes = await _bulk.process_canvas_enrollment_file(data, file.filename)
     return Response(
         content=excel_bytes,
@@ -1299,7 +1340,7 @@ async def gestion_inscribir_teams(file: UploadFile = File(...), _user=Depends(_r
     """Upload Excel Correo|Group ID → agrega a equipos Teams → returns Excel con Resultado"""
     import bulk_service as _bulk
     from fastapi.responses import Response
-    data = await file.read()
+    data = await _read_validated(file)
     excel_bytes = await _bulk.process_teams_enrollment_file(data, file.filename)
     return Response(
         content=excel_bytes,

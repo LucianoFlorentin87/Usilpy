@@ -3,10 +3,13 @@ Webhook para recibir datos de inscripciones — PostgreSQL via db.py.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
 import db
+
+logger = logging.getLogger(__name__)
 
 _CREATE_PENDING = """
 CREATE TABLE IF NOT EXISTS pending_enrollments (
@@ -43,8 +46,8 @@ async def init_pending_table() -> None:
             await db.execute(
                 f"ALTER TABLE pending_enrollments ADD COLUMN IF NOT EXISTS {col_def}"
             )
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.warning("DDL migration for column %s: %s", col_name, _e)
 
 
 async def receive_enrollment(data: dict, source: str = "webhook") -> dict:

@@ -18,13 +18,6 @@ from config import get_settings
 
 settings = get_settings()
 
-if settings.app_secret_key == "change_this_in_production":
-    import logging as _logging
-    _logging.getLogger(__name__).warning(
-        "SECURITY: APP_SECRET_KEY is using the default insecure value. "
-        "Set APP_SECRET_KEY in environment variables before deploying."
-    )
-
 # ---------------------------------------------------------------------------
 # JWT
 # ---------------------------------------------------------------------------
@@ -125,9 +118,9 @@ def build_azure_login_url() -> str:
         "scope": "openid profile email User.Read",
         "state": state,
     }
+    from urllib.parse import urlencode
     base = AZURE_AUTHORIZE_URL.format(tenant=settings.azure_tenant_id)
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    return f"{base}?{query}"
+    return f"{base}?{urlencode(params)}"
 
 
 async def exchange_azure_code(code: str, state: str) -> dict:

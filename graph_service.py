@@ -150,7 +150,8 @@ async def get_teams(top: int = 50) -> list[dict]:
 
 async def find_team_by_display_name(name: str) -> dict | None:
     """Find a Teams team by exact display name. Returns None if not found."""
-    filter_q = f"displayName eq '{name}' and resourceProvisioningOptions/Any(x:x eq 'Team')"
+    safe = name.replace("'", "''")
+    filter_q = f"displayName eq '{safe}' and resourceProvisioningOptions/Any(x:x eq 'Team')"
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.get(
             f"{GRAPH_BASE}/groups",

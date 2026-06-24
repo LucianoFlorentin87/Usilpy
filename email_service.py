@@ -7,6 +7,7 @@ Three template types:
 """
 from __future__ import annotations
 
+import html as _html
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -131,23 +132,27 @@ async def _send(to: str, subject: str, html: str) -> bool:
 async def send_welcome_email(
     to: str,
     nombre: str,
-    password: str,
+    password: str,  # kept for compat but NOT sent in email
     canvas_url: str,
     teams_url: str,
     cursos: list[str],
     semestre: str,
 ) -> bool:
     cursos_html = "".join(
-        f'<li style="padding:4px 0;border-bottom:1px solid #f0f2f5;">{c}</li>' for c in cursos
+        f'<li style="padding:4px 0;border-bottom:1px solid #f0f2f5;">{_html.escape(c)}</li>' for c in cursos
     ) if cursos else "<li>Sin cursos asignados</li>"
 
+    _safe_nombre = _html.escape(nombre)
+    _safe_semestre = _html.escape(semestre)
+    _safe_to = _html.escape(to)
+
     content = f"""
-    <h2 style="margin:0 0 6px;color:{_BRAND_COLOR};font-size:1.2rem;">¡Bienvenido/a, {nombre}!</h2>
-    <p style="color:#6b7280;margin:0 0 24px;font-size:0.88rem;">Semestre: <strong>{semestre}</strong></p>
+    <h2 style="margin:0 0 6px;color:{_BRAND_COLOR};font-size:1.2rem;">¡Bienvenido/a, {_safe_nombre}!</h2>
+    <p style="color:#6b7280;margin:0 0 24px;font-size:0.88rem;">Semestre: <strong>{_safe_semestre}</strong></p>
 
     <p style="color:#1a2332;font-size:0.9rem;margin:0 0 20px;">
       Tu cuenta ha sido creada exitosamente en el sistema académico de USIL.
-      A continuación encontrás tus credenciales de acceso:
+      A continuación encontrás tu usuario de acceso:
     </p>
 
     <table width="100%" cellpadding="0" cellspacing="0"
@@ -155,27 +160,23 @@ async def send_welcome_email(
       <tr>
         <td style="padding:20px 24px;">
           <p style="margin:0 0 10px;font-size:0.82rem;font-weight:600;color:#1e40af;text-transform:uppercase;letter-spacing:.05em;">
-            Credenciales de acceso
+            Acceso al sistema
           </p>
           <table>
             <tr>
               <td style="padding:4px 16px 4px 0;color:#6b7280;font-size:0.88rem;">Usuario / Email:</td>
-              <td style="padding:4px 0;font-weight:600;color:#1a2332;font-size:0.88rem;">{to}</td>
-            </tr>
-            <tr>
-              <td style="padding:4px 16px 4px 0;color:#6b7280;font-size:0.88rem;">Contraseña temporal:</td>
-              <td style="padding:4px 0;font-weight:700;color:{_ACCENT};font-family:monospace;font-size:1rem;">{password}</td>
+              <td style="padding:4px 0;font-weight:600;color:#1a2332;font-size:0.88rem;">{_safe_to}</td>
             </tr>
           </table>
           <p style="margin:12px 0 0;font-size:0.78rem;color:#6b7280;">
-            ⚠️ Cambiá tu contraseña en el primer inicio de sesión.
+            Para establecer tu contraseña, usá la opción <strong>"¿Olvidé mi contraseña?"</strong> en Canvas al ingresar por primera vez.
           </p>
         </td>
       </tr>
     </table>
 
     <p style="color:#1a2332;font-size:0.9rem;margin:0 0 12px;font-weight:600;">
-      Materias inscriptas — {semestre}:
+      Materias inscriptas — {_safe_semestre}:
     </p>
     <ul style="margin:0 0 24px;padding:0 0 0 18px;color:#374151;font-size:0.88rem;">
       {cursos_html}
@@ -274,10 +275,10 @@ async def send_admin_error_report(
 
     rows_html = ""
     for i, e in enumerate(errores[:50], 1):
-        sheet = e.get("sheet_name", e.get("cedula", ""))
-        cedula = e.get("cedula", "")
-        nombre = e.get("nombre", "")
-        error = e.get("error", str(e))
+        sheet = _html.escape(str(e.get("sheet_name", e.get("cedula", ""))))
+        cedula = _html.escape(str(e.get("cedula", "")))
+        nombre = _html.escape(str(e.get("nombre", "")))
+        error = _html.escape(str(e.get("error", str(e))))
         bg = "#fff" if i % 2 == 0 else "#f8fafc"
         rows_html += f"""<tr style="background:{bg};">
           <td style="padding:8px 12px;font-size:0.82rem;color:#6b7280;">{sheet or cedula}</td>
@@ -315,7 +316,7 @@ async def send_admin_error_report(
 
     <p style="color:#6b7280;font-size:0.82rem;">
       Iniciá sesión en el
-      <a href="http://localhost:8000" style="color:{_ACCENT};">sistema de gestión académica</a>
+      <a href="{settings.canvas_base_url or '#'}" style="color:{_ACCENT};">sistema de gestión académica</a>
       para revisar el log de auditoría completo y exportarlo a Excel.
     </p>
     """

@@ -58,3 +58,12 @@ class Settings(BaseSettings):
 
 def get_settings() -> Settings:
     return Settings()
+
+
+def validate_settings(s: Settings) -> None:
+    """Raise on insecure startup configuration."""
+    if s.app_secret_key == "change_this_in_production" and not s.debug:
+        raise RuntimeError(
+            "APP_SECRET_KEY must be set to a strong random value before deploying. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )

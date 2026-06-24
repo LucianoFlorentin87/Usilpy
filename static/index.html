@@ -1650,8 +1650,7 @@ function doLogout() { fetch('/api/auth/logout', {method:'POST'}); showLogin('');
     }
     window.history.replaceState(null, '', '/');
   }
-  // Legacy fragment token (kept for backward compat)
-  if (hash.startsWith('#token=')) { setToken(hash.slice(7)); window.history.replaceState(null,'','/'); }
+  // Legacy #token= fragment removed for security (tokens in URL history)
   const params = new URLSearchParams(window.location.search);
   if (params.get('auth_error')) showLogin('Error de autenticación. Intentá de nuevo.');
 })();
@@ -1759,17 +1758,17 @@ async function loadDashboard() {
     } else {
       timeline.innerHTML = execs.map(e => {
         const dotClass = e.estado === 'exitoso' ? 'exec-dot-ok' : e.estado === 'con_errores' ? 'exec-dot-warn' : 'exec-dot-error';
-        const ts = (e.timestamp || '').slice(0, 16).replace('T', ' ');
+        const ts = _esc((e.timestamp || '').slice(0, 16).replace('T', ' '));
         return `<div class="exec-item">
           <div class="exec-dot ${dotClass}"></div>
           <div class="exec-meta">
-            <div class="exec-title">${e.tipo?.toUpperCase() || 'manual'} — ${e.semestre || '—'}</div>
-            <div class="exec-sub">${ts} UTC · ${e.duracion_seg?.toFixed(1) || 0}s</div>
+            <div class="exec-title">${_esc(e.tipo?.toUpperCase() || 'manual')} — ${_esc(e.semestre || '—')}</div>
+            <div class="exec-sub">${ts} UTC · ${_esc(String(e.duracion_seg?.toFixed(1) || 0))}s</div>
           </div>
           <div class="exec-stats">
-            <span class="exec-stat">👥 ${e.total || 0}</span>
-            <span class="exec-stat">✅ ${e.creados || 0}</span>
-            ${e.errores ? `<span class="exec-stat" style="color:var(--error);">⚠ ${e.errores}</span>` : ''}
+            <span class="exec-stat">👥 ${parseInt(e.total)||0}</span>
+            <span class="exec-stat">✅ ${parseInt(e.creados)||0}</span>
+            ${e.errores ? `<span class="exec-stat" style="color:var(--error);">⚠ ${parseInt(e.errores)}</span>` : ''}
           </div>
         </div>`;
       }).join('');
@@ -1780,7 +1779,7 @@ async function loadDashboard() {
     _dashboardSemestres = [...semestresSet];
     const sel = document.getElementById('dash-semestre-filter');
     sel.innerHTML = '<option value="">Todos los semestres</option>' +
-      _dashboardSemestres.map(s => `<option value="${s}">${s}</option>`).join('');
+      _dashboardSemestres.map(s => `<option value="${_esc(s)}">${_esc(s)}</option>`).join('');
 
     await loadDashboardTable();
   } catch(e) {
@@ -1799,13 +1798,13 @@ async function loadDashboardTable() {
       return;
     }
     tbody.innerHTML = rows.map(r => `<tr>
-      <td style="font-size:0.75rem;">${(r.timestamp||'').slice(0,16).replace('T',' ')}</td>
-      <td>${r.cedula||''}</td>
-      <td>${r.nombre||''}</td>
+      <td style="font-size:0.75rem;">${_esc((r.timestamp||'').slice(0,16).replace('T',' '))}</td>
+      <td>${_esc(r.cedula||'')}</td>
+      <td>${_esc(r.nombre||'')}</td>
       <td>${chipAccion(r.accion)}</td>
-      <td><span style="font-size:0.75rem;color:var(--text-muted);">${r.plataforma||''}</span></td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.curso||''}">${r.curso||''}</td>
-      <td>${r.semestre||''}</td>
+      <td><span style="font-size:0.75rem;color:var(--text-muted);">${_esc(r.plataforma||'')}</span></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.curso||'')}">${_esc(r.curso||'')}</td>
+      <td>${_esc(r.semestre||'')}</td>
     </tr>`).join('');
   } catch(e) { console.error(e); }
 }
@@ -1851,7 +1850,7 @@ async function runMatriculacionUpload(dryRun) {
   formData.append('file', fileInput.files[0]);
 
   try {
-    const token = localStorage.getItem('token');
+    const token = getToken();
     const resp = await fetch(url, {
       method: 'POST',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
@@ -1865,7 +1864,7 @@ async function runMatriculacionUpload(dryRun) {
     matLog('info', `ID ejecución: ${ejecucion_id}`);
     await _pollProgress(ejecucion_id, dryRun);
   } catch(ex) {
-    matLog('error', `✗ Error: ${ex.message}`);
+    matLog('error', `✗ Error: ${_esc(ex.message)}`);
     document.getElementById('mat-progress-fill').style.width = '100%';
     setTimeout(() => { document.getElementById('mat-progress-card').style.display = 'none'; }, 2000);
   } finally {
@@ -1894,7 +1893,7 @@ async function runMatriculacion(dryRun) {
     matLog('info', `ID ejecución: ${ejecucion_id}`);
     await _pollProgress(ejecucion_id, dryRun);
   } catch(ex) {
-    matLog('error', `✗ Error: ${ex.message}`);
+    matLog('error', `✗ Error: ${_esc(ex.message)}`);
     document.getElementById('mat-progress-fill').style.width = '100%';
     setTimeout(() => { document.getElementById('mat-progress-card').style.display = 'none'; }, 2000);
   } finally {
@@ -2030,7 +2029,7 @@ function renderMatriculacionResult(result, dryRun) {
   if (valErrors.length) {
     valCard.style.display = 'block';
     document.getElementById('tbl-val-errors').innerHTML = valErrors.map(e =>
-      `<tr><td>${e.sheet_name||''}</td><td>${e.cedula||''}</td><td>${e.nombre||''}</td><td style="color:var(--error);">${e.error}</td></tr>`
+      `<tr><td>${_esc(e.sheet_name||'')}</td><td>${_esc(e.cedula||'')}</td><td>${_esc(e.nombre||'')}</td><td style="color:var(--error);">${_esc(e.error||'')}</td></tr>`
     ).join('');
   } else {
     valCard.style.display = 'none';
@@ -2047,16 +2046,16 @@ function renderMatriculacionResult(result, dryRun) {
     const cursos = r.cursos || [];
     const cursosHtml = cursos.map(c => {
       const tagClass = (c.errores?.length || 0) > 0 ? 'materia-tag-error' : 'materia-tag';
-      return `<span class="materia-tag ${tagClass}">${c.materia}</span>`;
+      return `<span class="materia-tag ${tagClass}">${_esc(c.materia||'')}</span>`;
     }).join('');
     const errorsHtml = (r.errores || []).map(e =>
-      `<div style="font-size:0.78rem;color:var(--error);padding:2px 0;">✗ ${e}</div>`
+      `<div style="font-size:0.78rem;color:var(--error);padding:2px 0;">✗ ${_esc(e)}</div>`
     ).join('');
     return `<div class="alumno-result">
       <div class="alumno-result-header" onclick="toggleAccordion(${i})">
         <span>${statusIcon}</span>
-        <span style="font-weight:600;font-size:0.88rem;">${r.nombre} <span style="font-weight:400;color:var(--text-muted);">(${r.cedula})</span></span>
-        <span style="font-size:0.78rem;color:var(--text-muted);margin-left:auto;">${r.email}</span>
+        <span style="font-weight:600;font-size:0.88rem;">${_esc(r.nombre||'')} <span style="font-weight:400;color:var(--text-muted);">(${_esc(r.cedula||'')})</span></span>
+        <span style="font-size:0.78rem;color:var(--text-muted);margin-left:auto;">${_esc(r.email||'')}</span>
         ${hasErrors ? '<span class="chip chip-error" style="margin-left:8px;">⚠ Error</span>' : ''}
         ${dryRun ? '<span class="chip chip-dry" style="margin-left:4px;">DRY</span>' : ''}
         <span style="color:var(--text-muted);font-size:0.85rem;margin-left:8px;">▾</span>
@@ -2094,14 +2093,14 @@ async function loadAuditoria() {
       return;
     }
     tbody.innerHTML = rows.map(r => `<tr>
-      <td style="white-space:nowrap;font-size:0.75rem;">${(r.timestamp||'').slice(0,19).replace('T',' ')}</td>
-      <td>${r.cedula||''}</td>
-      <td>${r.nombre||''}</td>
+      <td style="white-space:nowrap;font-size:0.75rem;">${_esc((r.timestamp||'').slice(0,19).replace('T',' '))}</td>
+      <td>${_esc(r.cedula||'')}</td>
+      <td>${_esc(r.nombre||'')}</td>
       <td>${chipAccion(r.accion)}</td>
-      <td style="font-size:0.78rem;color:var(--text-muted);">${r.plataforma||''}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.curso||''}">${r.curso||''}</td>
-      <td>${r.semestre||''}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.75rem;color:var(--text-muted);" title="${r.detalle||''}">${r.detalle||''}</td>
+      <td style="font-size:0.78rem;color:var(--text-muted);">${_esc(r.plataforma||'')}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.curso||'')}">${_esc(r.curso||'')}</td>
+      <td>${_esc(r.semestre||'')}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.75rem;color:var(--text-muted);" title="${_esc(r.detalle||'')}">${_esc(r.detalle||'')}</td>
     </tr>`).join('');
   } catch(e) { alert('Error: ' + e.message); }
 }
@@ -2201,10 +2200,10 @@ function renderResults(report) {
   (report.rows||[]).forEach(row => {
     if (row.error_global) { tbody.innerHTML += `<tr><td colspan="9" style="color:var(--error)">${_esc(row.error_global)}</td></tr>`; return; }
     tbody.innerHTML += `<tr>
-      <td>${row.fila||''}</td><td>${row.email||''}</td><td>${row.nombre||row.curso||''}</td>
-      <td>${chip(row.canvas?.status)}</td><td><span class="detail-text" title="${row.canvas?.detalle||''}">${row.canvas?.detalle||''}</span></td>
-      <td>${chip(row.azure?.status)}</td><td><span class="detail-text" title="${row.azure?.detalle||''}">${row.azure?.detalle||''}</span></td>
-      <td>${chip(row.teams?.status)}</td><td><span class="detail-text" title="${row.teams?.detalle||''}">${row.teams?.detalle||''}</span></td>
+      <td>${parseInt(row.fila)||''}</td><td>${_esc(row.email||'')}</td><td>${_esc(row.nombre||row.curso||'')}</td>
+      <td>${chip(row.canvas?.status)}</td><td><span class="detail-text" title="${_esc(row.canvas?.detalle||'')}">${_esc(row.canvas?.detalle||'')}</span></td>
+      <td>${chip(row.azure?.status)}</td><td><span class="detail-text" title="${_esc(row.azure?.detalle||'')}">${_esc(row.azure?.detalle||'')}</span></td>
+      <td>${chip(row.teams?.status)}</td><td><span class="detail-text" title="${_esc(row.teams?.detalle||'')}">${_esc(row.teams?.detalle||'')}</span></td>
     </tr>`;
   });
   document.getElementById('results-section').classList.remove('hidden');
@@ -2288,50 +2287,50 @@ function renderBulkResult(tipo, report, tbodyId) {
   if (summaryEl) {
     const color = report.errors > 0 ? 'var(--error)' : 'var(--success)';
     summaryEl.innerHTML = `<span style="color:${color};font-weight:600;">
-      Total: ${report.total} | ✅ OK: ${report.success} | ❌ Errores: ${report.errors}
+      Total: ${parseInt(report.total)||0} | ✅ OK: ${parseInt(report.success)||0} | ❌ Errores: ${parseInt(report.errors)||0}
     </span>`;
   }
   resultDiv.style.display = 'block';
 
   // Render rows
   tbody.innerHTML = (report.rows || []).map(row => {
-    if (row.error_global) return `<tr><td colspan="10" style="color:red;">${row.error_global}</td></tr>`;
+    if (row.error_global) return `<tr><td colspan="10" style="color:red;">${_esc(row.error_global)}</td></tr>`;
     const canvasSt = row.canvas?.status || '';
     const teamsSt = row.teams?.status || '';
     const azureSt = row.azure?.status || '';
 
     if (tipo === 'cursos') {
       return `<tr>
-        <td>${row.fila||''}</td>
-        <td>${row.nombre||''}</td>
-        <td style="font-size:.78rem;">${row.sis_id||''}</td>
-        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${canvasSt} ${row.canvas?.detalle ? '— '+row.canvas.detalle : ''}</td>
-        <td style="background:${statusColors[teamsSt]||'#fff'};font-size:.82rem;">${teamsSt} ${row.teams?.detalle ? '— '+row.teams.detalle : ''}</td>
+        <td>${parseInt(row.fila)||''}</td>
+        <td>${_esc(row.nombre||'')}</td>
+        <td style="font-size:.78rem;">${_esc(row.sis_id||'')}</td>
+        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${_esc(canvasSt)} ${row.canvas?.detalle ? '— '+_esc(row.canvas.detalle) : ''}</td>
+        <td style="background:${statusColors[teamsSt]||'#fff'};font-size:.82rem;">${_esc(teamsSt)} ${row.teams?.detalle ? '— '+_esc(row.teams.detalle) : ''}</td>
       </tr>`;
     } else if (tipo === 'canvas-usuarios') {
       return `<tr>
-        <td>${row.fila||''}</td>
-        <td>${row.nombre||''}</td>
-        <td>${row.email||''}</td>
-        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${canvasSt} ${row.canvas?.detalle ? '— '+row.canvas.detalle : ''}</td>
+        <td>${parseInt(row.fila)||''}</td>
+        <td>${_esc(row.nombre||'')}</td>
+        <td>${_esc(row.email||'')}</td>
+        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${_esc(canvasSt)} ${row.canvas?.detalle ? '— '+_esc(row.canvas.detalle) : ''}</td>
       </tr>`;
     } else if (tipo === 'azure-usuarios') {
       return `<tr>
-        <td>${row.fila||''}</td>
-        <td>${row.nombre||''}</td>
-        <td>${row.upn||''}</td>
-        <td style="background:${statusColors[azureSt]||'#fff'};font-size:.82rem;">${azureSt} ${row.azure?.detalle ? '— '+row.azure.detalle : ''}</td>
-        <td style="background:${statusColors[teamsSt]||'#fff'};font-size:.82rem;">${teamsSt} ${row.teams?.detalle||''}</td>
+        <td>${parseInt(row.fila)||''}</td>
+        <td>${_esc(row.nombre||'')}</td>
+        <td>${_esc(row.upn||'')}</td>
+        <td style="background:${statusColors[azureSt]||'#fff'};font-size:.82rem;">${_esc(azureSt)} ${row.azure?.detalle ? '— '+_esc(row.azure.detalle) : ''}</td>
+        <td style="background:${statusColors[teamsSt]||'#fff'};font-size:.82rem;">${_esc(teamsSt)} ${_esc(row.teams?.detalle||'')}</td>
       </tr>`;
     } else if (tipo === 'canvas-inscripciones') {
       return `<tr>
-        <td>${row.fila||''}</td>
-        <td>${row.email||''}</td>
-        <td>${row.curso||''}</td>
-        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${canvasSt} ${row.canvas?.detalle ? '— '+row.canvas.detalle : ''}</td>
+        <td>${parseInt(row.fila)||''}</td>
+        <td>${_esc(row.email||'')}</td>
+        <td>${_esc(row.curso||'')}</td>
+        <td style="background:${statusColors[canvasSt]||'#fff'};font-size:.82rem;">${_esc(canvasSt)} ${row.canvas?.detalle ? '— '+_esc(row.canvas.detalle) : ''}</td>
       </tr>`;
     }
-    return `<tr><td colspan="10">${JSON.stringify(row)}</td></tr>`;
+    return `<tr><td colspan="10">${_esc(JSON.stringify(row))}</td></tr>`;
   }).join('');
 }
 
@@ -2346,30 +2345,41 @@ async function loadSystemUsers() {
     tbody.innerHTML = users.map(u => {
       const estado = u.active ? '<span class="chip chip-ok">Activo</span>' : '<span class="chip chip-error">Inactivo</span>';
       const lastLogin = u.last_login ? new Date(u.last_login).toLocaleString('es') : '—';
-      const roleChip = `<span class="chip ${u.role==='admin'?'chip-error':u.role==='academico'?'chip-warn':'chip-skip'}">${roleLabels[u.role]||u.role}</span>`;
+      const roleChip = `<span class="chip ${u.role==='admin'?'chip-error':u.role==='academico'?'chip-warn':'chip-skip'}">${_esc(roleLabels[u.role]||u.role)}</span>`;
       return `<tr>
-        <td><strong>${u.username}</strong></td>
-        <td>${u.full_name||'—'}</td>
-        <td style="font-size:.78rem">${u.email}</td>
+        <td><strong>${_esc(u.username||'')}</strong></td>
+        <td>${_esc(u.full_name||'—')}</td>
+        <td style="font-size:.78rem">${_esc(u.email||'')}</td>
         <td>${roleChip}</td>
         <td>${estado}</td>
-        <td style="font-size:.78rem">${lastLogin}</td>
+        <td style="font-size:.78rem">${_esc(lastLogin)}</td>
         <td style="white-space:nowrap">
-          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem" onclick="toggleUserActive('${u.id}',${u.active})">
+          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem" data-uid="${_esc(u.id)}" data-active="${u.active?'1':'0'}" data-action="toggle">
             ${u.active?'Desactivar':'Activar'}
           </button>
-          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="changeUserRole('${u.id}','${u.role}')">
+          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem;margin-left:4px" data-uid="${_esc(u.id)}" data-role="${_esc(u.role)}" data-action="role">
             Cambiar rol
           </button>
-          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="changeUserPassword('${u.id}','${u.username}')">
+          <button class="btn btn-secondary" style="padding:3px 8px;font-size:.75rem;margin-left:4px" data-uid="${_esc(u.id)}" data-username="${_esc(u.username)}" data-action="password">
             Contraseña
           </button>
-          <button class="btn btn-danger" style="padding:3px 8px;font-size:.75rem;margin-left:4px" onclick="deleteSystemUser('${u.id}','${u.username}')">
+          <button class="btn btn-danger" style="padding:3px 8px;font-size:.75rem;margin-left:4px" data-uid="${_esc(u.id)}" data-username="${_esc(u.username)}" data-action="delete">
             Eliminar
           </button>
         </td>
       </tr>`;
     }).join('');
+    // Attach delegated event handlers (avoids JS injection via onclick strings)
+    tbody.querySelectorAll('button[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const uid = btn.dataset.uid;
+        const action = btn.dataset.action;
+        if (action === 'toggle') toggleUserActive(uid, btn.dataset.active === '1');
+        else if (action === 'role') changeUserRole(uid, btn.dataset.role);
+        else if (action === 'password') changeUserPassword(uid, btn.dataset.username);
+        else if (action === 'delete') deleteSystemUser(uid, btn.dataset.username);
+      });
+    });
   } catch(ex) {
     tbody.innerHTML = `<tr><td colspan="7" style="color:var(--error)">${_esc(ex.message)}</td></tr>`;
   }
@@ -2899,15 +2909,15 @@ async function portalCargarMisEnvios() {
       : e==='error' ? '<span class="chip chip-error">Error</span>'
       : '<span class="chip chip-warn">Pendiente</span>';
     tbody.innerHTML = alumnos.map((a, idx) => `<tr>
-      <td style="font-size:.75rem;">${(a.received_at||'').slice(0,10)}</td>
-      <td>${a.nombre||'—'}</td>
-      <td>${a.cedula||'—'}</td>
-      <td><span class="chip chip-skip">${a.semestre||'—'}</span></td>
-      <td style="font-size:.78rem;">${(a.cursos||[]).map(c=>typeof c==='string'?c:c.nombre||'').join('<br>')}</td>
+      <td style="font-size:.75rem;">${_esc((a.received_at||'').slice(0,10))}</td>
+      <td>${_esc(a.nombre||'—')}</td>
+      <td>${_esc(a.cedula||'—')}</td>
+      <td><span class="chip chip-skip">${_esc(a.semestre||'—')}</span></td>
+      <td style="font-size:.78rem;">${(a.cursos||[]).map(c=>_esc(typeof c==='string'?c:c.nombre||'')).join('<br>')}</td>
       <td>${estadoChip(a.estado_general)}</td>
       <td style="display:flex;gap:4px;">
-        <button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" onclick="verFormulario(${idx})">🖨️ Formulario</button>
-        <button class="btn" style="font-size:.72rem;padding:3px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;" onclick="portalEliminarInscripcion(${idx})">🗑️ Limpiar</button>
+        <button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;" data-idx="${idx}" onclick="verFormulario(parseInt(this.dataset.idx))">🖨️ Formulario</button>
+        <button class="btn" style="font-size:.72rem;padding:3px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;" data-idx="${idx}" onclick="portalEliminarInscripcion(parseInt(this.dataset.idx))">🗑️ Limpiar</button>
       </td>
     </tr>`).join('');
   } catch(ex) {
@@ -3175,18 +3185,18 @@ async function loadPending(estado = 'pendiente') {
     }
     const stateChip = s => s === 'pendiente' ? 'chip-warn' : s === 'procesado' ? 'chip-ok' : s === 'error' ? 'chip-error' : 'chip-skip';
     tbody.innerHTML = rows.map(r => `<tr>
-      <td><input type="checkbox" class="pending-check" value="${r.id}"></td>
-      <td style="font-size:.75rem">${new Date(r.received_at).toLocaleString('es')}</td>
-      <td style="font-size:.75rem;color:var(--text-muted)">${r.source||'—'}</td>
-      <td>${r.cedula}</td>
-      <td>${r.nombre||'—'}</td>
-      <td style="font-size:.75rem">${r.email||'—'}</td>
-      <td style="font-size:.75rem">${r.curso_id||'—'}</td>
-      <td>${r.semestre||'—'}</td>
-      <td><span class="chip ${stateChip(r.estado)}">${r.estado}</span>${r.detalle?`<br><small style="color:var(--text-muted)">${r.detalle}</small>`:''}</td>
+      <td><input type="checkbox" class="pending-check" value="${_esc(r.id||'')}"></td>
+      <td style="font-size:.75rem">${_esc(new Date(r.received_at).toLocaleString('es'))}</td>
+      <td style="font-size:.75rem;color:var(--text-muted)">${_esc(r.source||'—')}</td>
+      <td>${_esc(r.cedula||'')}</td>
+      <td>${_esc(r.nombre||'—')}</td>
+      <td style="font-size:.75rem">${_esc(r.email||'—')}</td>
+      <td style="font-size:.75rem">${_esc(r.curso_id||'—')}</td>
+      <td>${_esc(r.semestre||'—')}</td>
+      <td><span class="chip ${stateChip(r.estado)}">${_esc(r.estado||'')}</span>${r.detalle?`<br><small style="color:var(--text-muted)">${_esc(r.detalle)}</small>`:''}</td>
     </tr>`).join('');
   } catch(ex) {
-    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--error)">${ex.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--error)">${_esc(ex.message)}</td></tr>`;
   }
 }
 
@@ -3274,7 +3284,7 @@ async function loadAliases(estado) {
       </tr>`;
     }).join('');
   } catch(ex) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--error)">${ex.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--error)">${_esc(ex.message)}</td></tr>`;
   }
 }
 
@@ -3334,7 +3344,7 @@ async function loadTerms() {
       <td>${t.end_at   ? new Date(t.end_at).toLocaleDateString('es')   : '—'}</td>
     </tr>`).join('');
   } catch(ex) {
-    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--error)">${ex.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--error)">${_esc(ex.message)}</td></tr>`;
   }
 }
 
@@ -3409,10 +3419,10 @@ async function loadAzureGroups() {
     const data = await apiFetch('/api/azure/groups');
     document.getElementById('tbl-agroups').innerHTML = data.map(g =>
       `<tr>
-        <td style="font-size:.78rem;">${g.id?.slice(0,8)}…</td>
-        <td>${g.displayName}</td>
-        <td>${g.mail||''}</td>
-        <td><button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${g.id}')">📋 Copiar ID</button></td>
+        <td style="font-size:.78rem;">${_esc(g.id?.slice(0,8)||'')}…</td>
+        <td>${_esc(g.displayName||'')}</td>
+        <td>${_esc(g.mail||'')}</td>
+        <td><button class="btn btn-secondary btn-sm" data-gid="${_esc(g.id||'')}" onclick="copyToClipboard(this.dataset.gid)">📋 Copiar ID</button></td>
       </tr>`
     ).join('');
   } catch(e) { alert(e.message); }
@@ -3424,9 +3434,9 @@ async function createAzureGroup() {
   if (!name) { alert('El nombre del grupo es obligatorio'); return; }
   try {
     const r = await apiFetch('/api/azure/groups', 'POST', {display_name: name, description: desc});
-    document.getElementById('grp-msg').innerHTML = `<span style="color:var(--success)">✅ Grupo creado: ${r.displayName} (ID: ${r.id?.slice(0,8)}…)</span>`;
+    document.getElementById('grp-msg').innerHTML = `<span style="color:var(--success)">✅ Grupo creado: ${_esc(r.displayName||'')} (ID: ${_esc(r.id?.slice(0,8)||'')}…)</span>`;
     loadAzureGroups();
-  } catch(e) { document.getElementById('grp-msg').innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`; }
+  } catch(e) { document.getElementById('grp-msg').innerHTML = `<span style="color:var(--error)">❌ ${_esc(e.message)}</span>`; }
 }
 
 async function bulkAddGroupMembers() {
@@ -3451,9 +3461,9 @@ async function createTeam() {
   document.getElementById('tm-msg').textContent = '⏳ Creando equipo (puede tardar hasta 60 seg)…';
   try {
     const r = await apiFetch('/api/teams', 'POST', {display_name: name, description: desc});
-    document.getElementById('tm-msg').innerHTML = `<span style="color:var(--success)">✅ Equipo creado: ${r.displayName||name} — ID: <code>${r.id||''}</code></span>`;
+    document.getElementById('tm-msg').innerHTML = `<span style="color:var(--success)">✅ Equipo creado: ${_esc(r.displayName||name)} — ID: <code>${_esc(r.id||'')}</code></span>`;
     loadTeams();
-  } catch(e) { document.getElementById('tm-msg').innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`; }
+  } catch(e) { document.getElementById('tm-msg').innerHTML = `<span style="color:var(--error)">❌ ${_esc(e.message)}</span>`; }
 }
 
 async function addTeamMember() {
@@ -3463,7 +3473,7 @@ async function addTeamMember() {
   try {
     await apiFetch('/api/teams/members', 'POST', {team_id: teamId, user_id: userId});
     document.getElementById('tm-member-msg').innerHTML = `<span style="color:var(--success)">✅ Miembro agregado correctamente</span>`;
-  } catch(e) { document.getElementById('tm-member-msg').innerHTML = `<span style="color:var(--error)">❌ ${e.message}</span>`; }
+  } catch(e) { document.getElementById('tm-member-msg').innerHTML = `<span style="color:var(--error)">❌ ${_esc(e.message)}</span>`; }
 }
 
 async function loadTeams() {
@@ -3471,10 +3481,10 @@ async function loadTeams() {
     const data = await apiFetch('/api/teams');
     document.getElementById('tbl-teams').innerHTML = data.map(t =>
       `<tr>
-        <td style="font-size:.78rem;">${t.id?.slice(0,8)}…
-          <button class="btn btn-secondary btn-sm" style="margin-left:4px;" onclick="copyToClipboard('${t.id}')">📋</button>
+        <td style="font-size:.78rem;">${_esc(t.id?.slice(0,8)||'')}…
+          <button class="btn btn-secondary btn-sm" style="margin-left:4px;" data-tid="${_esc(t.id||'')}" onclick="copyToClipboard(this.dataset.tid)">📋</button>
         </td>
-        <td>${t.displayName||''}</td>
+        <td>${_esc(t.displayName||'')}</td>
       </tr>`
     ).join('') || '<tr><td colspan="2" style="color:var(--text-muted);">Sin equipos</td></tr>';
   } catch(e) { alert(e.message); }
@@ -3619,8 +3629,8 @@ async function inscribirCanvas() {
     statusEl.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:6px;">✅ Proceso completado. Descargá el Excel con los resultados.</div>';
     _portalLog('Inscripciones Canvas completadas. Excel listo para descargar.', 'info');
   } catch(ex) {
-    statusEl.innerHTML = `<div style="padding:12px;background:#fee2e2;border-radius:6px;">❌ Error: ${ex.message}</div>`;
-    _portalLog(`Error Canvas: ${ex.message}`, 'error');
+    statusEl.innerHTML = `<div style="padding:12px;background:#fee2e2;border-radius:6px;">❌ Error: ${_esc(ex.message)}</div>`;
+    _portalLog(`Error Canvas: ${_esc(ex.message)}`, 'error');
   }
 }
 
@@ -3643,8 +3653,8 @@ async function inscribirTeams() {
     statusEl.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:6px;">✅ Proceso completado. Descargá el Excel con los resultados.</div>';
     _portalLog('Inscripciones Teams completadas. Excel listo para descargar.', 'info');
   } catch(ex) {
-    statusEl.innerHTML = `<div style="padding:12px;background:#fee2e2;border-radius:6px;">❌ Error: ${ex.message}</div>`;
-    _portalLog(`Error Teams: ${ex.message}`, 'error');
+    statusEl.innerHTML = `<div style="padding:12px;background:#fee2e2;border-radius:6px;">❌ Error: ${_esc(ex.message)}</div>`;
+    _portalLog(`Error Teams: ${_esc(ex.message)}`, 'error');
   }
 }
 
@@ -3672,16 +3682,16 @@ async function cargarSyncEstado() {
     if (ul) {
       const fecha = ul.completado_en ? new Date(ul.completado_en).toLocaleString('es') : '—';
       document.getElementById('sync-ultima').innerHTML =
-        `<strong>Última sincronización:</strong> ${fecha} ·
-         Duración: ${ul.duracion_seg||0}s ·
-         Cursos: ${ul.cursos_procesados||0} ·
-         Alumnos: ${ul.alumnos_procesados||0} ·
-         Errores: <span style="color:${ul.errores>0?'#dc2626':'#16a34a'}">${ul.errores||0}</span>`;
+        `<strong>Última sincronización:</strong> ${_esc(fecha)} ·
+         Duración: ${parseInt(ul.duracion_seg)||0}s ·
+         Cursos: ${parseInt(ul.cursos_procesados)||0} ·
+         Alumnos: ${parseInt(ul.alumnos_procesados)||0} ·
+         Errores: <span style="color:${ul.errores>0?'#dc2626':'#16a34a'}">${parseInt(ul.errores)||0}</span>`;
     } else {
       document.getElementById('sync-ultima').innerHTML = 'Sin sincronizaciones previas. Hacé clic en <strong>Sincronizar ahora</strong> para iniciar.';
     }
   } catch(ex) {
-    document.getElementById('sync-ultima').innerHTML = `<span style="color:#dc2626;">Error al cargar estado: ${ex.message}</span>`;
+    document.getElementById('sync-ultima').innerHTML = `<span style="color:#dc2626;">Error al cargar estado: ${_esc(ex.message)}</span>`;
   }
 }
 
@@ -3697,11 +3707,11 @@ async function ejecutarSync() {
     resultEl.style.display = 'block';
     resultEl.innerHTML = `
       <div style="background:#d1fae5;border-radius:8px;padding:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-        <div>✅ <strong>Cursos:</strong> ${data.cursos}</div>
-        <div>👤 <strong>Alumnos:</strong> ${data.alumnos}</div>
-        <div>📋 <strong>Matriculaciones:</strong> ${data.matriculas}</div>
-        <div>📊 <strong>Calificaciones:</strong> ${data.calificaciones}</div>
-        <div>✅ <strong>Asistencias:</strong> ${data.asistencias}</div>
+        <div>✅ <strong>Cursos:</strong> ${parseInt(data.cursos)||0}</div>
+        <div>👤 <strong>Alumnos:</strong> ${parseInt(data.alumnos)||0}</div>
+        <div>📋 <strong>Matriculaciones:</strong> ${parseInt(data.matriculas)||0}</div>
+        <div>📊 <strong>Calificaciones:</strong> ${parseInt(data.calificaciones)||0}</div>
+        <div>✅ <strong>Asistencias:</strong> ${parseInt(data.asistencias)||0}</div>
         <div style="color:${data.errores>0?'#dc2626':'#16a34a'}">⚠ <strong>Errores:</strong> ${data.errores}</div>
       </div>
       <div style="margin-top:8px;font-size:.83rem;color:#64748b;">Tiempo total: ${data.duracion_seg}s</div>`;
@@ -3710,8 +3720,8 @@ async function ejecutarSync() {
   } catch(ex) {
     progressEl.style.display = 'none';
     resultEl.style.display = 'block';
-    resultEl.innerHTML = `<div style="background:#fee2e2;border-radius:8px;padding:12px;">❌ Error: ${ex.message}</div>`;
-    _portalLog(`Error en sync: ${ex.message}`, 'error');
+    resultEl.innerHTML = `<div style="background:#fee2e2;border-radius:8px;padding:12px;">❌ Error: ${_esc(ex.message)}</div>`;
+    _portalLog(`Error en sync: ${_esc(ex.message)}`, 'error');
   }
 }
 
@@ -3732,18 +3742,18 @@ async function syncBuscarAlumnos() {
         </tr></thead>
         <tbody>${rows.map((r,i) => `
           <tr style="background:${i%2?'#f8fafc':'#fff'};">
-            <td style="padding:7px 12px;">${r.nombre||'—'}</td>
-            <td style="padding:7px 12px;">${r.email||'—'}</td>
-            <td style="padding:7px 12px;">${r.sis_user_id||'—'}</td>
-            <td style="padding:7px 12px;">${r.canvas_user_id}</td>
+            <td style="padding:7px 12px;">${_esc(r.nombre||'—')}</td>
+            <td style="padding:7px 12px;">${_esc(r.email||'—')}</td>
+            <td style="padding:7px 12px;">${_esc(r.sis_user_id||'—')}</td>
+            <td style="padding:7px 12px;">${parseInt(r.canvas_user_id)||'—'}</td>
             <td style="padding:7px 12px;">
-              <button class="btn btn-secondary" style="padding:3px 10px;font-size:.78rem;" onclick="syncVerAlumno(${r.canvas_user_id},'${(r.nombre||'').replace(/'/g,"\\'")}')">Ver detalle</button>
+              <button class="btn btn-secondary" style="padding:3px 10px;font-size:.78rem;" data-uid="${parseInt(r.canvas_user_id)||0}" data-nombre="${_esc(r.nombre||'')}" onclick="syncVerAlumno(parseInt(this.dataset.uid),this.dataset.nombre)">Ver detalle</button>
             </td>
           </tr>`).join('')}
         </tbody>
       </table>`;
   } catch(ex) {
-    document.getElementById('sync-alumnos-tabla').innerHTML = `<p style="color:#dc2626;">Error: ${ex.message}</p>`;
+    document.getElementById('sync-alumnos-tabla').innerHTML = `<p style="color:#dc2626;">Error: ${_esc(ex.message)}</p>`;
   }
 }
 
@@ -3814,8 +3824,8 @@ async function crearCursos() {
     statusEl.innerHTML = '<div style="padding:12px;background:#d4edda;border-radius:6px;">✅ Procesamiento completado. Descargá el Excel con los IDs.</div>';
     _portalLog('Cursos y equipos creados. Excel con IDs listo para descargar.', 'info');
   } catch(e) {
-    statusEl.innerHTML = `<div style="padding:12px;background:#f8d7da;border-radius:6px;">❌ Error: ${e.message}</div>`;
-    _portalLog(`Error al crear cursos: ${e.message}`, 'error');
+    statusEl.innerHTML = `<div style="padding:12px;background:#f8d7da;border-radius:6px;">❌ Error: ${_esc(e.message)}</div>`;
+    _portalLog(`Error al crear cursos: ${_esc(e.message)}`, 'error');
   }
 }
 
@@ -3883,7 +3893,7 @@ async function ejecutarMatriculacion() {
         </div>
       </div>`;
   } catch(e) {
-    statusEl.innerHTML = `<div style="padding:12px;background:#f8d7da;border-radius:6px;">&#10060; Error: ${e.message}</div>`;
+    statusEl.innerHTML = `<div style="padding:12px;background:#f8d7da;border-radius:6px;">&#10060; Error: ${_esc(e.message)}</div>`;
   }
 }
 
@@ -3915,7 +3925,7 @@ async function guardarCron() {
       if (data.next_run) document.getElementById('cron-next-run').textContent = `Próxima ejecución: ${new Date(data.next_run).toLocaleString()}`;
     }
   } catch(e) {
-    statusEl.innerHTML = `<span style="color:red">&#10060; ${e.message}</span>`;
+    statusEl.innerHTML = `<span style="color:red">&#10060; ${_esc(e.message)}</span>`;
   }
 }
 </script>
