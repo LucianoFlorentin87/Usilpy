@@ -306,12 +306,12 @@
   <!-- Nav -->
   <div class="sidebar-nav">
 
-    <div class="nav-section-label">Navegación</div>
+    <div class="nav-section-label" id="nav-section-reportes">Navegación</div>
 
-    <div class="nav-item active" data-panel="dashboard" onclick="showPanel('dashboard', this)">
+    <div class="nav-item active" id="nav-dashboard" data-panel="dashboard" onclick="showPanel('dashboard', this)">
       <span class="nav-icon">📊</span> Dashboard
     </div>
-    <div class="nav-item" data-panel="auditoria" onclick="showPanel('auditoria', this)">
+    <div class="nav-item" id="nav-auditoria" data-panel="auditoria" onclick="showPanel('auditoria', this)">
       <span class="nav-icon">📋</span> Auditoría
     </div>
 
@@ -1574,21 +1574,23 @@ function showApp(user) {
 }
 
 function _applyRoleVisibility(role) {
-  const gestion = ['nav-section-gestion','nav-crear-cursos','nav-matriculacion'];
-  const portal  = ['nav-section-portal','nav-portal'];
-  const sync    = ['nav-section-sync','nav-sync','nav-alumnos'];
-  const admin   = ['nav-section-admin','nav-users','nav-pending','nav-cron'];
+  const reportes = ['nav-section-reportes','nav-dashboard','nav-auditoria'];
+  const gestion  = ['nav-section-gestion','nav-crear-cursos','nav-matriculacion'];
+  const portal   = ['nav-section-portal','nav-portal'];
+  const sync     = ['nav-section-sync','nav-sync','nav-alumnos'];
+  const admin    = ['nav-section-admin','nav-users','nav-pending','nav-cron'];
+  const all      = [...reportes,...gestion,...portal,...sync,...admin];
 
   function show(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = ''; }); }
   function hide(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 
+  hide(all);
   if (role === 'admin') {
-    show([...gestion, ...portal, ...sync, ...admin]);
+    show([...reportes,...gestion,...portal,...sync,...admin]);
   } else if (role === 'academico') {
-    hide([...gestion, ...sync, ...admin]);
     show(portal);
   } else {
-    hide([...gestion, ...portal, ...sync, ...admin]);
+    show(reportes);
   }
 }
 
