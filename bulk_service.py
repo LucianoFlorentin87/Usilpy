@@ -24,6 +24,7 @@ from openpyxl.utils import get_column_letter
 
 import canvas_service
 import graph_service
+import db
 from config import get_settings
 
 settings = get_settings()
@@ -644,6 +645,22 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
             "Estado Canvas": canvas_status,
             "Estado Teams": teams_status,
         })
+
+        # Persist to DB if at least one platform succeeded
+        if canvas_course_id or teams_team_id:
+            try:
+                await db.execute(
+                    """INSERT INTO cursos (materia, periodo, canvas_id, teams_id, canvas_status, teams_status)
+                       VALUES (?,?,?,?,?,?)
+                       ON CONFLICT (materia, periodo) DO UPDATE SET
+                         canvas_id = EXCLUDED.canvas_id,
+                         teams_id = EXCLUDED.teams_id,
+                         canvas_status = EXCLUDED.canvas_status,
+                         teams_status = EXCLUDED.teams_status""",
+                    materia, semestre, canvas_course_id, teams_team_id, canvas_status, teams_status,
+                )
+            except Exception as db_exc:
+                logger.warning("No se pudo guardar curso en BD: %s", db_exc)
 
     # Build output Excel
     wb = Workbook()

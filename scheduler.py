@@ -85,6 +85,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     await _db.init_pool()
     await audit_service.init_db()
+    await _db.execute("""
+        CREATE TABLE IF NOT EXISTS cursos (
+            id SERIAL PRIMARY KEY,
+            materia TEXT NOT NULL,
+            periodo TEXT NOT NULL,
+            canvas_id TEXT DEFAULT '',
+            teams_id TEXT DEFAULT '',
+            canvas_status TEXT DEFAULT '',
+            teams_status TEXT DEFAULT '',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE (materia, periodo)
+        )
+    """)
     # Seed initial admin from .env if no users exist yet
     if settings.admin_password_hash:
         await user_service.seed_admin(settings.admin_username, settings.admin_password_hash)

@@ -212,9 +212,10 @@ async def create_team(display_name: str, description: str = "") -> dict:
         group = r.json()
         group_id = group["id"]
 
-        # Step 2: wait a few seconds for group replication, then provision as team
-        await asyncio.sleep(5)
+        # Step 2: wait for group replication, then provision as team
+        await asyncio.sleep(8)
         team_payload = {
+            "template@odata.bind": "https://graph.microsoft.com/v1.0/teamsTemplates('standard')",
             "memberSettings": {"allowCreateUpdateChannels": True},
             "messagingSettings": {"allowUserEditMessages": True, "allowUserDeleteMessages": True},
             "funSettings": {"allowGiphy": True, "giphyContentRating": "moderate"},
@@ -229,12 +230,14 @@ async def create_team(display_name: str, description: str = "") -> dict:
                 data = tr.json()
                 data["id"] = data.get("id") or group_id
                 return data
-            if tr.status_code == 404:
-                await asyncio.sleep(5)
+            if tr.status_code in (404, 409):
+                await asyncio.sleep(6)
                 continue
+            if not tr.is_success:
+                raise RuntimeError(f"PUT /team error {tr.status_code}: {tr.text[:400]}")
             tr.raise_for_status()
 
-        # Fallback: return the group with the id so callers can use it
+        # Fallback: group created but team provisioning timed out — return group id
         group["id"] = group_id
         return group
 
