@@ -184,6 +184,8 @@ async def create_team(display_name: str, description: str = "") -> dict:
     hdrs = _headers()
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(f"{GRAPH_BASE}/groups", headers=hdrs, json=group_payload)
+        if not r.is_success:
+            raise RuntimeError(f"Graph groups 400: {r.text[:500]}")
         r.raise_for_status()
         group = r.json()
         group_id = group["id"]
