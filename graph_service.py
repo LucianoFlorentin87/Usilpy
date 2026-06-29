@@ -178,21 +178,24 @@ async def create_team(display_name: str, description: str = "") -> dict:
     base_nick = re.sub(r"[^a-zA-Z0-9]", "", display_name)[:14] or "team"
     mail_nick = f"{base_nick}{_sec.token_hex(3)}"
 
-    # Resolve owner: look up real user by UPN (Teams requires a real user, not service principal)
-    owners = []
+    # Resolve owner UPN → user object ID
+    owner_user_id: str | None = None
     owner_upn = s.teams_owner_upn or s.email_sender or s.smtp_user
     if owner_upn:
         async with httpx.AsyncClient(timeout=10) as cl:
-            u_resp = await cl.get(
-                f"{GRAPH_BASE}/users/{owner_upn}?$select=id",
-                headers=hdrs,
-            )
+            u_resp = await cl.get(f"{GRAPH_BASE}/users/{owner_upn}?$select=id", headers=hdrs)
             if u_resp.is_success:
-                user_id = u_resp.json().get("id")
-                if user_id:
-                    owners = [f"{GRAPH_BASE}/directoryObjects/{user_id}"]
+                owner_user_id = u_resp.json().get("id")
+            else:
+                logger.warning("No se pudo resolver owner UPN %s: %s %s", owner_upn, u_resp.status_code, u_resp.text[:200])
 
-    # Step 1: create the underlying Microsoft 365 group
+    if not owner_user_id:
+        raise RuntimeError(
+            f"No se encontró el usuario owner '{owner_upn}' en Azure AD. "
+            "Configurá TEAMS_OWNER_UPN con el UPN exacto de un usuario administrador de Microsoft 365."
+        )
+
+    # Step 1: create M365 group with owner
     group_payload = {
         "displayName": display_name,
         "description": description or display_name,
@@ -201,20 +204,19 @@ async def create_team(display_name: str, description: str = "") -> dict:
         "mailNickname": mail_nick,
         "securityEnabled": False,
         "visibility": "Private",
+        "owners@odata.bind": [f"{GRAPH_BASE}/users/{owner_user_id}"],
+        "members@odata.bind": [f"{GRAPH_BASE}/users/{owner_user_id}"],
     }
-    if owners:
-        group_payload["owners@odata.bind"] = owners
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(f"{GRAPH_BASE}/groups", headers=hdrs, json=group_payload)
         if not r.is_success:
             raise RuntimeError(f"Graph groups error {r.status_code}: {r.text[:500]}")
-        r.raise_for_status()
         group = r.json()
         group_id = group["id"]
 
         # Step 2: wait for group replication, then provision as team
-        await asyncio.sleep(8)
+        await asyncio.sleep(15)
         team_payload = {
             "memberSettings": {"allowCreateUpdateChannels": True},
             "messagingSettings": {"allowUserEditMessages": True, "allowUserDeleteMessages": True},
