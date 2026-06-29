@@ -435,7 +435,7 @@ def _validate_file(file: UploadFile) -> None:
 
 
 async def _read_validated(file: UploadFile) -> bytes:
-    data = await _read_validated(file)
+    data = await file.read()
     if len(data) > _MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Archivo demasiado grande (máx 20 MB)")
     return data
