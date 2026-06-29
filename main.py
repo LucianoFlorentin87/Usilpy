@@ -1359,6 +1359,31 @@ async def gestion_matricular(file: UploadFile = File(...), _user=Depends(_requir
     return summary
 
 
+@app.post("/api/gestion/matricular-alumnos")
+async def gestion_matricular_alumnos(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Excel: cedula, nombre, email, materia, periodo → matricula en Canvas + Teams + email"""
+    import bulk_service as _bulk
+    from fastapi.responses import Response
+    data = await _read_validated(file)
+    excel_bytes = await _bulk.process_matricular_sheet(data, file.filename)
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=matriculacion_resultado.xlsx"}
+    )
+
+
+@app.get("/api/gestion/plantilla-matricular")
+async def plantilla_matricular(_user=Depends(_require_admin)):
+    import bulk_service as _bulk
+    from fastapi.responses import Response
+    return Response(
+        content=_bulk.build_plantilla_matricular(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=plantilla_matricular.xlsx"}
+    )
+
+
 @app.post("/api/gestion/inscribir-canvas")
 async def gestion_inscribir_canvas(file: UploadFile = File(...), _user=Depends(_require_admin)):
     """Upload Excel SIS User ID|Course ID|Rol → inscribe en Canvas → returns Excel con Resultado"""
