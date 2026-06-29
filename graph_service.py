@@ -215,10 +215,8 @@ async def create_team(display_name: str, description: str = "") -> dict:
         # Step 2: wait for group replication, then provision as team
         await asyncio.sleep(8)
         team_payload = {
-            "template@odata.bind": "https://graph.microsoft.com/v1.0/teamsTemplates('standard')",
             "memberSettings": {"allowCreateUpdateChannels": True},
             "messagingSettings": {"allowUserEditMessages": True, "allowUserDeleteMessages": True},
-            "funSettings": {"allowGiphy": True, "giphyContentRating": "moderate"},
         }
         for attempt in range(6):
             tr = await client.put(
@@ -234,6 +232,7 @@ async def create_team(display_name: str, description: str = "") -> dict:
                 await asyncio.sleep(6)
                 continue
             if not tr.is_success:
+                logger.error("PUT /groups/%s/team attempt %d: %s %s", group_id, attempt, tr.status_code, tr.text[:400])
                 raise RuntimeError(f"PUT /team error {tr.status_code}: {tr.text[:400]}")
             tr.raise_for_status()
 
