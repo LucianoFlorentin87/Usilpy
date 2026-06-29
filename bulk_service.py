@@ -541,7 +541,7 @@ def _build_plantilla(headers: list[str], rows: list[list], sheet_name: str) -> b
 
 def build_plantilla_cursos() -> bytes:
     return _build_plantilla(
-        headers=["materia", "semestre", "programa"],
+        headers=["materia", "periodo", "programa"],
         rows=[
             ["Matemática I", "2025-2", "Ingeniería en Sistemas"],
             ["Administración", "2025-2", "Administración de Empresas"],
@@ -588,9 +588,12 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
 
     for _, row in df.iterrows():
         materia = str(row.get("materia", "")).strip()
-        semestre = str(row.get("semestre", settings.semestre_actual)).strip() if "semestre" in df.columns else settings.semestre_actual
-        if not semestre or semestre == "nan":
-            semestre = settings.semestre_actual
+        periodo = (
+            str(row.get("periodo", row.get("semestre", ""))).strip()
+            if ("periodo" in df.columns or "semestre" in df.columns)
+            else ""
+        )
+        semestre = periodo if periodo and periodo != "nan" else settings.semestre_actual
 
         canvas_course_id = ""
         canvas_status = "error"
@@ -635,7 +638,7 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
 
         rows_out.append({
             "Materia": materia,
-            "Semestre": semestre,
+            "Periodo": semestre,
             "ID Canvas": canvas_course_id,
             "ID Ms": teams_team_id,
             "Estado Canvas": canvas_status,
@@ -647,7 +650,7 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
     ws = wb.active
     ws.title = "Cursos"
 
-    headers = ["Materia", "Semestre", "ID Canvas", "ID Ms", "Estado Canvas", "Estado Teams"]
+    headers = ["Materia", "Periodo", "ID Canvas", "ID Ms", "Estado Canvas", "Estado Teams"]
     header_fill = PatternFill("solid", fgColor="1F4E79")
     header_font = Font(color="FFFFFF", bold=True)
     for col_idx, h in enumerate(headers, 1):
@@ -664,7 +667,7 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
 
     for row_idx, r in enumerate(rows_out, 2):
         ws.cell(row=row_idx, column=1, value=r["Materia"])
-        ws.cell(row=row_idx, column=2, value=r["Semestre"])
+        ws.cell(row=row_idx, column=2, value=r["Periodo"])
         ws.cell(row=row_idx, column=3, value=r["ID Canvas"])
         ws.cell(row=row_idx, column=4, value=r["ID Ms"])
         canvas_st = r["Estado Canvas"]
