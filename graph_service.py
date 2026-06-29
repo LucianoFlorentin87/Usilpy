@@ -167,25 +167,47 @@ async def create_team(display_name: str, description: str = "") -> dict:
     """
     Create a Microsoft Teams team.
     Strategy: create an M365 group first, then PUT /group/{id}/team to provision it.
-    This uses Group.ReadWrite.All which the app already has.
     """
-    import asyncio
+    import asyncio, secrets as _sec
+    from config import get_settings as _gs
+
+    hdrs = _headers()
+    s = _gs()
+
+    # Unique mailNickname: strip non-alphanum + 6-char hex suffix to avoid conflicts
+    base_nick = re.sub(r"[^a-zA-Z0-9]", "", display_name)[:14] or "team"
+    mail_nick = f"{base_nick}{_sec.token_hex(3)}"
+
+    # Build owners list from configured Azure client if available
+    owners = []
+    if s.azure_tenant_id and s.azure_client_id:
+        async with httpx.AsyncClient(timeout=10) as cl:
+            sp_resp = await cl.get(
+                f"{GRAPH_BASE}/servicePrincipals?$filter=appId eq '{s.azure_client_id}'&$select=id",
+                headers=hdrs,
+            )
+            if sp_resp.is_success:
+                items = sp_resp.json().get("value", [])
+                if items:
+                    owners = [f"{GRAPH_BASE}/directoryObjects/{items[0]['id']}"]
 
     # Step 1: create the underlying Microsoft 365 group
     group_payload = {
         "displayName": display_name,
-        "description": description,
+        "description": description or display_name,
         "groupTypes": ["Unified"],
         "mailEnabled": True,
-        "mailNickname": re.sub(r"[^a-zA-Z0-9]", "", display_name)[:20] or "team",
+        "mailNickname": mail_nick,
         "securityEnabled": False,
         "visibility": "Private",
     }
-    hdrs = _headers()
+    if owners:
+        group_payload["owners@odata.bind"] = owners
+
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(f"{GRAPH_BASE}/groups", headers=hdrs, json=group_payload)
         if not r.is_success:
-            raise RuntimeError(f"Graph groups 400: {r.text[:500]}")
+            raise RuntimeError(f"Graph groups error {r.status_code}: {r.text[:500]}")
         r.raise_for_status()
         group = r.json()
         group_id = group["id"]
