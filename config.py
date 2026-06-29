@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     teams_default_team_id: str = ""
     teams_base_url: str = "https://teams.microsoft.com"
     teams_webhook_url: str = ""
+    teams_owner_upn: str = ""   # UPN del admin owner de equipos (ej: admin@usil.edu.py)
 
     # OneDrive (Excel de matriculación)
     onedrive_file_id: str = ""

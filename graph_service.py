@@ -178,18 +178,19 @@ async def create_team(display_name: str, description: str = "") -> dict:
     base_nick = re.sub(r"[^a-zA-Z0-9]", "", display_name)[:14] or "team"
     mail_nick = f"{base_nick}{_sec.token_hex(3)}"
 
-    # Build owners list from configured Azure client if available
+    # Resolve owner: look up real user by UPN (Teams requires a real user, not service principal)
     owners = []
-    if s.azure_tenant_id and s.azure_client_id:
+    owner_upn = s.teams_owner_upn or s.email_sender or s.smtp_user
+    if owner_upn:
         async with httpx.AsyncClient(timeout=10) as cl:
-            sp_resp = await cl.get(
-                f"{GRAPH_BASE}/servicePrincipals?$filter=appId eq '{s.azure_client_id}'&$select=id",
+            u_resp = await cl.get(
+                f"{GRAPH_BASE}/users/{owner_upn}?$select=id",
                 headers=hdrs,
             )
-            if sp_resp.is_success:
-                items = sp_resp.json().get("value", [])
-                if items:
-                    owners = [f"{GRAPH_BASE}/directoryObjects/{items[0]['id']}"]
+            if u_resp.is_success:
+                user_id = u_resp.json().get("id")
+                if user_id:
+                    owners = [f"{GRAPH_BASE}/directoryObjects/{user_id}"]
 
     # Step 1: create the underlying Microsoft 365 group
     group_payload = {

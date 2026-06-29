@@ -2690,10 +2690,28 @@ function _portalLog(msg, tipo = 'info') {
   const log = document.getElementById('portal-error-log');
   const card = document.getElementById('portal-log-card');
   if (!log || !card) return;
-  const color = tipo === 'error' ? '#f87171' : tipo === 'warn' ? '#fbbf24' : '#94a3b8';
-  const prefix = tipo === 'error' ? '✗' : tipo === 'warn' ? '⚠' : '·';
   const time = new Date().toLocaleTimeString('es');
-  log.innerHTML += `<div style="color:${color};padding:1px 0;"><span style="color:#475569;">[${time}]</span> <span style="color:${color};">${prefix}</span> ${msg}</div>`;
+  const cfg = {
+    error:   { bg:'#fee2e2', border:'#fca5a5', icon:'❌', text:'#991b1b', label:'Error' },
+    warn:    { bg:'#fef9c3', border:'#fde047', icon:'⚠️',  text:'#854d0e', label:'Aviso' },
+    success: { bg:'#dcfce7', border:'#86efac', icon:'✅', text:'#166534', label:'Éxito' },
+    info:    { bg:'#f1f5f9', border:'#cbd5e1', icon:'ℹ️',  text:'#334155', label:'Info'  },
+  };
+  const c = cfg[tipo] || cfg.info;
+  const div = document.createElement('div');
+  div.style.cssText = `
+    background:${c.bg};border:1px solid ${c.border};border-radius:10px;
+    padding:8px 12px;margin-bottom:6px;display:flex;gap:8px;align-items:flex-start;
+    animation:slideIn .2s ease;box-shadow:0 1px 3px rgba(0,0,0,.08);
+  `;
+  div.innerHTML = `
+    <span style="font-size:1rem;line-height:1.4;">${c.icon}</span>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:.7rem;color:${c.text};font-weight:600;opacity:.7;margin-bottom:1px;">${c.label} · ${time}</div>
+      <div style="color:${c.text};font-size:.8rem;line-height:1.4;word-break:break-word;">${_esc(msg)}</div>
+    </div>
+  `;
+  log.appendChild(div);
   log.scrollTop = log.scrollHeight;
   card.style.display = '';
 }
