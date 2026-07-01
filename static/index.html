@@ -1650,6 +1650,16 @@ function authHeaders() {
   return t ? { 'Authorization': 'Bearer ' + t } : {};
 }
 
+// Auto-refresh token every 30 minutes to prevent expiry during long sessions
+setInterval(async () => {
+  const t = getToken();
+  if (!t) return;
+  try {
+    const r = await fetch('/api/auth/refresh', { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
+    if (r.ok) { const d = await r.json(); setToken(d.access_token); }
+  } catch(e) { /* silently ignore network errors */ }
+}, 30 * 60 * 1000);
+
 let _currentUser = null;
 
 function showApp(user) {

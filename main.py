@@ -238,6 +238,14 @@ async def login(body: LoginRequest, request: Request):
     return {"access_token": token, "token_type": "bearer", "user": payload}
 
 
+@app.post("/api/auth/refresh")
+async def refresh_token(current_user: dict = Depends(get_current_user)):
+    """Renueva el token JWT sin necesidad de volver a loguearse."""
+    payload = {k: v for k, v in current_user.items() if k != "exp"}
+    token = auth_service.create_access_token(payload)
+    return {"access_token": token, "token_type": "bearer"}
+
+
 @app.get("/api/auth/azure/login")
 async def azure_login():
     if not auth_service.settings.azure_client_id:

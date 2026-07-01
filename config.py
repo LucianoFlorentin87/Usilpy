@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
     # Auth
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 480
+    jwt_expire_minutes: int = 1440  # 24 horas
     admin_username: str = "admin"
     admin_password_hash: str = ""
     azure_redirect_uri: str = "http://localhost:8000/api/auth/azure/callback"
