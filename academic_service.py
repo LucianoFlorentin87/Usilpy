@@ -465,7 +465,8 @@ async def buscar_alumno(q: str) -> list[dict]:
     return await db.fetch(
         """SELECT cedula, MAX(nombre) as nombre, MAX(carrera) as carrera, MAX(programa) as programa
            FROM historial_academico
-           WHERE cedula ILIKE ? OR nombre ILIKE ?
+           WHERE (cedula ILIKE ? OR nombre ILIKE ?)
+             AND cedula ~ '^[0-9]+$'
            GROUP BY cedula
            ORDER BY MAX(nombre)
            LIMIT 20""",
