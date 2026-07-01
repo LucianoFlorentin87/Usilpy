@@ -1670,7 +1670,7 @@ function showApp(user) {
   document.getElementById('user-name-label').textContent = user.name || user.sub || '';
   _applyRoleVisibility(user.role || 'viewer');
   if (user.role === 'academico') {
-    showPanel('portal-academico', document.querySelector('[data-panel="portal-academico"]'));
+    showPanel('panel-buscar-alumno', document.querySelector('[data-panel="panel-buscar-alumno"]'));
   } else {
     showPanel('dashboard', document.querySelector('[data-panel="dashboard"]'));
     loadDashboard();
@@ -1683,17 +1683,18 @@ function _applyRoleVisibility(role) {
   const portal   = ['nav-section-portal','nav-portal'];
   const sync     = ['nav-section-sync','nav-sync','nav-alumnos'];
   const admin    = ['nav-section-admin','nav-users','nav-pending','nav-cron'];
-  const academico = ['nav-section-academico','nav-historial','nav-buscar-alumno'];
-  const all      = [...reportes,...gestion,...portal,...sync,...admin,...academico];
+  const academicoAdmin = ['nav-section-academico','nav-historial','nav-buscar-alumno'];
+  const academicoUser  = ['nav-section-academico','nav-buscar-alumno'];
+  const all      = [...reportes,...gestion,...portal,...sync,...admin,...academicoAdmin];
 
   function show(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = ''; }); }
   function hide(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 
   hide(all);
   if (role === 'admin') {
-    show([...reportes,...gestion,...portal,...sync,...admin,...academico]);
+    show([...reportes,...gestion,...portal,...sync,...admin,...academicoAdmin]);
   } else if (role === 'academico') {
-    show([...portal,...academico]);
+    show([...academicoUser]);
   } else {
     show(reportes);
   }
