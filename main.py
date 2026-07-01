@@ -1389,6 +1389,53 @@ async def gestion_matricular(file: UploadFile = File(...), _user=Depends(_requir
     return summary
 
 
+# ── Académico: historial y correlativas ───────────────────────────────────────
+
+@app.post("/api/academico/importar-historial")
+async def importar_historial(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Importa historial de notas GND desde Excel."""
+    import academic_service as _ac
+    data = await _read_validated(file)
+    result = await _ac.importar_historial_gnd(data, file.filename)
+    return result
+
+
+@app.post("/api/academico/importar-mallas")
+async def importar_mallas(file: UploadFile = File(...), _user=Depends(_require_admin)):
+    """Importa mallas curriculares (correlativas) GND desde Excel."""
+    import academic_service as _ac
+    data = await _read_validated(file)
+    result = await _ac.importar_mallas_gnd(data, file.filename)
+    return result
+
+
+@app.get("/api/academico/alumno/{cedula}")
+async def historial_alumno(cedula: str, _user=Depends(get_current_user)):
+    """Retorna historial académico completo de un alumno."""
+    import academic_service as _ac
+    return await _ac.historial_alumno(cedula)
+
+
+@app.get("/api/academico/buscar")
+async def buscar_alumno(q: str, _user=Depends(get_current_user)):
+    """Busca alumnos por cédula o nombre."""
+    import academic_service as _ac
+    return await _ac.buscar_alumno(q)
+
+
+@app.get("/api/academico/validar-correlativas")
+async def validar_correlativas(
+    cedula: str,
+    materia: str,
+    carrera: str,
+    programa: str = "GND",
+    _user=Depends(get_current_user),
+):
+    """Verifica si el alumno puede inscribirse a la materia (correlativas)."""
+    import academic_service as _ac
+    return await _ac.validar_correlativas(cedula, materia, carrera, programa)
+
+
 @app.post("/api/gestion/matricular-alumnos")
 async def gestion_matricular_alumnos(file: UploadFile = File(...), _user=Depends(_require_admin)):
     """Excel: cedula, nombre, email, materia, periodo → matricula en Canvas + Teams + email"""
