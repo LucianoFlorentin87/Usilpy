@@ -1249,8 +1249,7 @@ async def process_matricular_sheet(file_bytes: bytes, filename: str) -> bytes:
                 azure_user = await graph_service.get_user_by_upn(email) if email else None
                 if azure_user:
                     uid = azure_user.get("id", "")
-                    added = await graph_service.add_member_to_group(teams_id, uid)
-                    teams_status = "agregado" if added else "error: no se pudo agregar"
+                    teams_status = await graph_service.add_member_to_group_status(teams_id, uid)
                 else:
                     teams_status = "error: usuario Azure no encontrado/creado"
             except Exception as exc:

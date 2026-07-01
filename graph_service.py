@@ -121,6 +121,22 @@ async def get_groups(top: int = 50) -> list[dict]:
         return resp.json().get("value", [])
 
 
+async def add_member_to_group_status(group_id: str, user_id: str) -> str:
+    """Add user to group. Returns status string: 'agregado', 'ya miembro', or 'error: ...'"""
+    payload = {"@odata.id": f"{GRAPH_BASE}/directoryObjects/{user_id}"}
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{GRAPH_BASE}/groups/{group_id}/members/$ref",
+            headers=_headers(),
+            json=payload,
+        )
+        if resp.status_code in (200, 204):
+            return "agregado"
+        if resp.status_code == 400 and "already exist" in resp.text.lower():
+            return "ya miembro"
+        return f"error: {resp.status_code} {resp.text[:60]}"
+
+
 async def add_member_to_group(group_id: str, user_id: str) -> bool:
     payload = {"@odata.id": f"{GRAPH_BASE}/directoryObjects/{user_id}"}
     async with httpx.AsyncClient() as client:
@@ -129,7 +145,12 @@ async def add_member_to_group(group_id: str, user_id: str) -> bool:
             headers=_headers(),
             json=payload,
         )
-        return resp.status_code in (200, 204)
+        if resp.status_code in (200, 204):
+            return True
+        # 400 "already exist" = already a member, treat as success
+        if resp.status_code == 400 and "already exist" in resp.text.lower():
+            return True
+        return False
 
 
 # ── Teams ─────────────────────────────────────────────────────────────────────
