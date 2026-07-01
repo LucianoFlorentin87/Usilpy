@@ -336,6 +336,14 @@
       <span class="nav-icon">🎓</span> Alumnos
     </div>
 
+    <div class="nav-section-label" id="nav-section-academico" style="display:none;">Académico GND</div>
+    <div class="nav-item" id="nav-historial" data-panel="panel-historial" onclick="showPanel('panel-historial', this)" style="display:none;">
+      <span class="nav-icon">📚</span> Historial de notas
+    </div>
+    <div class="nav-item" id="nav-buscar-alumno" data-panel="panel-buscar-alumno" onclick="showPanel('panel-buscar-alumno', this)" style="display:none;">
+      <span class="nav-icon">🔍</span> Consultar alumno
+    </div>
+
     <div class="nav-section-label" id="nav-section-admin" style="display:none;">Administración</div>
     <div class="nav-item" id="nav-users" data-panel="system-users" onclick="showPanel('system-users', this)" style="display:none;">
       <span class="nav-icon">👤</span> Usuarios del sistema
@@ -1103,6 +1111,40 @@
       </div>
     </div>
 
+    <!-- ══════════ PANEL: HISTORIAL NOTAS ══════════ -->
+    <div id="panel-panel-historial" class="panel">
+      <div class="card">
+        <h3 style="margin-bottom:4px;">📚 Historial de notas — GND</h3>
+        <p style="color:#64748b;margin-bottom:20px;">Importá el Excel de calificaciones para cargar el historial en la base de datos.</p>
+
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;max-width:560px;">
+          <label style="font-weight:600;display:block;margin-bottom:8px;">Archivo Excel de calificaciones GND</label>
+          <input type="file" id="historial-file" accept=".xlsx,.xls" style="margin-bottom:14px;width:100%;">
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary" onclick="importarHistorial()">⬆ Importar historial</button>
+            <button class="btn" onclick="importarMallas()" style="background:#7c3aed;color:#fff;">🗂 Importar mallas / correlativas</button>
+          </div>
+          <div id="historial-status" style="display:none;margin-top:14px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PANEL: CONSULTAR ALUMNO ══════════ -->
+    <div id="panel-panel-buscar-alumno" class="panel">
+      <div class="card">
+        <h3 style="margin-bottom:4px;">🔍 Consultar alumno</h3>
+        <p style="color:#64748b;margin-bottom:20px;">Buscá un alumno por cédula o nombre y mirá su historial académico completo.</p>
+
+        <div style="display:flex;gap:10px;max-width:560px;margin-bottom:20px;">
+          <input type="text" id="buscar-alumno-input" placeholder="Cédula o nombre..." style="flex:1;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:.95rem;">
+          <button class="btn btn-primary" onclick="buscarAlumno()">Buscar</button>
+        </div>
+
+        <div id="buscar-alumno-resultados"></div>
+        <div id="historial-alumno-tabla" style="margin-top:20px;"></div>
+      </div>
+    </div>
+
     <!-- ══════════ PANEL: CRON CONFIG ══════════ -->
     <div id="panel-cron-config" class="panel">
       <div class="card">
@@ -1631,16 +1673,17 @@ function _applyRoleVisibility(role) {
   const portal   = ['nav-section-portal','nav-portal'];
   const sync     = ['nav-section-sync','nav-sync','nav-alumnos'];
   const admin    = ['nav-section-admin','nav-users','nav-pending','nav-cron'];
-  const all      = [...reportes,...gestion,...portal,...sync,...admin];
+  const academico = ['nav-section-academico','nav-historial','nav-buscar-alumno'];
+  const all      = [...reportes,...gestion,...portal,...sync,...admin,...academico];
 
   function show(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = ''; }); }
   function hide(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 
   hide(all);
   if (role === 'admin') {
-    show([...reportes,...gestion,...portal,...sync,...admin]);
+    show([...reportes,...gestion,...portal,...sync,...admin,...academico]);
   } else if (role === 'academico') {
-    show(portal);
+    show([...portal,...academico]);
   } else {
     show(reportes);
   }
@@ -1733,6 +1776,8 @@ const panelTitles = {
   'cron-config':         ['Configurar cron',        'Administración'],
   'sync-panel':          ['Sincronización Canvas',  'Base de datos'],
   'sync-alumnos':        ['Alumnos',                'Base de datos'],
+  'panel-historial':     ['Historial de notas',     'Académico GND'],
+  'panel-buscar-alumno': ['Consultar alumno',        'Académico GND'],
 };
 
 function showPanel(id, el) {
@@ -3730,6 +3775,113 @@ async function descargarPlantillaMatricular() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+// ── Académico GND ─────────────────────────────────────────────────────────────
+
+async function importarHistorial() {
+  const file = document.getElementById('historial-file').files[0];
+  if (!file) { alert('Seleccioná un archivo Excel'); return; }
+  const st = document.getElementById('historial-status');
+  st.style.display = 'block';
+  st.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Importando historial... esto puede tardar unos segundos.</div>';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch('/api/academico/importar-historial', {
+      method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${data.detail || r.statusText}</div>`;
+      return;
+    }
+    const errTxt = data.errores?.length ? `<br><small style="color:#92400e;">Errores: ${data.errores.slice(0,3).join('; ')}</small>` : '';
+    st.innerHTML = `<div style="padding:12px;background:#d1fae5;border-radius:6px;color:#065f46;">
+      ✓ Historial importado — <strong>${data.insertados}</strong> nuevos, <strong>${data.actualizados}</strong> actualizados${errTxt}
+    </div>`;
+  } catch(e) {
+    st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${e.message}</div>`;
+  }
+}
+
+async function importarMallas() {
+  const file = document.getElementById('historial-file').files[0];
+  if (!file) { alert('Seleccioná el mismo archivo Excel para importar las mallas'); return; }
+  const st = document.getElementById('historial-status');
+  st.style.display = 'block';
+  st.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Importando mallas curriculares...</div>';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch('/api/academico/importar-mallas', {
+      method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${data.detail || r.statusText}</div>`;
+      return;
+    }
+    const errTxt = data.errores?.length ? `<br><small style="color:#92400e;">Errores: ${data.errores.slice(0,3).join('; ')}</small>` : '';
+    st.innerHTML = `<div style="padding:12px;background:#d1fae5;border-radius:6px;color:#065f46;">
+      ✓ Mallas importadas — <strong>${data.insertados}</strong> correlativas cargadas${errTxt}
+    </div>`;
+  } catch(e) {
+    st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${e.message}</div>`;
+  }
+}
+
+async function buscarAlumno() {
+  const q = document.getElementById('buscar-alumno-input').value.trim();
+  if (!q) return;
+  const res = document.getElementById('buscar-alumno-resultados');
+  const tabla = document.getElementById('historial-alumno-tabla');
+  res.innerHTML = '⏳ Buscando...';
+  tabla.innerHTML = '';
+  const r = await fetch(`/api/academico/buscar?q=${encodeURIComponent(q)}`, {
+    headers: { Authorization: `Bearer ${getToken()}` }
+  });
+  const data = await r.json();
+  if (!r.ok || !data.length) { res.innerHTML = '<p style="color:#64748b;">Sin resultados.</p>'; return; }
+  res.innerHTML = data.map(a => `
+    <div onclick="verHistorialAlumno('${a.cedula}','${(a.nombre||'').replace(/'/g,"\\'")}','${a.carrera||''}')"
+         style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+      <div><strong>${a.nombre || a.cedula}</strong> <span style="color:#64748b;font-size:.85rem;">CI: ${a.cedula}</span></div>
+      <div style="font-size:.82rem;color:#6366f1;">${a.carrera || ''} · ${a.programa || ''}</div>
+    </div>`).join('');
+}
+
+async function verHistorialAlumno(cedula, nombre, carrera) {
+  const tabla = document.getElementById('historial-alumno-tabla');
+  tabla.innerHTML = '⏳ Cargando historial...';
+  const r = await fetch(`/api/academico/alumno/${cedula}`, {
+    headers: { Authorization: `Bearer ${getToken()}` }
+  });
+  const data = await r.json();
+  if (!r.ok || !data.length) { tabla.innerHTML = '<p style="color:#64748b;">Sin historial registrado.</p>'; return; }
+  const filas = data.map(d => {
+    const aprobado = d.aprobado === true ? '✓' : d.aprobado === false ? '✗' : '—';
+    const color = d.aprobado === true ? '#065f46' : d.aprobado === false ? '#991b1b' : '#64748b';
+    return `<tr>
+      <td>${d.ciclo || '—'}</td>
+      <td>${d.materia}</td>
+      <td>${d.nota || '—'}</td>
+      <td style="color:${color};font-weight:700;text-align:center;">${aprobado}</td>
+      <td>${d.periodo || '—'}</td>
+    </tr>`;
+  }).join('');
+  tabla.innerHTML = `
+    <h4 style="margin-bottom:10px;">${nombre} <span style="font-weight:400;color:#64748b;font-size:.85rem;">${carrera}</span></h4>
+    <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+      <thead><tr style="background:#f1f5f9;">
+        <th style="padding:8px;text-align:left;border-bottom:2px solid #e2e8f0;">Ciclo</th>
+        <th style="padding:8px;text-align:left;border-bottom:2px solid #e2e8f0;">Materia</th>
+        <th style="padding:8px;text-align:left;border-bottom:2px solid #e2e8f0;">Nota</th>
+        <th style="padding:8px;text-align:center;border-bottom:2px solid #e2e8f0;">Estado</th>
+        <th style="padding:8px;text-align:left;border-bottom:2px solid #e2e8f0;">Período</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>`;
 }
 
 async function inscribirCanvas() {
