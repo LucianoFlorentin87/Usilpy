@@ -106,6 +106,36 @@ async def root():
     return FileResponse("static/index.html")
 
 
+@app.post("/api/admin/retry-team/{group_id}")
+async def retry_team_provisioning(group_id: str, _: dict = Depends(get_current_user)):
+    """Reintenta convertir un grupo M365 en equipo Teams."""
+    import asyncio as _aio
+    import graph_service as _gs
+    hdrs = _gs._headers()
+    import httpx as _httpx
+    GRAPH_BASE = _gs.GRAPH_BASE
+    team_payload = {
+        "memberSettings": {"allowCreateUpdateChannels": True},
+        "messagingSettings": {"allowUserEditMessages": True, "allowUserDeleteMessages": True},
+    }
+    async with _httpx.AsyncClient(timeout=60) as client:
+        # Check group exists
+        r = await client.get(f"{GRAPH_BASE}/groups/{group_id}?$select=id,displayName", headers=hdrs)
+        if r.status_code == 404:
+            raise HTTPException(status_code=404, detail="Grupo no encontrado en Azure AD")
+        group_name = r.json().get("displayName", group_id)
+        # Retry PUT /team up to 5 times
+        for attempt in range(5):
+            tr = await client.put(f"{GRAPH_BASE}/groups/{group_id}/team", headers=hdrs, json=team_payload)
+            if tr.status_code in (200, 201):
+                return {"status": "ok", "group": group_name, "team_id": tr.json().get("id", group_id)}
+            if tr.status_code in (404, 409):
+                await _aio.sleep(5)
+                continue
+            raise HTTPException(status_code=tr.status_code, detail=tr.text[:300])
+    return {"status": "timeout", "group": group_name, "detail": "El equipo puede aparecer en Teams en unos minutos"}
+
+
 @app.get("/api/canvas-ping")
 async def canvas_ping():
     """Diagnóstico público de Canvas — sin auth."""
