@@ -94,29 +94,37 @@ async def importar_historial_gnd(file_bytes: bytes, filename: str) -> dict:
 
         df = xl.parse(sheet_key, dtype=str).fillna("")
 
-        # Normalizar columnas
-        df.columns = [_norm(c).lower().replace(" ", "_") for c in df.columns]
+        # Rename duplicate columns by appending index suffix before normalizing
+        seen: dict[str, int] = {}
+        new_cols = []
+        for c in df.columns:
+            key = _norm(c).lower().replace(" ", "_")
+            if key in seen:
+                seen[key] += 1
+                new_cols.append(f"{key}__{seen[key]}")
+            else:
+                seen[key] = 0
+                new_cols.append(key)
+        df.columns = new_cols
 
-        # Mapear columnas con nombres variables entre hojas
+        # Mapear columnas — solo primera ocurrencia de cada campo
         col_map = {
-            "nombre": next((c for c in df.columns if "nombre" in c and "apellido" in c), None),
-            "cedula": next((c for c in df.columns if c == "cedula"), None),
-            "codigo": next((c for c in df.columns if "codigo" in c and "asig" in c), None),
+            "nombre":  next((c for c in df.columns if "nombre" in c and "apellido" in c), None),
+            "cedula":  next((c for c in df.columns if c == "cedula"), None),   # first = alumno
+            "codigo":  next((c for c in df.columns if "codigo" in c and "asig" in c), None),
             "materia": next((c for c in df.columns if c == "cursos"), None),
-            "ciclo": next((c for c in df.columns if c == "ciclo"), None),
-            "nota": next((c for c in df.columns if c in ("nta", "nota")), None),
+            "ciclo":   next((c for c in df.columns if c == "ciclo"), None),
+            "nota":    next((c for c in df.columns if c in ("nta", "nota")), None),
             "periodo": next((c for c in df.columns if c == "periodo"), None),
             "docente": next((c for c in df.columns if c == "docente"), None),
         }
 
         rows_to_upsert = []
-        cedula_col = col_map["cedula"]
-        materia_col = col_map["materia"]
         for _, row in df.iterrows():
-            # Use direct column access to avoid pandas Series ambiguity
-            cedula = _norm(row[cedula_col] if cedula_col and cedula_col in row.index else "")
-            materia = _norm(row[materia_col] if materia_col and materia_col in row.index else "")
-            if not cedula or not materia:
+            cedula = _norm(row.get(col_map["cedula"] or "", ""))
+            materia = _norm(row.get(col_map["materia"] or "", ""))
+            # Skip rows with non-numeric cedula (header noise, teacher cedula, etc.)
+            if not cedula or not cedula.isdigit() or not materia:
                 continue
 
             nombre = _norm(row.get(col_map["nombre"] or "", ""))
