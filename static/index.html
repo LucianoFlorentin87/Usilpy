@@ -3695,7 +3695,7 @@ async function matricularAlumnos() {
   const fd = new FormData();
   fd.append('file', file);
   try {
-    const r = await fetch('/api/gestion/matricular-alumnos', { method: 'POST', headers: { Authorization: `Bearer ${_token()}` }, body: fd });
+    const r = await fetch('/api/gestion/matricular-alumnos', { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd });
     if (!r.ok) {
       const err = await r.json().catch(() => ({ detail: r.statusText }));
       statusEl.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ Error: ${err.detail || r.statusText}</div>`;
@@ -3715,7 +3715,7 @@ async function matricularAlumnos() {
 }
 
 async function descargarPlantillaMatricular() {
-  const token = _token();
+  const token = getToken();
   if (!token) { alert('Sesión expirada. Recargá la página.'); return; }
   const r = await fetch('/api/gestion/plantilla-matricular', { headers: { Authorization: `Bearer ${token}` } });
   if (!r.ok) {
