@@ -3715,13 +3715,21 @@ async function matricularAlumnos() {
 }
 
 async function descargarPlantillaMatricular() {
-  const r = await fetch('/api/gestion/plantilla-matricular', { headers: { Authorization: `Bearer ${_token()}` } });
-  if (!r.ok) { alert('Error al descargar plantilla'); return; }
+  const token = _token();
+  if (!token) { alert('Sesión expirada. Recargá la página.'); return; }
+  const r = await fetch('/api/gestion/plantilla-matricular', { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    alert('Error al descargar plantilla: ' + (err.detail || r.status));
+    return;
+  }
   const blob = await r.blob();
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'plantilla_matriculacion.xlsx';
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
 }
 
 async function inscribirCanvas() {
