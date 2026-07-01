@@ -3785,23 +3785,35 @@ async function importarHistorial() {
   const st = document.getElementById('historial-status');
   st.style.display = 'block';
   st.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Importando historial... esto puede tardar unos segundos.</div>';
+  _portalLog(`Iniciando importación de historial — archivo: ${file.name}`);
   const fd = new FormData();
   fd.append('file', file);
   try {
     const r = await fetch('/api/academico/importar-historial', {
       method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
     });
-    const data = await r.json();
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(e) {
+      const preview = text.slice(0,200);
+      st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ El servidor devolvió una respuesta inesperada (posible timeout):<br><code style="font-size:.8rem;">${preview}</code></div>`;
+      _portalLog(`Error importación historial: respuesta no-JSON — ${preview}`, 'error');
+      return;
+    }
     if (!r.ok) {
       st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${data.detail || r.statusText}</div>`;
+      _portalLog(`Error importación historial: ${data.detail || r.statusText}`, 'error');
       return;
     }
     const errTxt = data.errores?.length ? `<br><small style="color:#92400e;">Errores: ${data.errores.slice(0,3).join('; ')}</small>` : '';
     st.innerHTML = `<div style="padding:12px;background:#d1fae5;border-radius:6px;color:#065f46;">
-      ✓ Historial importado — <strong>${data.insertados}</strong> nuevos, <strong>${data.actualizados}</strong> actualizados${errTxt}
+      ✓ Historial importado — <strong>${data.insertados}</strong> registros procesados${errTxt}
     </div>`;
+    _portalLog(`Historial importado: ${data.insertados} registros, ${data.errores?.length || 0} errores`, 'success');
   } catch(e) {
     st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${e.message}</div>`;
+    _portalLog(`Error importación historial: ${e.message}`, 'error');
   }
 }
 
@@ -3811,23 +3823,35 @@ async function importarMallas() {
   const st = document.getElementById('historial-status');
   st.style.display = 'block';
   st.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Importando mallas curriculares...</div>';
+  _portalLog(`Iniciando importación de mallas — archivo: ${file.name}`);
   const fd = new FormData();
   fd.append('file', file);
   try {
     const r = await fetch('/api/academico/importar-mallas', {
       method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
     });
-    const data = await r.json();
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(e) {
+      const preview = text.slice(0,200);
+      st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ Respuesta inesperada del servidor:<br><code style="font-size:.8rem;">${preview}</code></div>`;
+      _portalLog(`Error importación mallas: respuesta no-JSON — ${preview}`, 'error');
+      return;
+    }
     if (!r.ok) {
       st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${data.detail || r.statusText}</div>`;
+      _portalLog(`Error importación mallas: ${data.detail || r.statusText}`, 'error');
       return;
     }
     const errTxt = data.errores?.length ? `<br><small style="color:#92400e;">Errores: ${data.errores.slice(0,3).join('; ')}</small>` : '';
     st.innerHTML = `<div style="padding:12px;background:#d1fae5;border-radius:6px;color:#065f46;">
       ✓ Mallas importadas — <strong>${data.insertados}</strong> correlativas cargadas${errTxt}
     </div>`;
+    _portalLog(`Mallas importadas: ${data.insertados} correlativas, ${data.errores?.length || 0} errores`, 'success');
   } catch(e) {
     st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${e.message}</div>`;
+    _portalLog(`Error importación mallas: ${e.message}`, 'error');
   }
 }
 
