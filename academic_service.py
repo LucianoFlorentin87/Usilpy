@@ -110,9 +110,12 @@ async def importar_historial_gnd(file_bytes: bytes, filename: str) -> dict:
         }
 
         rows_to_upsert = []
+        cedula_col = col_map["cedula"]
+        materia_col = col_map["materia"]
         for _, row in df.iterrows():
-            cedula = _norm(row.get(col_map["cedula"] or "", ""))
-            materia = _norm(row.get(col_map["materia"] or "", ""))
+            # Use direct column access to avoid pandas Series ambiguity
+            cedula = _norm(row[cedula_col] if cedula_col and cedula_col in row.index else "")
+            materia = _norm(row[materia_col] if materia_col and materia_col in row.index else "")
             if not cedula or not materia:
                 continue
 
@@ -312,13 +315,14 @@ async def historial_alumno(cedula: str) -> list[dict]:
 
 
 async def buscar_alumno(q: str) -> list[dict]:
-    """Busca alumnos por cédula o nombre."""
+    """Busca alumnos por cédula o nombre, un resultado por alumno."""
     like = f"%{q}%"
     return await db.fetch(
-        """SELECT DISTINCT cedula, nombre, carrera, programa
+        """SELECT cedula, MAX(nombre) as nombre, MAX(carrera) as carrera, MAX(programa) as programa
            FROM historial_academico
            WHERE cedula ILIKE ? OR nombre ILIKE ?
-           ORDER BY nombre
+           GROUP BY cedula
+           ORDER BY MAX(nombre)
            LIMIT 20""",
         like, like,
     )
