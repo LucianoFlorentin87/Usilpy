@@ -1181,7 +1181,8 @@ async def process_matricular_sheet(file_bytes: bytes, filename: str) -> bytes:
         cedula  = str(row.get("cedula", "")).strip()
         nombre  = str(row.get("nombre", "")).strip()
         email   = str(row.get("email", "")).strip()
-        materia = str(row.get("materia", "")).strip()
+        import unicodedata as _ud
+        materia = _ud.normalize("NFC", str(row.get("materia", "")).strip())
         periodo = str(row.get("periodo", row.get("semestre", settings.semestre_actual))).strip()
         if not periodo or periodo == "nan":
             periodo = settings.semestre_actual
@@ -1203,9 +1204,9 @@ async def process_matricular_sheet(file_bytes: bytes, filename: str) -> bytes:
             })
             continue
 
-        # 1. Buscar IDs en BD
+        # 1. Buscar IDs en BD (LOWER + TRIM para tolerar diferencias de codificación/mayúsculas)
         curso_db = await db.fetchrow(
-            "SELECT canvas_id, teams_id FROM cursos WHERE materia = ? AND periodo = ?",
+            "SELECT canvas_id, teams_id FROM cursos WHERE LOWER(TRIM(materia)) = LOWER(?) AND LOWER(TRIM(periodo)) = LOWER(?)",
             materia, periodo,
         )
         canvas_id = curso_db.get("canvas_id", "") if curso_db else ""
