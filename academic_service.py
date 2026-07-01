@@ -140,30 +140,23 @@ async def importar_historial_gnd(file_bytes: bytes, filename: str) -> dict:
             continue
 
         try:
-            for r in rows_to_upsert:
-                existing = await db.fetchrow(
-                    "SELECT id FROM historial_academico WHERE cedula=? AND codigo_materia=? AND periodo=?",
-                    r[0], r[4], r[10],
-                )
-                if existing:
-                    await db.execute(
-                        """UPDATE historial_academico
-                           SET nombre=?, carrera=?, nota=?, nota_num=?, aprobado=?,
-                               docente=?, ciclo=?
-                           WHERE cedula=? AND codigo_materia=? AND periodo=?""",
-                        r[1], r[2], r[7], r[8], r[9], r[11], r[6],
-                        r[0], r[4], r[10],
-                    )
-                    actualizados += 1
-                else:
-                    await db.execute(
-                        """INSERT INTO historial_academico
+            # Batch upsert — one round-trip per sheet
+            pool = db.get_pool()
+            async with pool.acquire() as conn:
+                result = await conn.executemany(
+                    """INSERT INTO historial_academico
                            (cedula, nombre, carrera, programa, codigo_materia, materia,
                             ciclo, nota, nota_num, aprobado, periodo, docente)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        *r,
-                    )
-                    insertados += 1
+                       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+                       ON CONFLICT (cedula, codigo_materia, periodo)
+                       DO UPDATE SET
+                           nombre=EXCLUDED.nombre, carrera=EXCLUDED.carrera,
+                           nota=EXCLUDED.nota, nota_num=EXCLUDED.nota_num,
+                           aprobado=EXCLUDED.aprobado, docente=EXCLUDED.docente,
+                           ciclo=EXCLUDED.ciclo""",
+                    rows_to_upsert,
+                )
+            insertados += len(rows_to_upsert)
         except Exception as exc:
             msg = f"{sheet_key}: {exc}"
             logger.error(msg)
@@ -238,21 +231,18 @@ async def importar_mallas_gnd(file_bytes: bytes, filename: str) -> dict:
             prereq_final = None if prereq.lower() in ("ninguno", "nan", "") else prereq
             rows.append(("GND", carrera, semestre, codigo, materia, prereq_final))
 
-        for r in rows:
-            try:
-                existing = await db.fetchrow(
-                    "SELECT id FROM correlativas WHERE programa=? AND carrera=? AND materia=?",
-                    r[0], r[1], r[4],
+        try:
+            pool = db.get_pool()
+            async with pool.acquire() as conn:
+                await conn.executemany(
+                    """INSERT INTO correlativas (programa, carrera, semestre, codigo_materia, materia, prerequisito)
+                       VALUES ($1,$2,$3,$4,$5,$6)
+                       ON CONFLICT DO NOTHING""",
+                    rows,
                 )
-                if not existing:
-                    await db.execute(
-                        """INSERT INTO correlativas (programa, carrera, semestre, codigo_materia, materia, prerequisito)
-                           VALUES (?,?,?,?,?,?)""",
-                        *r,
-                    )
-                    insertados += 1
-            except Exception as exc:
-                errores.append(f"{sheet_name}/{r[4]}: {exc}")
+            insertados += len(rows)
+        except Exception as exc:
+            errores.append(f"{sheet_name}: {exc}")
 
     return {"insertados": insertados, "errores": errores}
 
