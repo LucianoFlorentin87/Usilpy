@@ -1397,14 +1397,21 @@ async def importar_historial(file: UploadFile = File(...), background_tasks: Bac
     """Importa historial de notas GND desde Excel en background."""
     import academic_service as _ac
     import uuid as _uuid
-    data = await _read_validated(file)
+    import asyncio as _asyncio
+    # Read raw bytes fast — no pandas here
+    raw = await file.read()
+    fname = file.filename
     job_id = str(_uuid.uuid4())[:8]
     _import_jobs[job_id] = {"status": "running", "result": None}
 
     async def _run():
         try:
-            result = await _ac.importar_historial_gnd(data, file.filename)
-            _import_jobs[job_id] = {"status": "done", "result": result}
+            result = await _asyncio.get_event_loop().run_in_executor(
+                None, lambda: _ac._importar_historial_sync(raw, fname)
+            )
+            # DB insert is async — run after sync parsing
+            result2 = await _ac.importar_historial_gnd_rows(result["rows"], result["carrera_map"])
+            _import_jobs[job_id] = {"status": "done", "result": result2}
         except Exception as e:
             _import_jobs[job_id] = {"status": "error", "result": {"errores": [str(e)]}}
 
@@ -1417,13 +1424,18 @@ async def importar_mallas(file: UploadFile = File(...), background_tasks: Backgr
     """Importa mallas curriculares (correlativas) GND desde Excel en background."""
     import academic_service as _ac
     import uuid as _uuid
-    data = await _read_validated(file)
+    import asyncio as _asyncio
+    raw = await file.read()
+    fname = file.filename
     job_id = str(_uuid.uuid4())[:8]
     _import_jobs[job_id] = {"status": "running", "result": None}
 
     async def _run():
         try:
-            result = await _ac.importar_mallas_gnd(data, file.filename)
+            rows = await _asyncio.get_event_loop().run_in_executor(
+                None, lambda: _ac._parsear_mallas_sync(raw, fname)
+            )
+            result = await _ac.importar_mallas_rows(rows)
             _import_jobs[job_id] = {"status": "done", "result": result}
         except Exception as e:
             _import_jobs[job_id] = {"status": "error", "result": {"errores": [str(e)]}}
