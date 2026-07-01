@@ -3779,80 +3779,64 @@ async function descargarPlantillaMatricular() {
 
 // ── Académico GND ─────────────────────────────────────────────────────────────
 
+async function _importarConPolling(endpoint, file, label) {
+  const st = document.getElementById('historial-status');
+  st.style.display = 'block';
+  st.innerHTML = `<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Enviando archivo...</div>`;
+  _portalLog(`Iniciando ${label} — archivo: ${file.name}`);
+  const fd = new FormData();
+  fd.append('file', file);
+  let jobId;
+  try {
+    const r = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd });
+    const data = await r.json();
+    if (!r.ok) {
+      st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${data.detail || r.statusText}</div>`;
+      _portalLog(`Error ${label}: ${data.detail || r.statusText}`, 'error');
+      return;
+    }
+    jobId = data.job_id;
+    _portalLog(`${label} iniciado (job: ${jobId}), procesando en servidor...`);
+  } catch(e) {
+    st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${e.message}</div>`;
+    _portalLog(`Error ${label}: ${e.message}`, 'error');
+    return;
+  }
+
+  // Poll until done
+  let dots = 0;
+  const interval = setInterval(async () => {
+    dots = (dots + 1) % 4;
+    st.innerHTML = `<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Procesando${'.'.repeat(dots+1)}</div>`;
+    try {
+      const r2 = await fetch(`/api/academico/import-status/${jobId}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      const job = await r2.json();
+      if (job.status === 'done') {
+        clearInterval(interval);
+        const res = job.result;
+        const errTxt = res.errores?.length ? `<br><small style="color:#92400e;">Errores: ${res.errores.slice(0,3).join('; ')}</small>` : '';
+        st.innerHTML = `<div style="padding:12px;background:#d1fae5;border-radius:6px;color:#065f46;">✓ ${label} completado — <strong>${res.insertados || 0}</strong> registros${errTxt}</div>`;
+        _portalLog(`${label} completado: ${res.insertados || 0} registros, ${res.errores?.length || 0} errores`, 'success');
+      } else if (job.status === 'error') {
+        clearInterval(interval);
+        const msg = job.result?.errores?.[0] || 'Error desconocido';
+        st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${msg}</div>`;
+        _portalLog(`Error ${label}: ${msg}`, 'error');
+      }
+    } catch(e) { /* keep polling */ }
+  }, 2000);
+}
+
 async function importarHistorial() {
   const file = document.getElementById('historial-file').files[0];
   if (!file) { alert('Seleccioná un archivo Excel'); return; }
-  const st = document.getElementById('historial-status');
-  st.style.display = 'block';
-  st.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Importando historial... esto puede tardar unos segundos.</div>';
-  _portalLog(`Iniciando importación de historial — archivo: ${file.name}`);
-  const fd = new FormData();
-  fd.append('file', file);
-  try {
-    const r = await fetch('/api/academico/importar-historial', {
-      method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
-    });
-    const text = await r.text();
-    let data;
-    try { data = JSON.parse(text); }
-    catch(e) {
-      const preview = text.slice(0,200);
-      st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ El servidor devolvió una respuesta inesperada (posible timeout):<br><code style="font-size:.8rem;">${preview}</code></div>`;
-      _portalLog(`Error importación historial: respuesta no-JSON — ${preview}`, 'error');
-      return;
-    }
-    if (!r.ok) {
-      st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${data.detail || r.statusText}</div>`;
-      _portalLog(`Error importación historial: ${data.detail || r.statusText}`, 'error');
-      return;
-    }
-    const errTxt = data.errores?.length ? `<br><small style="color:#92400e;">Errores: ${data.errores.slice(0,3).join('; ')}</small>` : '';
-    st.innerHTML = `<div style="padding:12px;background:#d1fae5;border-radius:6px;color:#065f46;">
-      ✓ Historial importado — <strong>${data.insertados}</strong> registros procesados${errTxt}
-    </div>`;
-    _portalLog(`Historial importado: ${data.insertados} registros, ${data.errores?.length || 0} errores`, 'success');
-  } catch(e) {
-    st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${e.message}</div>`;
-    _portalLog(`Error importación historial: ${e.message}`, 'error');
-  }
+  await _importarConPolling('/api/academico/importar-historial', file, 'Importación de historial');
 }
 
 async function importarMallas() {
   const file = document.getElementById('historial-file').files[0];
   if (!file) { alert('Seleccioná el mismo archivo Excel para importar las mallas'); return; }
-  const st = document.getElementById('historial-status');
-  st.style.display = 'block';
-  st.innerHTML = '<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Importando mallas curriculares...</div>';
-  _portalLog(`Iniciando importación de mallas — archivo: ${file.name}`);
-  const fd = new FormData();
-  fd.append('file', file);
-  try {
-    const r = await fetch('/api/academico/importar-mallas', {
-      method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
-    });
-    const text = await r.text();
-    let data;
-    try { data = JSON.parse(text); }
-    catch(e) {
-      const preview = text.slice(0,200);
-      st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ Respuesta inesperada del servidor:<br><code style="font-size:.8rem;">${preview}</code></div>`;
-      _portalLog(`Error importación mallas: respuesta no-JSON — ${preview}`, 'error');
-      return;
-    }
-    if (!r.ok) {
-      st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${data.detail || r.statusText}</div>`;
-      _portalLog(`Error importación mallas: ${data.detail || r.statusText}`, 'error');
-      return;
-    }
-    const errTxt = data.errores?.length ? `<br><small style="color:#92400e;">Errores: ${data.errores.slice(0,3).join('; ')}</small>` : '';
-    st.innerHTML = `<div style="padding:12px;background:#d1fae5;border-radius:6px;color:#065f46;">
-      ✓ Mallas importadas — <strong>${data.insertados}</strong> correlativas cargadas${errTxt}
-    </div>`;
-    _portalLog(`Mallas importadas: ${data.insertados} correlativas, ${data.errores?.length || 0} errores`, 'success');
-  } catch(e) {
-    st.innerHTML = `<div style="padding:12px;background:#fde2e2;border-radius:6px;color:#b00;">✗ ${e.message}</div>`;
-    _portalLog(`Error importación mallas: ${e.message}`, 'error');
-  }
+  await _importarConPolling('/api/academico/importar-mallas', file, 'Importación de mallas');
 }
 
 async function buscarAlumno() {

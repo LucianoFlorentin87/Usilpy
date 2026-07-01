@@ -61,6 +61,7 @@ app.add_middleware(
 
 # ── Simple in-process rate limiter for login ──────────────────────────────────
 _login_attempts: dict = defaultdict(list)
+_import_jobs: dict = {}  # job_id -> {status, result}
 _LOGIN_MAX = 10       # attempts
 _LOGIN_WINDOW = 300   # seconds (5 min)
 
@@ -1392,21 +1393,51 @@ async def gestion_matricular(file: UploadFile = File(...), _user=Depends(_requir
 # ── Académico: historial y correlativas ───────────────────────────────────────
 
 @app.post("/api/academico/importar-historial")
-async def importar_historial(file: UploadFile = File(...), _user=Depends(_require_admin)):
-    """Importa historial de notas GND desde Excel."""
+async def importar_historial(file: UploadFile = File(...), background_tasks: BackgroundTasks = BackgroundTasks(), _user=Depends(_require_admin)):
+    """Importa historial de notas GND desde Excel en background."""
     import academic_service as _ac
+    import uuid as _uuid
     data = await _read_validated(file)
-    result = await _ac.importar_historial_gnd(data, file.filename)
-    return result
+    job_id = str(_uuid.uuid4())[:8]
+    _import_jobs[job_id] = {"status": "running", "result": None}
+
+    async def _run():
+        try:
+            result = await _ac.importar_historial_gnd(data, file.filename)
+            _import_jobs[job_id] = {"status": "done", "result": result}
+        except Exception as e:
+            _import_jobs[job_id] = {"status": "error", "result": {"errores": [str(e)]}}
+
+    background_tasks.add_task(_run)
+    return {"job_id": job_id, "status": "running"}
 
 
 @app.post("/api/academico/importar-mallas")
-async def importar_mallas(file: UploadFile = File(...), _user=Depends(_require_admin)):
-    """Importa mallas curriculares (correlativas) GND desde Excel."""
+async def importar_mallas(file: UploadFile = File(...), background_tasks: BackgroundTasks = BackgroundTasks(), _user=Depends(_require_admin)):
+    """Importa mallas curriculares (correlativas) GND desde Excel en background."""
     import academic_service as _ac
+    import uuid as _uuid
     data = await _read_validated(file)
-    result = await _ac.importar_mallas_gnd(data, file.filename)
-    return result
+    job_id = str(_uuid.uuid4())[:8]
+    _import_jobs[job_id] = {"status": "running", "result": None}
+
+    async def _run():
+        try:
+            result = await _ac.importar_mallas_gnd(data, file.filename)
+            _import_jobs[job_id] = {"status": "done", "result": result}
+        except Exception as e:
+            _import_jobs[job_id] = {"status": "error", "result": {"errores": [str(e)]}}
+
+    background_tasks.add_task(_run)
+    return {"job_id": job_id, "status": "running"}
+
+
+@app.get("/api/academico/import-status/{job_id}")
+async def import_status(job_id: str, _user=Depends(_require_admin)):
+    job = _import_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job no encontrado")
+    return job
 
 
 @app.get("/api/academico/alumno/{cedula}")
