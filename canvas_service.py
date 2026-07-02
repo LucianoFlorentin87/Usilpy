@@ -88,15 +88,22 @@ async def get_courses(per_page: int = 50) -> list[dict]:
 
 async def get_all_courses() -> list[dict]:
     """Fetch ALL courses in the account with pagination, returning id + name + sis_course_id."""
-    acct = await _account_id()
+    try:
+        acct = await _account_id()
+    except Exception as e:
+        raise RuntimeError(f"No se pudo obtener account ID de Canvas: {e}") from e
+
     courses: list[dict] = []
     url = f"{_base()}/api/v1/accounts/{acct}/courses"
     params = {"per_page": 100, "state[]": ["available", "unpublished", "completed"]}
     async with httpx.AsyncClient(timeout=60) as client:
         while url:
             resp = await client.get(url, headers=_headers(), params=params)
-            resp.raise_for_status()
+            if not resp.is_success:
+                raise RuntimeError(f"Canvas API error {resp.status_code}: {resp.text[:300]}")
             batch = resp.json()
+            if not isinstance(batch, list):
+                raise RuntimeError(f"Canvas devolvió formato inesperado: {str(batch)[:200]}")
             courses.extend({"id": c["id"], "name": c["name"], "sis_course_id": c.get("sis_course_id", "")} for c in batch)
             # Follow Link header for next page
             link = resp.headers.get("Link", "")
@@ -106,7 +113,7 @@ async def get_all_courses() -> list[dict]:
                     next_url = part.split(";")[0].strip().strip("<>")
                     break
             url = next_url
-            params = {}  # params already encoded in next_url
+            params = {}
     return courses
 
 
