@@ -2811,9 +2811,9 @@ async function portalAutocompletarAlumno() {
 
     // Mapeo carrera → (programa, valor select carrera)
     const MAP = {
-      'Administración de Empresas':    { prog: 'GND', carr: 'ADM' },
-      'Negocios Internacionales':      { prog: 'GND', carr: 'NEG' },
-      'Marketing y Gestión Comercial': { prog: 'GND', carr: 'MKT' },
+      'Administración de Empresas':    { prog: 'GND', carr: 'gnd_administracion' },
+      'Negocios Internacionales':      { prog: 'GND', carr: 'gnd_negocios' },
+      'Marketing y Gestión Comercial': { prog: 'GND', carr: 'gnd_marketing' },
     };
     const m = MAP[alumno.carrera];
     if (!m) return;
