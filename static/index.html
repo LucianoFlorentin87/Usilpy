@@ -1153,9 +1153,10 @@
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;max-width:560px;">
           <label style="font-weight:600;display:block;margin-bottom:8px;">Archivo Excel de calificaciones GND</label>
           <input type="file" id="historial-file" accept=".xlsx,.xls" style="margin-bottom:14px;width:100%;">
-          <div style="display:flex;gap:10px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="btn btn-primary" onclick="importarHistorial()">⬆ Importar historial</button>
             <button class="btn" onclick="importarMallas()" style="background:#7c3aed;color:#fff;">🗂 Importar mallas / correlativas</button>
+            <button class="btn btn-secondary" onclick="repararNombres()" title="Corrige nombres de materias en historial para que coincidan exactamente con la malla cargada">🔧 Sincronizar nombres con malla</button>
           </div>
           <div id="historial-status" style="display:none;margin-top:14px;"></div>
         </div>
@@ -4067,6 +4068,31 @@ async function importarMallas() {
   const file = document.getElementById('historial-file').files[0];
   if (!file) { alert('Seleccioná el mismo archivo Excel para importar las mallas'); return; }
   await _importarConPolling('/api/academico/importar-mallas', file, 'Importación de mallas');
+}
+
+async function repararNombres() {
+  const statusEl = document.getElementById('historial-status');
+  statusEl.style.display = '';
+  statusEl.innerHTML = '<p style="color:var(--text-muted)">🔧 Comparando nombres entre malla e historial...</p>';
+  try {
+    // Primero comparar para mostrar cuántos hay
+    const cmp = await apiFetch('/api/admin/mallas/comparar');
+    if (!cmp.total) {
+      statusEl.innerHTML = '<p style="color:var(--success)">✓ Todos los nombres del historial ya coinciden con la malla. Nada que reparar.</p>';
+      return;
+    }
+    statusEl.innerHTML = `<p style="color:var(--warn)">⚠ Se encontraron <strong>${cmp.total}</strong> nombres distintos. Aplicando correcciones...</p>`;
+    const res = await apiFetch('/api/admin/mallas/reparar', { method: 'POST' });
+    let html = `<p style="color:var(--success)">✓ <strong>${res.actualizados}</strong> nombres corregidos en historial.</p>`;
+    if (res.detalle && res.detalle.length) {
+      html += '<details style="margin-top:8px;font-size:.8rem;"><summary>Ver correcciones</summary><ul style="margin-top:6px;">';
+      res.detalle.forEach(d => { html += `<li><span style="color:#ef4444">${d.de}</span> → <span style="color:#16a34a">${d.a}</span></li>`; });
+      html += '</ul></details>';
+    }
+    statusEl.innerHTML = html;
+  } catch(e) {
+    statusEl.innerHTML = `<p style="color:var(--error)">❌ ${e.message}</p>`;
+  }
 }
 
 let _alumnoActual = null;

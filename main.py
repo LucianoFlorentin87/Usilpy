@@ -1511,6 +1511,20 @@ async def buscar_alumno(q: str, _user=Depends(get_current_user)):
     return await _ac.buscar_alumno(q)
 
 
+@app.get("/api/admin/mallas/comparar")
+async def comparar_mallas(_user=Depends(_require_admin)):
+    """Compara nombres de materias entre malla (correlativas) e historial_academico."""
+    import academic_service as _ac
+    return await _ac.comparar_mallas_historial()
+
+
+@app.post("/api/admin/mallas/reparar")
+async def reparar_mallas(_user=Depends(_require_admin)):
+    """Actualiza nombres de materias en historial_academico para que coincidan con la malla."""
+    import academic_service as _ac
+    return await _ac.reparar_nombres_historial()
+
+
 @app.get("/api/academico/validar-correlativas")
 async def validar_correlativas(
     cedula: str,

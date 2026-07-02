@@ -764,6 +764,105 @@ async def estado_inscripcion(cedula: str) -> dict:
     return {"cedula": cedula, "carrera": carrera, "programa": programa, "materias": materias}
 
 
+async def comparar_mallas_historial() -> dict:
+    """Compara nombres de materias entre correlativas (malla) e historial_academico.
+    Devuelve materias del historial que no tienen correspondencia exacta en la malla,
+    junto con la sugerencia de corrección si existe una coincidencia fuzzy."""
+    import difflib
+
+    # Nombres canónicos de la malla por (programa, carrera)
+    malla_rows = await db.fetch(
+        "SELECT DISTINCT programa, carrera, materia FROM correlativas ORDER BY programa, carrera, materia"
+    )
+    malla_map: dict[tuple, set] = {}
+    for r in malla_rows:
+        key = (r["programa"], r["carrera"])
+        malla_map.setdefault(key, set())
+        malla_map[key].add(r["materia"].strip())
+
+    # Nombres distintos en historial por (programa, carrera)
+    hist_rows = await db.fetch(
+        "SELECT DISTINCT programa, carrera, materia FROM historial_academico ORDER BY programa, carrera, materia"
+    )
+
+    mismatches = []
+    for r in hist_rows:
+        key = (r["programa"], r["carrera"])
+        materia_hist = r["materia"].strip()
+        canónicos = malla_map.get(key, set())
+        if not canónicos:
+            continue
+        # Coincidencia exacta → OK
+        if materia_hist in canónicos:
+            continue
+        # Coincidencia case-insensitive → OK
+        canon_lower = {m.lower(): m for m in canónicos}
+        if materia_hist.lower() in canon_lower:
+            continue
+        # Sin coincidencia exacta: buscar la más cercana
+        matches = difflib.get_close_matches(materia_hist, canónicos, n=1, cutoff=0.6)
+        mismatches.append({
+            "programa": r["programa"],
+            "carrera": r["carrera"],
+            "en_historial": materia_hist,
+            "sugerencia": matches[0] if matches else None,
+        })
+
+    return {"total": len(mismatches), "mismatches": mismatches}
+
+
+async def reparar_nombres_historial() -> dict:
+    """Actualiza en historial_academico los nombres de materias que no coinciden
+    exactamente con la malla, usando la coincidencia fuzzy >= 0.6 como sugerencia."""
+    import difflib
+
+    malla_rows = await db.fetch(
+        "SELECT DISTINCT programa, carrera, materia FROM correlativas"
+    )
+    malla_map: dict[tuple, set] = {}
+    for r in malla_rows:
+        key = (r["programa"], r["carrera"])
+        malla_map.setdefault(key, set())
+        malla_map[key].add(r["materia"].strip())
+
+    hist_rows = await db.fetch(
+        "SELECT DISTINCT programa, carrera, materia FROM historial_academico"
+    )
+
+    updates = []
+    for r in hist_rows:
+        key = (r["programa"], r["carrera"])
+        materia_hist = r["materia"].strip()
+        canónicos = malla_map.get(key, set())
+        if not canónicos:
+            continue
+        if materia_hist in canónicos:
+            continue
+        canon_lower = {m.lower(): m for m in canónicos}
+        if materia_hist.lower() in canon_lower:
+            # Corregir capitalización
+            updates.append((canon_lower[materia_hist.lower()], r["programa"], r["carrera"], materia_hist))
+            continue
+        matches = difflib.get_close_matches(materia_hist, canónicos, n=1, cutoff=0.75)
+        if matches:
+            updates.append((matches[0], r["programa"], r["carrera"], materia_hist))
+
+    if not updates:
+        return {"actualizados": 0, "detalle": []}
+
+    pool = db.get_pool()
+    async with pool.acquire() as conn:
+        await conn.executemany(
+            "UPDATE historial_academico SET materia=$1 WHERE programa=$2 AND carrera=$3 AND materia=$4",
+            updates,
+        )
+
+    return {
+        "actualizados": len(updates),
+        "detalle": [{"de": u[3], "a": u[0]} for u in updates],
+    }
+
+
 async def buscar_alumno(q: str) -> list[dict]:
     """Busca alumnos por cédula o nombre, un resultado por alumno."""
     like = f"%{q}%"
