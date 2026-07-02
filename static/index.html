@@ -1146,7 +1146,21 @@
         </div>
 
         <div id="buscar-alumno-resultados"></div>
-        <div id="historial-alumno-tabla" style="margin-top:20px;"></div>
+        <div id="alumno-detalle" style="margin-top:20px;display:none;">
+          <!-- Tabs -->
+          <div style="display:flex;gap:4px;border-bottom:2px solid #e2e8f0;margin-bottom:16px;">
+            <button id="tab-historial" onclick="switchTab('historial')"
+              style="padding:8px 18px;border:none;background:none;cursor:pointer;font-weight:600;color:#2563eb;border-bottom:2px solid #2563eb;margin-bottom:-2px;font-size:.9rem;">
+              📋 Historial
+            </button>
+            <button id="tab-inscripcion" onclick="switchTab('inscripcion')"
+              style="padding:8px 18px;border:none;background:none;cursor:pointer;font-weight:500;color:#64748b;font-size:.9rem;">
+              ✅ Puede inscribir
+            </button>
+          </div>
+          <div id="historial-alumno-tabla"></div>
+          <div id="inscripcion-alumno-tabla" style="display:none;"></div>
+        </div>
       </div>
     </div>
 
@@ -3873,24 +3887,47 @@ async function importarMallas() {
   await _importarConPolling('/api/academico/importar-mallas', file, 'Importación de mallas');
 }
 
+let _alumnoActual = null;
+
+function switchTab(tab) {
+  const tabs = ['historial','inscripcion'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`tab-${t}`);
+    const panel = document.getElementById(`${t}-alumno-tabla`);
+    const active = t === tab;
+    btn.style.color = active ? '#2563eb' : '#64748b';
+    btn.style.fontWeight = active ? '600' : '500';
+    btn.style.borderBottom = active ? '2px solid #2563eb' : 'none';
+    btn.style.marginBottom = active ? '-2px' : '0';
+    panel.style.display = active ? '' : 'none';
+  });
+  if (tab === 'inscripcion' && _alumnoActual) verInscripcionAlumno(_alumnoActual);
+}
+
 async function buscarAlumno() {
   const q = document.getElementById('buscar-alumno-input').value.trim();
   if (!q) return;
   const res = document.getElementById('buscar-alumno-resultados');
-  const tabla = document.getElementById('historial-alumno-tabla');
+  document.getElementById('alumno-detalle').style.display = 'none';
   res.innerHTML = '⏳ Buscando...';
-  tabla.innerHTML = '';
   const r = await fetch(`/api/academico/buscar?q=${encodeURIComponent(q)}`, {
     headers: { Authorization: `Bearer ${getToken()}` }
   });
   const data = await r.json();
   if (!r.ok || !data.length) { res.innerHTML = '<p style="color:#64748b;">Sin resultados.</p>'; return; }
   res.innerHTML = data.map(a => `
-    <div onclick="verHistorialAlumno('${a.cedula}','${(a.nombre||'').replace(/'/g,"\\'")}','${a.carrera||''}')"
+    <div onclick="seleccionarAlumno('${a.cedula}','${(a.nombre||'').replace(/'/g,"\\'")}','${a.carrera||''}')"
          style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
-      <div><strong>${a.nombre || a.cedula}</strong> <span style="color:#64748b;font-size:.85rem;">CI: ${a.cedula}</span></div>
-      <div style="font-size:.82rem;color:#6366f1;">${a.carrera || ''} · ${a.programa || ''}</div>
+      <div><strong>${_esc(a.nombre || a.cedula)}</strong> <span style="color:#64748b;font-size:.85rem;">CI: ${a.cedula}</span></div>
+      <div style="font-size:.82rem;color:#6366f1;">${_esc(a.carrera || '')} · ${_esc(a.programa || '')}</div>
     </div>`).join('');
+}
+
+async function seleccionarAlumno(cedula, nombre, carrera) {
+  _alumnoActual = {cedula, nombre, carrera};
+  document.getElementById('alumno-detalle').style.display = '';
+  switchTab('historial');
+  await verHistorialAlumno(cedula, nombre, carrera);
 }
 
 async function verHistorialAlumno(cedula, nombre, carrera) {
@@ -3942,6 +3979,62 @@ async function verHistorialAlumno(cedula, nombre, carrera) {
         <tbody>${filas}</tbody>
       </table>
     </div>`;
+}
+
+async function verInscripcionAlumno({cedula, nombre, carrera}) {
+  const el = document.getElementById('inscripcion-alumno-tabla');
+  el.innerHTML = '⏳ Calculando materias...';
+  try {
+    const data = await apiFetch(`/api/academico/alumno/${cedula}/inscripcion`);
+    const materias = data.materias || [];
+    if (!materias.length) { el.innerHTML = '<p style="color:#64748b;">Sin datos de malla para este alumno.</p>'; return; }
+
+    const grupos = {
+      puede_inscribir: materias.filter(m => m.estado === 'puede_inscribir'),
+      aprobada:        materias.filter(m => m.estado === 'aprobada'),
+      cursando:        materias.filter(m => m.estado === 'cursando'),
+      bloqueada:       materias.filter(m => m.estado === 'bloqueada'),
+    };
+
+    const renderSeccion = (titulo, items, bg, color, icon, mostrarFaltantes=false) => {
+      if (!items.length) return '';
+      const filas = items.map((m,i) => `
+        <tr style="background:${i%2===0?'#fff':bg+'22'};">
+          <td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:center;color:#64748b;">${i+1}</td>
+          <td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:.82rem;">${m.semestre ? 'Ciclo '+m.semestre : '—'}</td>
+          <td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;font-weight:500;color:#1e293b;">${_esc(m.materia)}</td>
+          ${mostrarFaltantes ? `<td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;color:#dc2626;font-size:.82rem;">Falta: ${_esc(m.faltantes.join(', '))}</td>` : '<td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;"></td>'}
+        </tr>`).join('');
+      return `
+        <div style="margin-bottom:20px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+          <div style="background:${bg};padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:${color};font-weight:700;font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;">${icon} ${titulo}</span>
+            <span style="color:${color};opacity:.7;font-size:.8rem;">${items.length} materias</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:.87rem;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:8px 12px;text-align:center;border-bottom:1px solid #e2e8f0;color:#94a3b8;font-size:.75rem;">#</th>
+              <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e2e8f0;color:#94a3b8;font-size:.75rem;">CICLO</th>
+              <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e2e8f0;color:#94a3b8;font-size:.75rem;">MATERIA</th>
+              <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e2e8f0;color:#94a3b8;font-size:.75rem;">${mostrarFaltantes?'CORRELATIVA PENDIENTE':''}</th>
+            </tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>`;
+    };
+
+    el.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <strong>${_esc(nombre)}</strong>
+        <span style="color:#64748b;font-size:.85rem;margin-left:8px;">${_esc(carrera)} · CI: ${cedula}</span>
+      </div>
+      ${renderSeccion('Puede inscribirse', grupos.puede_inscribir, '#d1fae5', '#065f46', '✅')}
+      ${renderSeccion('Cursando', grupos.cursando, '#dbeafe', '#1e40af', '📖')}
+      ${renderSeccion('Bloqueada — correlativas pendientes', grupos.bloqueada, '#fee2e2', '#991b1b', '🔒', true)}
+      ${renderSeccion('Aprobadas', grupos.aprobada, '#f1f5f9', '#475569', '✓')}`;
+  } catch(e) {
+    el.innerHTML = `<p style="color:red;">❌ Error: ${_esc(e.message)}</p>`;
+  }
 }
 
 async function inscribirCanvas() {

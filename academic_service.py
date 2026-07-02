@@ -459,6 +459,96 @@ async def historial_alumno(cedula: str) -> list[dict]:
     )
 
 
+async def estado_inscripcion(cedula: str) -> dict:
+    """
+    Devuelve para cada materia de la malla del alumno:
+    - aprobada: ya la aprobó
+    - puede_inscribir: correlativas cumplidas pero no aprobada aún
+    - bloqueada: correlativas pendientes (indica cuáles)
+    - cursando: nota sin definir (cursando / pendiente)
+    """
+    # Historial del alumno
+    historial = await db.fetch(
+        """SELECT materia, codigo_materia, nota, nota_num, aprobado, ciclo, periodo, carrera, programa
+           FROM historial_academico WHERE cedula = ? ORDER BY ciclo, materia""",
+        cedula,
+    )
+    if not historial:
+        return {"cedula": cedula, "materias": [], "carrera": None, "programa": None}
+
+    carrera  = historial[0]["carrera"]
+    programa = historial[0]["programa"]
+
+    # Set de materias aprobadas (normalizado)
+    aprobadas = {_norm(r["materia"]).lower() for r in historial if r["aprobado"] is True}
+    # Set de materias cursadas/en curso
+    en_curso  = {_norm(r["materia"]).lower() for r in historial if r["aprobado"] is None and r["nota"]}
+
+    # Malla completa de la carrera
+    malla = await db.fetch(
+        """SELECT DISTINCT codigo_materia, materia, semestre
+           FROM correlativas
+           WHERE carrera = ? AND programa = ?
+           ORDER BY semestre, materia""",
+        carrera, programa,
+    )
+
+    # Prereqs por materia
+    prereq_map: dict[str, list[str]] = {}
+    prereqs_rows = await db.fetch(
+        """SELECT materia, prerequisito FROM correlativas
+           WHERE carrera = ? AND programa = ? AND prerequisito IS NOT NULL""",
+        carrera, programa,
+    )
+    for r in prereqs_rows:
+        key = _norm(r["materia"]).lower()
+        prereq_map.setdefault(key, [])
+        for p in r["prerequisito"].replace(" y ", ",").split(","):
+            p = p.strip()
+            if p:
+                prereq_map[key].append(p)
+
+    materias = []
+    for m in malla:
+        nombre = _norm(m["materia"])
+        key    = nombre.lower()
+        prereqs = prereq_map.get(key, [])
+
+        if key in aprobadas:
+            estado = "aprobada"
+            faltantes = []
+        elif key in en_curso:
+            estado = "cursando"
+            faltantes = []
+        else:
+            faltantes = [p for p in prereqs if _norm(p).lower() not in aprobadas]
+            estado = "puede_inscribir" if not faltantes else "bloqueada"
+
+        materias.append({
+            "codigo":    m["codigo_materia"],
+            "materia":   nombre,
+            "semestre":  m["semestre"],
+            "estado":    estado,
+            "faltantes": faltantes,
+        })
+
+    # También incluir materias del historial que no están en la malla (otros programas, etc.)
+    malla_nombres = {_norm(m["materia"]).lower() for m in malla}
+    for r in historial:
+        key = _norm(r["materia"]).lower()
+        if key not in malla_nombres:
+            estado = "aprobada" if r["aprobado"] else ("cursando" if r["aprobado"] is None else "desaprobada")
+            materias.append({
+                "codigo":   r["codigo_materia"],
+                "materia":  _norm(r["materia"]),
+                "semestre": r.get("ciclo"),
+                "estado":   estado,
+                "faltantes": [],
+            })
+
+    return {"cedula": cedula, "carrera": carrera, "programa": programa, "materias": materias}
+
+
 async def buscar_alumno(q: str) -> list[dict]:
     """Busca alumnos por cédula o nombre, un resultado por alumno."""
     like = f"%{q}%"

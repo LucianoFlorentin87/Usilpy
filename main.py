@@ -1476,6 +1476,13 @@ async def historial_alumno(cedula: str, _user=Depends(get_current_user)):
     return await _ac.historial_alumno(cedula)
 
 
+@app.get("/api/academico/alumno/{cedula}/inscripcion")
+async def estado_inscripcion(cedula: str, _user=Depends(get_current_user)):
+    """Estado de inscripción: qué materias puede/no puede inscribir según correlativas."""
+    import academic_service as _ac
+    return await _ac.estado_inscripcion(cedula)
+
+
 @app.get("/api/academico/buscar")
 async def buscar_alumno(q: str, _user=Depends(get_current_user)):
     """Busca alumnos por cédula o nombre."""
