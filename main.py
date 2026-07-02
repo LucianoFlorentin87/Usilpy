@@ -1077,6 +1077,27 @@ async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get
         else:
             merged[key] = {**u, "en_canvas": False, "en_azure": True}
 
+    # Si Canvas y Azure no encontraron nada, buscar en BD local (historial_academico)
+    if not merged:
+        try:
+            import academic_service as _ac
+            local = await _ac.buscar_alumno(q)
+            for u in local:
+                key = (u.get("cedula") or "").lower()
+                merged[key] = {
+                    "fuente": "local",
+                    "nombre": u.get("nombre"),
+                    "email": u.get("email", ""),
+                    "sis_id": u.get("cedula"),
+                    "cedula": u.get("cedula"),
+                    "carrera": u.get("carrera"),
+                    "programa": u.get("programa"),
+                    "en_canvas": False,
+                    "en_azure": False,
+                }
+        except Exception as e:
+            errores.append(f"BD local: {str(e)[:120]}")
+
     return {"resultados": list(merged.values()), "errores": errores}
 
 
