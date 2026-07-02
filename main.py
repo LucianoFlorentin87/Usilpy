@@ -1518,6 +1518,16 @@ async def buscar_alumno(q: str, _user=Depends(get_current_user)):
     return await _ac.buscar_alumno(q)
 
 
+@app.post("/api/admin/limpiar-datos-academicos")
+async def limpiar_datos_academicos(_user=Depends(_require_admin)):
+    """Elimina TODOS los registros de historial_academico y correlativas. Irreversible."""
+    n_h = await db.fetchval("SELECT COUNT(*) FROM historial_academico")
+    n_c = await db.fetchval("SELECT COUNT(*) FROM correlativas")
+    await db.execute("DELETE FROM historial_academico")
+    await db.execute("DELETE FROM correlativas")
+    return {"eliminados_historial": n_h, "eliminados_correlativas": n_c}
+
+
 @app.get("/api/admin/mallas/comparar")
 async def comparar_mallas(_user=Depends(_require_admin)):
     """Compara nombres de materias entre malla (correlativas) e historial_academico."""

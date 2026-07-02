@@ -1158,6 +1158,10 @@
             <button class="btn" onclick="importarMallas()" style="background:#7c3aed;color:#fff;">🗂 Importar mallas / correlativas</button>
             <button class="btn btn-secondary" onclick="repararNombres()" title="Corrige nombres de materias en historial para que coincidan exactamente con la malla cargada">🔧 Sincronizar nombres con malla</button>
           </div>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+            <button class="btn" onclick="limpiarDatosAcademicos()" style="background:#dc2626;color:#fff;font-size:.82rem;">🗑 Limpiar todos los datos académicos</button>
+            <span style="font-size:.78rem;color:var(--text-muted);margin-left:10px;">Borra historial y mallas por completo antes de reimportar.</span>
+          </div>
           <div id="historial-status" style="display:none;margin-top:14px;"></div>
         </div>
       </div>
@@ -4084,6 +4088,19 @@ async function importarMallas() {
   const file = document.getElementById('historial-file').files[0];
   if (!file) { alert('Seleccioná el mismo archivo Excel para importar las mallas'); return; }
   await _importarConPolling('/api/academico/importar-mallas', file, 'Importación de mallas');
+}
+
+async function limpiarDatosAcademicos() {
+  if (!confirm('⚠ Esto eliminará TODOS los registros de historial académico y mallas. Esta acción no se puede deshacer.\n\n¿Confirmar?')) return;
+  const statusEl = document.getElementById('historial-status');
+  statusEl.style.display = '';
+  statusEl.innerHTML = '<p style="color:var(--text-muted)">🗑 Eliminando datos...</p>';
+  try {
+    const res = await apiFetch('/api/admin/limpiar-datos-academicos', { method: 'POST' });
+    statusEl.innerHTML = `<p style="color:var(--success)">✓ Datos eliminados — historial: <strong>${res.eliminados_historial}</strong> registros, mallas: <strong>${res.eliminados_correlativas}</strong> registros. Ya podés reimportar las planillas.</p>`;
+  } catch(e) {
+    statusEl.innerHTML = `<p style="color:var(--error)">❌ ${e.message}</p>`;
+  }
 }
 
 async function repararNombres() {
