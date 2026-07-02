@@ -317,8 +317,17 @@ async def list_courses(_: dict = Depends(get_current_user)):
         return await canvas_service.get_courses()
     except Exception as exc:
         logger.error("Upstream service error: %s", exc)
-
         raise HTTPException(status_code=502, detail="Error de comunicación con servicio externo")
+
+
+@app.get("/api/canvas/all-courses")
+async def list_all_courses(_: dict = Depends(_require_admin)):
+    """Todos los cursos de Canvas con id, nombre y sis_course_id (paginado)."""
+    try:
+        return await canvas_service.get_all_courses()
+    except Exception as exc:
+        logger.error("Canvas all-courses error: %s", exc)
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.get("/api/canvas/users")

@@ -86,6 +86,30 @@ async def get_courses(per_page: int = 50) -> list[dict]:
         return resp.json()
 
 
+async def get_all_courses() -> list[dict]:
+    """Fetch ALL courses in the account with pagination, returning id + name + sis_course_id."""
+    acct = await _account_id()
+    courses: list[dict] = []
+    url = f"{_base()}/api/v1/accounts/{acct}/courses"
+    params = {"per_page": 100, "state[]": ["available", "unpublished", "completed"]}
+    async with httpx.AsyncClient(timeout=60) as client:
+        while url:
+            resp = await client.get(url, headers=_headers(), params=params)
+            resp.raise_for_status()
+            batch = resp.json()
+            courses.extend({"id": c["id"], "name": c["name"], "sis_course_id": c.get("sis_course_id", "")} for c in batch)
+            # Follow Link header for next page
+            link = resp.headers.get("Link", "")
+            next_url = None
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    next_url = part.split(";")[0].strip().strip("<>")
+                    break
+            url = next_url
+            params = {}  # params already encoded in next_url
+    return courses
+
+
 async def get_users(per_page: int = 50) -> list[dict]:
     acct = await _account_id()
     async with httpx.AsyncClient() as client:
