@@ -1034,7 +1034,7 @@ async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get
 
     async def _canvas():
         try:
-            if not canvas_service.settings.canvas_base_url:
+            if not auth_service.settings.canvas_base_url:
                 errores.append("Canvas: CANVAS_BASE_URL no configurado en el servidor")
                 return []
             if q.isdigit():
@@ -1052,7 +1052,7 @@ async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get
 
     async def _azure():
         try:
-            if not canvas_service.settings.azure_client_id:
+            if not auth_service.settings.azure_client_id:
                 errores.append("Azure AD: AZURE_CLIENT_ID no configurado en el servidor")
                 return []
             results = await graph_service.search_users(q)
