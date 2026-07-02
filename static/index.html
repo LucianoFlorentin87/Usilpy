@@ -2820,9 +2820,13 @@ async function portalAutocompletarAlumno() {
 
     document.getElementById('pf-programa').value = m.prog;
     portalProgramaChange();
-    // Esperar a que se rendericen las opciones de carrera
-    await new Promise(r => setTimeout(r, 50));
-    document.getElementById('pf-carrera').value = m.carr;
+    // Esperar a que las opciones de carrera estén disponibles (máx 500ms)
+    const selCarrera = document.getElementById('pf-carrera');
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 50));
+      if ([...selCarrera.options].some(o => o.value === m.carr)) break;
+    }
+    selCarrera.value = m.carr;
     portalCarreraChange();
     _portalLog(`Carrera autocompletada desde historial: ${alumno.carrera}`, 'info');
   } catch(e) {
