@@ -106,8 +106,8 @@ def _importar_historial_sync(file_bytes: bytes, filename: str) -> dict:
     all_rows: list[tuple] = []
     carrera_map: dict[str, str] = {}
 
-    # CPEL detection: if any CPEL historial sheet is present, parse CPEL
-    if any(s in xl.sheet_names for s in CPEL_HISTORIAL_SHEETS):
+    # CPEL detection: use sheets that only exist in CPEL files (not GND)
+    if any(s in xl.sheet_names for s in ["CPEL PRO", "CPEL", "NO TOCAR", "malla ADMI"]):
         cpel_rows = _parsear_historial_cpel_sync(file_bytes)
         all_rows.extend(cpel_rows)
         for r in cpel_rows:
@@ -429,8 +429,8 @@ def _parsear_mallas_sync(file_bytes: bytes, filename: str) -> list:
     xl = pd.ExcelFile(buf)
     all_rows: list[tuple] = []
 
-    # CPEL mallas
-    if any(s in xl.sheet_names for s in CPEL_MALLA_SHEETS):
+    # CPEL mallas (use malla ADMI as discriminator — only present in CPEL files)
+    if "malla ADMI" in xl.sheet_names:
         all_rows.extend(_parsear_mallas_cpel_sync(file_bytes))
 
     for sheet_key, sheet_name in MALLA_SHEETS.items():
@@ -448,9 +448,18 @@ def _parsear_mallas_sync(file_bytes: bytes, filename: str) -> list:
             continue
         df.columns = [_norm(v).lower().replace(" ", "_") for v in df.iloc[header_row].values]
         df = df.iloc[header_row + 1:].reset_index(drop=True)
-        sem_col = next((c for c in df.columns if "semestre" in c), None)
+
+        # Skip sub-header row if the first data row has no numeric semestre
+        first_sem = _norm(df.iloc[0].iloc[0]) if len(df) > 0 else ""
+        if first_sem and not first_sem.replace(".", "").isdigit():
+            df = df.iloc[1:].reset_index(drop=True)
+
+        sem_col = next((c for c in df.columns if c == "semestre"), None) or \
+                  next((c for c in df.columns if "semestre" in c), None)
         cod_col = next((c for c in df.columns if "código" in c or "codigo" in c), None)
-        mat_col = next((c for c in df.columns if "asignatura" in c), None)
+        # Prefer the plain "asignatura" col over "código_de_asignatura"
+        mat_col = next((c for c in df.columns if c == "asignatura"), None) or \
+                  next((c for c in df.columns if "asignatura" in c and "codigo" not in c and "código" not in c), None)
         pre_col = next((c for c in df.columns if "requisito" in c), None)
         if not mat_col or not pre_col:
             continue
