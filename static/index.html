@@ -4036,21 +4036,43 @@ async function ejecutarSync() {
   resultEl.style.display = 'none';
   _portalLog('Iniciando sincronización con Canvas...');
   try {
-    const data = await apiFetch('/api/sync/canvas', 'POST');
+    // POST retorna job_id inmediatamente
+    const { job_id } = await apiFetch('/api/sync/canvas', 'POST');
+    // Polling cada 4 segundos
+    let dots = 0;
+    const timer = setInterval(async () => {
+      dots = (dots + 1) % 4;
+      progressEl.querySelector && (progressEl.innerHTML = `<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Sincronizando con Canvas${'.'.repeat(dots+1)} (puede tardar varios minutos)</div>`);
+    }, 4000);
+    progressEl.innerHTML = `<div style="padding:12px;background:#fff3cd;border-radius:6px;">⏳ Sincronizando con Canvas... (puede tardar varios minutos)</div>`;
+    let job;
+    while (true) {
+      await new Promise(r => setTimeout(r, 4000));
+      const r = await fetch(`/api/sync/canvas/status/${job_id}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      job = await r.json();
+      if (job.status === 'done') break;
+    }
+    clearInterval(timer);
     progressEl.style.display = 'none';
     resultEl.style.display = 'block';
-    resultEl.innerHTML = `
-      <div style="background:#d1fae5;border-radius:8px;padding:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-        <div>✅ <strong>Cursos:</strong> ${parseInt(data.cursos)||0}</div>
-        <div>👤 <strong>Alumnos:</strong> ${parseInt(data.alumnos)||0}</div>
-        <div>📋 <strong>Matriculaciones:</strong> ${parseInt(data.matriculas)||0}</div>
-        <div>📊 <strong>Calificaciones:</strong> ${parseInt(data.calificaciones)||0}</div>
-        <div>✅ <strong>Asistencias:</strong> ${parseInt(data.asistencias)||0}</div>
-        <div style="color:${data.errores>0?'#dc2626':'#16a34a'}">⚠ <strong>Errores:</strong> ${data.errores}</div>
-      </div>
-      <div style="margin-top:8px;font-size:.83rem;color:#64748b;">Tiempo total: ${data.duracion_seg}s</div>`;
-    _portalLog(`Sync completado — ${data.cursos} cursos, ${data.alumnos} alumnos, ${data.asistencias} asistencias`, 'info');
-    await cargarSyncEstado();
+    const data = job.result || {};
+    if (data.error) {
+      resultEl.innerHTML = `<div style="background:#fee2e2;border-radius:8px;padding:12px;">❌ Error: ${_esc(data.error)}</div>`;
+      _portalLog(`Error en sync: ${data.error}`, 'error');
+    } else {
+      resultEl.innerHTML = `
+        <div style="background:#d1fae5;border-radius:8px;padding:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          <div>✅ <strong>Cursos:</strong> ${parseInt(data.cursos)||0}</div>
+          <div>👤 <strong>Alumnos:</strong> ${parseInt(data.alumnos)||0}</div>
+          <div>📋 <strong>Matriculaciones:</strong> ${parseInt(data.matriculas)||0}</div>
+          <div>📊 <strong>Calificaciones:</strong> ${parseInt(data.calificaciones)||0}</div>
+          <div>✅ <strong>Asistencias:</strong> ${parseInt(data.asistencias)||0}</div>
+          <div style="color:${data.errores>0?'#dc2626':'#16a34a'}">⚠ <strong>Errores:</strong> ${data.errores||0}</div>
+        </div>
+        <div style="margin-top:8px;font-size:.83rem;color:#64748b;">Tiempo total: ${data.duracion_seg||0}s</div>`;
+      _portalLog(`Sync completado — ${data.cursos||0} cursos, ${data.alumnos||0} alumnos, ${data.asistencias||0} asistencias`, 'info');
+      await cargarSyncEstado();
+    }
   } catch(ex) {
     progressEl.style.display = 'none';
     resultEl.style.display = 'block';

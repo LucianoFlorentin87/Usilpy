@@ -1550,12 +1550,30 @@ async def gestion_inscribir_teams(file: UploadFile = File(...), _user=Depends(_r
 
 
 @app.post("/api/sync/canvas")
-async def sync_canvas(_user=Depends(_require_admin)):
-    """Trigger manual Canvas sync — cursos, alumnos, matriculas, notas, asistencias."""
+async def sync_canvas(background_tasks: BackgroundTasks, _user=Depends(_require_admin)):
+    """Trigger manual Canvas sync en background — retorna job_id para polling."""
     import sync_service
-    await sync_service.init_db()
-    result = await sync_service.run_sync("manual")
-    return result
+    job_id = str(_uuid.uuid4())[:8]
+    _import_jobs[job_id] = {"status": "running", "result": None}
+
+    async def _run():
+        try:
+            await sync_service.init_db()
+            result = await sync_service.run_sync("manual")
+            _import_jobs[job_id] = {"status": "done", "result": result}
+        except Exception as exc:
+            _import_jobs[job_id] = {"status": "done", "result": {"error": str(exc)}}
+
+    background_tasks.add_task(_run)
+    return {"job_id": job_id, "status": "running"}
+
+
+@app.get("/api/sync/canvas/status/{job_id}")
+async def sync_canvas_status(job_id: str, _user=Depends(_require_admin)):
+    job = _import_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job no encontrado")
+    return job
 
 
 @app.get("/api/sync/estado")
