@@ -3048,11 +3048,14 @@ function portalFiltrarMaterias() {
       const aprobada  = est && est.estado === 'aprobada';
       const cursando  = est && est.estado === 'cursando';
 
-      // Ocultar aprobadas y cursando — no tienen sentido en la lista de inscripción
-      if (aprobada || cursando) return '';
-
       let icono, estilo, titulo = '';
-      if (bloqueada) {
+      if (aprobada) {
+        icono = '✓'; estilo = 'color:#16a34a;background:#f0fdf4;';
+        titulo = 'Ya aprobada';
+      } else if (cursando) {
+        icono = '📖'; estilo = 'color:#2563eb;background:#eff6ff;';
+        titulo = 'Cursando actualmente';
+      } else if (bloqueada) {
         icono = '🔒'; estilo = 'color:#ef4444;background:#fff1f2;';
         titulo = `Falta aprobar: ${(est.faltantes||[]).join(', ')}`;
       } else if (sel) {
@@ -3061,15 +3064,15 @@ function portalFiltrarMaterias() {
         icono = '☐'; estilo = '';
       }
 
-      const onclick = bloqueada ? '' : `onclick="portalToggleMateria('${m.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}','${sem.replace(/'/g,"\\'")}')"`;
-      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;${bloqueada?'cursor:not-allowed;opacity:.7;':'cursor:pointer;'}${estilo}"
+      const deshabilitada = bloqueada || aprobada || cursando;
+      const onclick = deshabilitada ? '' : `onclick="portalToggleMateria('${m.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}','${sem.replace(/'/g,"\\'")}')"`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;${deshabilitada?'cursor:default;opacity:.7;':'cursor:pointer;'}${estilo}"
         ${onclick} title="${titulo}">
         <span style="font-size:1rem;width:18px;text-align:center;">${icono}</span>
         <span style="font-size:.83rem;flex:1;">${m}</span>
-        ${titulo ? `<span style="font-size:.72rem;color:#f87171;">${titulo}</span>` : ''}
+        ${titulo ? `<span style="font-size:.72rem;color:#94a3b8;">${titulo}</span>` : ''}
       </div>`;
-    }).filter(x => x).join('');
-    if (!items) continue;
+    }).join('');
     html += `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;padding:8px 4px 3px;text-transform:uppercase;">${sem}</div>`;
     html += items;
   }
