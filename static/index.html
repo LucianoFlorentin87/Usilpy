@@ -2582,6 +2582,7 @@ async function deleteSystemUser(id, username) {
 // ── Portal académico ─────────────────────────────────────────────────────────
 let _portalMaterias = [];
 let _portalMateriasSeleccionadas = [];
+let _portalEstadoMaterias = {}; // materia_lower → {estado, faltantes}
 let _misInscripcionesData = [];
 
 // ── Mallas curriculares ───────────────────────────────────────────────────────
@@ -2829,6 +2830,20 @@ async function portalAutocompletarAlumno() {
     selCarrera.value = m.carr;
     portalCarreraChange();
     _portalLog(`Carrera autocompletada desde historial: ${alumno.carrera}`, 'info');
+
+    // Cargar estado de correlativas para filtrar materias
+    try {
+      const inscripcion = await apiFetch(`/api/academico/alumno/${cedula}/inscripcion`);
+      _portalEstadoMaterias = {};
+      for (const mat of (inscripcion.materias || [])) {
+        _portalEstadoMaterias[mat.materia.toLowerCase().trim()] = {
+          estado: mat.estado,
+          faltantes: mat.faltantes || [],
+        };
+      }
+      portalFiltrarMaterias();
+      _portalLog('Correlativas cargadas — solo se muestran materias disponibles para inscripción.', 'info');
+    } catch(e) { /* sin historial, se muestra todo */ }
   } catch(e) {
     // Alumno no en BD — completan manualmente
   }
@@ -2954,6 +2969,7 @@ function portalSeleccionarAlumno(u) {
 }
 
 function portalNuevoAlumno() {
+  _portalEstadoMaterias = {};
   ['pf-apellido','pf-nombre','pf-cedula','pf-email','pf-obs'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('pf-semestre').value = _getSemestreActual();
   document.getElementById('portal-ficha-badge').textContent = 'Alumno nuevo';
@@ -2993,6 +3009,7 @@ function portalFiltrarMaterias() {
     return;
   }
   const malla = MALLAS[carrera];
+  const tieneEstado = Object.keys(_portalEstadoMaterias).length > 0;
   let html = '';
   for (const [sem, materias] of Object.entries(malla.semestres)) {
     const filtradas = q ? materias.filter(m => m.toLowerCase().includes(q)) : materias;
@@ -3000,10 +3017,34 @@ function portalFiltrarMaterias() {
     html += `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;padding:8px 4px 3px;text-transform:uppercase;">${sem}</div>`;
     html += filtradas.map(m => {
       const sel = _portalMateriasSeleccionadas.some(x => x.id === m);
-      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;${sel?'background:#eff6ff;border-left:3px solid #3b82f6;':''}"
-        onclick="portalToggleMateria('${m.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}','${sem.replace(/'/g,"\\'")}')">
-        <span style="font-size:1rem;width:18px;text-align:center;">${sel?'☑':'☐'}</span>
+      const est = tieneEstado ? (_portalEstadoMaterias[m.toLowerCase().trim()] || {estado:'puede_inscribir'}) : null;
+      const bloqueada  = est && est.estado === 'bloqueada';
+      const aprobada   = est && est.estado === 'aprobada';
+      const cursando   = est && est.estado === 'cursando';
+      const deshabilitada = bloqueada || aprobada || cursando;
+
+      let icono, estilo, titulo = '';
+      if (aprobada) {
+        icono = '✓'; estilo = 'color:#86efac;background:#f0fdf4;';
+        titulo = 'Ya aprobada';
+      } else if (cursando) {
+        icono = '📖'; estilo = 'color:#93c5fd;background:#eff6ff;';
+        titulo = 'Cursando actualmente';
+      } else if (bloqueada) {
+        icono = '🔒'; estilo = 'color:#fca5a5;background:#fff1f2;';
+        titulo = `Falta aprobar: ${(est.faltantes||[]).join(', ')}`;
+      } else if (sel) {
+        icono = '☑'; estilo = 'background:#eff6ff;border-left:3px solid #3b82f6;';
+      } else {
+        icono = '☐'; estilo = '';
+      }
+
+      const onclick = deshabilitada ? '' : `onclick="portalToggleMateria('${m.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}','${sem.replace(/'/g,"\\'")}')"`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;${deshabilitada?'opacity:.55;':'cursor:pointer;'}${estilo}"
+        ${onclick} title="${titulo}">
+        <span style="font-size:1rem;width:18px;text-align:center;">${icono}</span>
         <span style="font-size:.83rem;flex:1;">${m}</span>
+        ${titulo ? `<span style="font-size:.72rem;color:#94a3b8;">${titulo}</span>` : ''}
       </div>`;
     }).join('');
   }
