@@ -45,6 +45,7 @@ _CPEL_MATERIA_FIXES: dict[str, str] = {
     "administracion estategica":                    "Administración Estratégica",
     "administracion financiera":                    "Administración Financiera",
     "administracion publica":                       "Administración Pública",
+    "administracion ii":                            "Administración II",
     "administracion de recursos humanos":           "Administración de Recursos Humanos",
     "administracion  i":                            "Administración I",
     "auditoría de gestion administrativa":          "Auditoría de Gestión Administrativa",
@@ -150,12 +151,25 @@ def _importar_historial_sync(file_bytes: bytes, filename: str) -> dict:
     all_rows: list[tuple] = []
     carrera_map: dict[str, str] = {}
 
+    # Build code→canonical-name map from mallas in this same file
+    malla_rows = _parsear_mallas_sync(file_bytes, filename)
+    codigo_map = _build_codigo_map(malla_rows)
+
     # CPEL detection: use sheets that only exist in CPEL files (not GND)
     if any(s in xl.sheet_names for s in ["CPEL PRO", "CPEL", "NO TOCAR", "malla ADMI"]):
         cpel_rows = _parsear_historial_cpel_sync(file_bytes)
-        all_rows.extend(cpel_rows)
+        # Also build code→name from CPEL historial sheet (has 92% coverage)
+        cpel_codigo_map = _build_cpel_codigo_map_from_historial(file_bytes)
+        codigo_map.update(cpel_codigo_map)
+        # Normalize materia names via code map
+        normalized = []
         for r in cpel_rows:
-            carrera_map[r[2]] = r[2]  # carrera → carrera (display only)
+            codigo = r[4].strip().upper() if r[4] else ""
+            materia = codigo_map.get(codigo, r[5]) if codigo else r[5]
+            normalized.append(r[:5] + (materia,) + r[6:])
+        all_rows.extend(normalized)
+        for r in normalized:
+            carrera_map[r[2]] = r[2]
 
     # GND detection: if any GND sheet is present, parse GND
     gnd_found = False
@@ -203,6 +217,11 @@ def _importar_historial_sync(file_bytes: bytes, filename: str) -> dict:
                 continue
             nombre = _norm(row.get(col_map["nombre"] or "", ""))
             codigo = _norm(row.get(col_map["codigo"] or "", ""))
+            if codigo.lower() in ("nan", "none", ""):
+                codigo = ""
+            # Normalizar nombre de materia por código si existe en la malla
+            if codigo:
+                materia = codigo_map.get(codigo.upper(), materia)
             ciclo_raw = row.get(col_map["ciclo"] or "", "")
             try:
                 ciclo = int(float(ciclo_raw)) if ciclo_raw and ciclo_raw != "nan" else None
@@ -215,6 +234,28 @@ def _importar_historial_sync(file_bytes: bytes, filename: str) -> dict:
                              nota_txt, nota_num, aprobado, periodo, docente))
 
     return {"rows": all_rows, "carrera_map": carrera_map}
+
+
+def _build_cpel_codigo_map_from_historial(file_bytes: bytes) -> dict[str, str]:
+    """Extrae mapa {codigo_upper → nombre} de la hoja CPEL del historial (92% coverage)."""
+    buf = io.BytesIO(file_bytes)
+    xl = pd.ExcelFile(buf)
+    code_map: dict[str, str] = {}
+    if "CPEL" not in xl.sheet_names:
+        return code_map
+    df = xl.parse("CPEL", dtype=str).fillna("")
+    cols = [_norm(c).lower().replace(" ", "_") for c in df.columns]
+    df.columns = cols
+    cod_col = next((c for c in cols if "codigo" in c and "asig" in c), None)
+    mat_col = next((c for c in cols if c == "cursos"), None)
+    if not cod_col or not mat_col:
+        return code_map
+    for _, row in df.iterrows():
+        cod = _norm(row.get(cod_col, "")).upper()
+        mat = _norm(row.get(mat_col, ""))
+        if cod and cod not in ("NAN", "NONE", "") and mat and mat.lower() not in ("nan", ""):
+            code_map.setdefault(cod, _fix_materia(mat))
+    return code_map
 
 
 def _parsear_historial_cpel_sync(file_bytes: bytes) -> list[tuple]:
@@ -466,6 +507,17 @@ async def importar_historial_gnd(file_bytes: bytes, filename: str) -> dict:
 # Importar mallas curriculares (correlativas)
 # ---------------------------------------------------------------------------
 
+def _build_codigo_map(malla_rows: list) -> dict[str, str]:
+    """Construye mapa {codigo_upper → nombre_canónico} desde las filas de malla parseadas."""
+    m: dict[str, str] = {}
+    for r in malla_rows:
+        codigo = r[3].strip().upper()
+        materia = r[4].strip()
+        if codigo and codigo not in ("NAN", "NONE", ""):
+            m[codigo] = materia
+    return m
+
+
 def _parsear_mallas_sync(file_bytes: bytes, filename: str) -> list:
     """Parse mallas Excel synchronously. Returns list of row tuples.
     Auto-detects GND vs CPEL by sheet names."""
@@ -500,17 +552,18 @@ def _parsear_mallas_sync(file_bytes: bytes, filename: str) -> list:
 
         sem_col = next((c for c in df.columns if c == "semestre"), None) or \
                   next((c for c in df.columns if "semestre" in c), None)
-        cod_col = next((c for c in df.columns if "código" in c or "codigo" in c), None)
         # Prefer the plain "asignatura" col over "código_de_asignatura"
         mat_col = next((c for c in df.columns if c == "asignatura"), None) or \
                   next((c for c in df.columns if "asignatura" in c and "codigo" not in c and "código" not in c), None)
         pre_col = next((c for c in df.columns if "requisito" in c), None)
+        # Code col: may be named "código de asignatura" (first col) or appear last
+        cod_col = next((c for c in df.columns if ("código" in c or "codigo" in c) and "asig" in c), None)
         if not mat_col or not pre_col:
             continue
         for _, row in df.iterrows():
             materia = _norm(row.get(mat_col, ""))
             prereq = _norm(row.get(pre_col, ""))
-            if not materia or materia.lower() in ("nan", "optativas"):
+            if not materia or materia.lower() in ("nan", "optativas", "total", ""):
                 continue
             semestre_raw = row.get(sem_col, "") if sem_col else ""
             try:
@@ -518,6 +571,8 @@ def _parsear_mallas_sync(file_bytes: bytes, filename: str) -> list:
             except (ValueError, TypeError):
                 semestre = None
             codigo = _norm(row.get(cod_col, "")) if cod_col else ""
+            if codigo.lower() in ("nan", "none", ""):
+                codigo = ""
             prereq_final = None if prereq.lower() in ("ninguno", "nan", "") else prereq
             all_rows.append(("GND", carrera, semestre, codigo, materia, prereq_final))
 
