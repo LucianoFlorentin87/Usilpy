@@ -208,7 +208,7 @@ async def send_welcome_email(
     </p>
     """
 
-    html = _base_html(f"Bienvenido/a al sistema académico — {nombre}", content)
+    html = _base_html(f"Bienvenido/a al sistema académico — {html.escape(nombre)}", content)
     return await _send(to, f"Bienvenido/a a USIL — Semestre {semestre}", html)
 
 
@@ -282,7 +282,7 @@ async def send_admin_error_report(
         bg = "#fff" if i % 2 == 0 else "#f8fafc"
         rows_html += f"""<tr style="background:{bg};">
           <td style="padding:8px 12px;font-size:0.82rem;color:#6b7280;">{sheet or cedula}</td>
-          <td style="padding:8px 12px;font-size:0.82rem;color:#374151;">{nombre}</td>
+          <td style="padding:8px 12px;font-size:0.82rem;color:#374151;">{html.escape(nombre)}</td>
           <td style="padding:8px 12px;font-size:0.82rem;color:#991b1b;">{error}</td>
         </tr>"""
 

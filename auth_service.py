@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 import secrets
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 import bcrypt
 import httpx
 
@@ -32,7 +33,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def decode_token(token: str) -> dict:
-    """Raises JWTError si el token es inválido o expiró."""
+    """Raises InvalidTokenError si el token es inválido o expiró."""
     return jwt.decode(token, settings.app_secret_key, algorithms=[settings.jwt_algorithm])
 
 

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.base import BaseHTTPMiddleware
-from jose import JWTError
+from jwt.exceptions import InvalidTokenError
 from pydantic import BaseModel
 
 import canvas_service
@@ -82,7 +82,7 @@ async def get_current_user(
     try:
         payload = auth_service.decode_token(credentials.credentials)
         return payload
-    except JWTError:
+    except InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
 
