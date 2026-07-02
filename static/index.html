@@ -520,8 +520,30 @@
             oninput="portalFiltrarMaterias()" />
         </div>
 
-        <!-- Panel materias externas -->
-        <div id="pf-externo-panel" style="display:none;margin-bottom:10px;border:1px dashed #f59e0b;border-radius:8px;padding:12px;background:#fffbeb;">
+        <div id="pf-materias-lista" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:#fafbfd;">
+          <p style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:16px 0;">Seleccioná un programa para ver las materias disponibles</p>
+        </div>
+
+        <div id="pf-materias-seleccionadas" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+
+        <!-- Tabla de horarios por materia -->
+        <div id="pf-horarios-card" style="display:none;margin-top:14px;">
+          <div style="font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:6px;">Horarios <span style="font-weight:400;color:var(--text-muted);">(opcional — completá día y hora por materia)</span></div>
+          <div class="table-wrap">
+            <table id="pf-horarios-table">
+              <thead><tr><th>Materia</th><th>Día</th><th>Hora inicio</th><th>Hora fin</th></tr></thead>
+              <tbody id="pf-horarios-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Agregar materia de otro programa -->
+        <div style="margin-top:12px;text-align:right;">
+          <button type="button" class="btn btn-outline" onclick="portalToggleExterno()" style="font-size:.8rem;padding:5px 12px;">
+            ➕ Agregar de otro programa
+          </button>
+        </div>
+        <div id="pf-externo-panel" style="display:none;margin-top:8px;border:1px dashed #f59e0b;border-radius:8px;padding:12px;background:#fffbeb;">
           <div style="font-size:.8rem;font-weight:700;color:#92400e;margin-bottom:8px;">📌 Materia de otro programa (por falta de cupo)</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
             <select id="pf-ext-programa" onchange="portalExternoPrograma()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
@@ -538,29 +560,6 @@
           </div>
           <div id="pf-ext-lista" style="max-height:180px;overflow-y:auto;border:1px solid #fde68a;border-radius:6px;padding:6px;background:#fff;">
             <p style="color:#92400e;font-size:.82rem;text-align:center;padding:8px 0;">Seleccioná programa y carrera</p>
-          </div>
-        </div>
-
-        <div style="margin-bottom:8px;text-align:right;">
-          <button type="button" class="btn btn-outline" onclick="portalToggleExterno()" style="font-size:.8rem;padding:5px 12px;">
-            ➕ Agregar de otro programa
-          </button>
-        </div>
-
-        <div id="pf-materias-lista" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:#fafbfd;">
-          <p style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:16px 0;">Seleccioná un programa para ver las materias disponibles</p>
-        </div>
-
-        <div id="pf-materias-seleccionadas" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
-
-        <!-- Tabla de horarios por materia -->
-        <div id="pf-horarios-card" style="display:none;margin-top:14px;">
-          <div style="font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:6px;">Horarios <span style="font-weight:400;color:var(--text-muted);">(opcional — completá día y hora por materia)</span></div>
-          <div class="table-wrap">
-            <table id="pf-horarios-table">
-              <thead><tr><th>Materia</th><th>Día</th><th>Hora inicio</th><th>Hora fin</th></tr></thead>
-              <tbody id="pf-horarios-tbody"></tbody>
-            </table>
           </div>
         </div>
 
