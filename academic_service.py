@@ -1,6 +1,6 @@
 """
-Servicio académico GND: importación de historial de notas, mallas curriculares
-y validación de correlativas.
+Servicio académico: importación de historial de notas, mallas curriculares
+y validación de correlativas (programas GND y CPEL).
 """
 from __future__ import annotations
 
@@ -28,6 +28,28 @@ MALLA_SHEETS = {
     "NEG": "malla NEG",
     "MKT": "malla MKT",
 }
+
+# CPEL -----------------------------------------------------------------------
+# Hojas de historial a procesar (en orden de prioridad)
+CPEL_HISTORIAL_SHEETS = ["CPEL PRO", "CPEL", "NO TOCAR"]
+
+# Hojas de malla CPEL → carrera canónica
+CPEL_MALLA_SHEETS = {
+    "malla ADMI": "Administración de Empresas",
+    "malla NEGO": "Negocios Internacionales",
+    "malla MKT":  "Marketing y Gestión Comercial",
+}
+
+# Normaliza los distintos nombres de carrera que aparecen en las planillas CPEL
+def _norm_carrera_cpel(raw: str) -> str:
+    s = raw.strip().lower()
+    if any(x in s for x in ("adm", "empresa")):
+        return "Administración de Empresas"
+    if any(x in s for x in ("neg", "global")):
+        return "Negocios Internacionales"
+    if any(x in s for x in ("mar", "mkt", "gestion")):
+        return "Marketing y Gestión Comercial"
+    return raw.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -77,16 +99,34 @@ def _norm_periodo(p: Any) -> str:
 # ---------------------------------------------------------------------------
 
 def _importar_historial_sync(file_bytes: bytes, filename: str) -> dict:
-    """Parse Excel synchronously (CPU-bound). Returns rows + carrera_map."""
+    """Parse Excel synchronously (CPU-bound). Returns rows + carrera_map.
+    Auto-detects GND vs CPEL by sheet names."""
     buf = io.BytesIO(file_bytes)
     xl = pd.ExcelFile(buf)
     all_rows: list[tuple] = []
     carrera_map: dict[str, str] = {}
 
+    # CPEL detection: if any CPEL historial sheet is present, parse CPEL
+    if any(s in xl.sheet_names for s in CPEL_HISTORIAL_SHEETS):
+        cpel_rows = _parsear_historial_cpel_sync(file_bytes)
+        all_rows.extend(cpel_rows)
+        for r in cpel_rows:
+            carrera_map[r[2]] = r[2]  # carrera → carrera (display only)
+
+    # GND detection: if any GND sheet is present, parse GND
+    gnd_found = False
     for sheet_key, (programa, carrera) in PROGRAMAS.items():
         if sheet_key not in xl.sheet_names:
             continue
+        gnd_found = True
         carrera_map[sheet_key] = carrera
+
+    if not gnd_found:
+        return {"rows": all_rows, "carrera_map": carrera_map}
+
+    for sheet_key, (programa, carrera) in PROGRAMAS.items():
+        if sheet_key not in xl.sheet_names:
+            continue
 
         df = xl.parse(sheet_key, dtype=str).fillna("")
         seen: dict[str, int] = {}
@@ -131,6 +171,123 @@ def _importar_historial_sync(file_bytes: bytes, filename: str) -> dict:
                              nota_txt, nota_num, aprobado, periodo, docente))
 
     return {"rows": all_rows, "carrera_map": carrera_map}
+
+
+def _parsear_historial_cpel_sync(file_bytes: bytes) -> list[tuple]:
+    """Parsea las hojas de historial CPEL. La carrera se lee de la columna Carreras por fila."""
+    buf = io.BytesIO(file_bytes)
+    xl = pd.ExcelFile(buf)
+    all_rows: list[tuple] = []
+    seen_keys: set[tuple] = set()  # dedup (cedula, codigo_materia, periodo) entre hojas
+
+    for sheet_name in CPEL_HISTORIAL_SHEETS:
+        if sheet_name not in xl.sheet_names:
+            continue
+
+        df = xl.parse(sheet_name, dtype=str).fillna("")
+
+        # Normalizar nombres de columna eliminando duplicados
+        seen: dict[str, int] = {}
+        new_cols = []
+        for c in df.columns:
+            key = _norm(c).lower().replace(" ", "_")
+            if key in seen:
+                seen[key] += 1
+                new_cols.append(f"{key}__{seen[key]}")
+            else:
+                seen[key] = 0
+                new_cols.append(key)
+        df.columns = new_cols
+
+        col_map = {
+            "nombre":   next((c for c in df.columns if "nombre" in c and "apellido" in c), None),
+            "cedula":   next((c for c in df.columns if c == "cedula"), None),
+            "carreras": next((c for c in df.columns if c == "carreras"), None),
+            "codigo":   next((c for c in df.columns if "codigo" in c and "asig" in c), None),
+            "materia":  next((c for c in df.columns if c == "cursos"), None),
+            "ciclo":    next((c for c in df.columns if c == "ciclo"), None),
+            "nota":     next((c for c in df.columns if c in ("nta", "nota")), None),
+            "periodo":  next((c for c in df.columns if c == "periodo"), None),
+            "docente":  next((c for c in df.columns if c == "docente"), None),
+        }
+
+        for _, row in df.iterrows():
+            cedula = _norm(row.get(col_map["cedula"] or "", ""))
+            materia = _norm(row.get(col_map["materia"] or "", ""))
+            if not cedula or not cedula.isdigit() or not materia:
+                continue
+
+            codigo = _norm(row.get(col_map["codigo"] or "", "")) if col_map["codigo"] else ""
+            periodo = _norm_periodo(row.get(col_map["periodo"] or "", "")) if col_map["periodo"] else ""
+
+            dedup_key = (cedula, codigo or materia, periodo)
+            if dedup_key in seen_keys:
+                continue
+            seen_keys.add(dedup_key)
+
+            carrera_raw = _norm(row.get(col_map["carreras"] or "", "")) if col_map["carreras"] else ""
+            carrera = _norm_carrera_cpel(carrera_raw) if carrera_raw else "Desconocida"
+
+            nombre = _norm(row.get(col_map["nombre"] or "", "")) if col_map["nombre"] else ""
+            ciclo_raw = row.get(col_map["ciclo"] or "", "") if col_map["ciclo"] else ""
+            try:
+                ciclo = int(float(ciclo_raw)) if ciclo_raw and ciclo_raw not in ("nan", "") else None
+            except (ValueError, TypeError):
+                ciclo = None
+
+            nota_raw = row.get(col_map["nota"] or "", "") if col_map["nota"] else ""
+            nota_txt, nota_num, aprobado = _parse_nota(nota_raw)
+            docente = _norm(row.get(col_map["docente"] or "", "")) if col_map["docente"] else ""
+
+            all_rows.append((cedula, nombre, carrera, "CPEL", codigo, materia, ciclo,
+                             nota_txt, nota_num, aprobado, periodo, docente))
+
+    return all_rows
+
+
+def _parsear_mallas_cpel_sync(file_bytes: bytes) -> list[tuple]:
+    """Parsea las hojas de malla CPEL. Sin columna de prerequisitos — se importan con prereq=None."""
+    buf = io.BytesIO(file_bytes)
+    xl = pd.ExcelFile(buf)
+    all_rows: list[tuple] = []
+
+    for sheet_name, carrera in CPEL_MALLA_SHEETS.items():
+        if sheet_name not in xl.sheet_names:
+            continue
+
+        df = xl.parse(sheet_name, header=None, dtype=str).fillna("")
+
+        # Encontrar fila de encabezado buscando alguna columna que contenga "asign" o "sem"
+        header_row = None
+        for i, row in df.iterrows():
+            vals = [_norm(v).lower() for v in row.values]
+            if any("asign" in v or (v.startswith("sem") and len(v) <= 8) for v in vals if v):
+                header_row = i
+                break
+        if header_row is None:
+            continue
+
+        df.columns = [_norm(v).lower().replace(" ", "_") for v in df.iloc[header_row].values]
+        df = df.iloc[header_row + 1:].reset_index(drop=True)
+
+        mat_col = next((c for c in df.columns if "asign" in c), None)
+        sem_col = next((c for c in df.columns if c.startswith("sem") and len(c) <= 8), None)
+
+        if not mat_col:
+            continue
+
+        for _, row in df.iterrows():
+            materia = _norm(row.get(mat_col, ""))
+            if not materia or materia.lower() in ("nan", ""):
+                continue
+            semestre_raw = row.get(sem_col, "") if sem_col else ""
+            try:
+                semestre = int(float(semestre_raw)) if semestre_raw and semestre_raw not in ("nan", "") else None
+            except (ValueError, TypeError):
+                semestre = None
+            all_rows.append(("CPEL", carrera, semestre, "", materia, None))
+
+    return all_rows
 
 
 async def importar_historial_gnd_rows(rows: list, carrera_map: dict) -> dict:
@@ -266,10 +423,15 @@ async def importar_historial_gnd(file_bytes: bytes, filename: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _parsear_mallas_sync(file_bytes: bytes, filename: str) -> list:
-    """Parse mallas Excel synchronously. Returns list of row tuples."""
+    """Parse mallas Excel synchronously. Returns list of row tuples.
+    Auto-detects GND vs CPEL by sheet names."""
     buf = io.BytesIO(file_bytes)
     xl = pd.ExcelFile(buf)
     all_rows: list[tuple] = []
+
+    # CPEL mallas
+    if any(s in xl.sheet_names for s in CPEL_MALLA_SHEETS):
+        all_rows.extend(_parsear_mallas_cpel_sync(file_bytes))
 
     for sheet_key, sheet_name in MALLA_SHEETS.items():
         if sheet_name not in xl.sheet_names:
