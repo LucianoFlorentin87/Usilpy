@@ -40,6 +40,50 @@ CPEL_MALLA_SHEETS = {
     "malla MKT":  "Marketing y Gestión Comercial",
 }
 
+# Correcciones de typos conocidos en nombres de materias CPEL
+_CPEL_MATERIA_FIXES: dict[str, str] = {
+    "administracion estategica":                    "Administración Estratégica",
+    "administracion financiera":                    "Administración Financiera",
+    "administracion publica":                       "Administración Pública",
+    "administracion de recursos humanos":           "Administración de Recursos Humanos",
+    "administracion  i":                            "Administración I",
+    "auditoría de gestion administrativa":          "Auditoría de Gestión Administrativa",
+    "formulacion y evaluacion de proyecto":         "Formulación y Evaluación de Proyectos de Inversión",
+    "investigacion y analisis de mercado ii":       "Investigación y Análisis de Mercado II",
+    "investigacion y analisis de mercado i":        "Investigación y Análisis de Mercado I",
+    "metodologia de la investigacion":              "Metodología de la Investigación",
+    "logistica":                                    "Logística",
+    "negociacion":                                  "Negociación",
+    "negociacion en negocios internacionales":      "Negociación en Negocios Internacionales",
+    "politica de precio":                           "Política de Precio",
+    "politica y estrategia de empresas":            "Política y Estrategia de Empresas",
+    "organizacion de sistemas y metodos":           "Organización de Sistemas y Métodos",
+    "matematica i":                                 "Matemática I",
+    "matematica ii":                                "Matemática II",
+    "matematica financiera":                        "Matemática Financiera",
+    "ingles i":                                     "Inglés I",
+    "ingles ii":                                    "Inglés II",
+    "ingles iii":                                   "Inglés III",
+    "ingles iv":                                    "Inglés IV",
+    "direccion y planeamiento":                     "Dirección y Planeamiento",
+    "etica":                                        "Ética",
+    "pymes y empresas":                             "Pymes y Empresas Familiares",
+    "publicidad y promocion":                       "Publicidad y Promoción",
+    "estrategia de distribucion":                   "Estrategia de Distribución",
+    "comportamiento organizacional del marketing":  "Comportamiento Organizacional",
+    "investigacion y analisis de mercado internacionales": "Investigación y Análisis de Mercados Internacionales",
+    "markenting":                                   "Marketing",
+    "administración  i":                            "Administración I",
+}
+
+
+def _fix_materia(name: str) -> str:
+    """Apply known typo corrections to a materia name."""
+    key = unicodedata.normalize("NFKD", name.strip().lower())
+    key = "".join(c for c in key if not unicodedata.combining(c))
+    return _CPEL_MATERIA_FIXES.get(key, name.strip())
+
+
 # Normaliza los distintos nombres de carrera que aparecen en las planillas CPEL
 def _norm_carrera_cpel(raw: str) -> str:
     s = raw.strip().lower()
@@ -239,7 +283,7 @@ def _parsear_historial_cpel_sync(file_bytes: bytes) -> list[tuple]:
             nota_txt, nota_num, aprobado = _parse_nota(nota_raw)
             docente = _norm(row.get(col_map["docente"] or "", "")) if col_map["docente"] else ""
 
-            all_rows.append((cedula, nombre, carrera, "CPEL", codigo, materia, ciclo,
+            all_rows.append((cedula, nombre, carrera, "CPEL", codigo, _fix_materia(materia), ciclo,
                              nota_txt, nota_num, aprobado, periodo, docente))
 
     return all_rows
@@ -285,7 +329,7 @@ def _parsear_mallas_cpel_sync(file_bytes: bytes) -> list[tuple]:
                 semestre = int(float(semestre_raw)) if semestre_raw and semestre_raw not in ("nan", "") else None
             except (ValueError, TypeError):
                 semestre = None
-            all_rows.append(("CPEL", carrera, semestre, "", materia, None))
+            all_rows.append(("CPEL", carrera, semestre, "", _fix_materia(materia), None))
 
     return all_rows
 
