@@ -764,13 +764,57 @@ async def estado_inscripcion(cedula: str) -> dict:
     return {"cedula": cedula, "carrera": carrera, "programa": programa, "materias": materias}
 
 
-async def comparar_mallas_historial() -> dict:
-    """Compara nombres de materias entre correlativas (malla) e historial_academico.
-    Devuelve materias del historial que no tienen correspondencia exacta en la malla,
-    junto con la sugerencia de corrección si existe una coincidencia fuzzy."""
+import re as _re
+_ROMAN_SUFFIX = _re.compile(r'\b(I{1,3}|IV|VI{0,3}|IX|X{1,3}|\d+)$')
+
+
+def _materia_suffix(name: str) -> str:
+    """Extrae el sufijo numérico/romano final de un nombre de materia, o '' si no tiene."""
+    m = _ROMAN_SUFFIX.search(name.strip())
+    return m.group(0).upper() if m else ""
+
+
+def _strip_accents(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in s if not unicodedata.combining(c)).lower()
+
+
+def _safe_match(source: str, candidates: set[str]) -> str | None:
+    """Devuelve el nombre canónico que corresponde a source, o None si no hay match seguro.
+
+    Reglas (en orden):
+    1. Exacto → retorna tal cual
+    2. Case-insensitive exacto → retorna canónico
+    3. Sin acentos + case-insensitive exacto → retorna canónico
+    4. Fuzzy >= 0.85 SOLO si el sufijo numérico/romano es idéntico (evita I↔II, etc.)
+    """
     import difflib
 
-    # Nombres canónicos de la malla por (programa, carrera)
+    # 1. Exacto
+    if source in candidates:
+        return source
+
+    # 2. Case-insensitive
+    lower_map = {c.lower(): c for c in candidates}
+    if source.lower() in lower_map:
+        return lower_map[source.lower()]
+
+    # 3. Sin acentos
+    stripped_map = {_strip_accents(c): c for c in candidates}
+    if _strip_accents(source) in stripped_map:
+        return stripped_map[_strip_accents(source)]
+
+    # 4. Fuzzy — solo si el sufijo numérico coincide exactamente
+    src_suffix = _materia_suffix(source)
+    safe_candidates = {c for c in candidates if _materia_suffix(c) == src_suffix}
+    if not safe_candidates:
+        return None
+    matches = difflib.get_close_matches(source, safe_candidates, n=1, cutoff=0.85)
+    return matches[0] if matches else None
+
+
+async def comparar_mallas_historial() -> dict:
+    """Compara nombres de materias entre correlativas (malla) e historial_academico."""
     malla_rows = await db.fetch(
         "SELECT DISTINCT programa, carrera, materia FROM correlativas ORDER BY programa, carrera, materia"
     )
@@ -780,7 +824,6 @@ async def comparar_mallas_historial() -> dict:
         malla_map.setdefault(key, set())
         malla_map[key].add(r["materia"].strip())
 
-    # Nombres distintos en historial por (programa, carrera)
     hist_rows = await db.fetch(
         "SELECT DISTINCT programa, carrera, materia FROM historial_academico ORDER BY programa, carrera, materia"
     )
@@ -790,32 +833,29 @@ async def comparar_mallas_historial() -> dict:
         key = (r["programa"], r["carrera"])
         materia_hist = r["materia"].strip()
         canónicos = malla_map.get(key, set())
-        if not canónicos:
+        if not canónicos or materia_hist in canónicos:
             continue
-        # Coincidencia exacta → OK
-        if materia_hist in canónicos:
-            continue
-        # Coincidencia case-insensitive → OK
-        canon_lower = {m.lower(): m for m in canónicos}
-        if materia_hist.lower() in canon_lower:
-            continue
-        # Sin coincidencia exacta: buscar la más cercana
-        matches = difflib.get_close_matches(materia_hist, canónicos, n=1, cutoff=0.6)
-        mismatches.append({
-            "programa": r["programa"],
-            "carrera": r["carrera"],
-            "en_historial": materia_hist,
-            "sugerencia": matches[0] if matches else None,
-        })
+        sugerencia = _safe_match(materia_hist, canónicos)
+        if sugerencia and sugerencia != materia_hist:
+            mismatches.append({
+                "programa": r["programa"],
+                "carrera": r["carrera"],
+                "en_historial": materia_hist,
+                "sugerencia": sugerencia,
+            })
+        elif not sugerencia:
+            mismatches.append({
+                "programa": r["programa"],
+                "carrera": r["carrera"],
+                "en_historial": materia_hist,
+                "sugerencia": None,
+            })
 
     return {"total": len(mismatches), "mismatches": mismatches}
 
 
 async def reparar_nombres_historial() -> dict:
-    """Actualiza en historial_academico los nombres de materias que no coinciden
-    exactamente con la malla, usando la coincidencia fuzzy >= 0.6 como sugerencia."""
-    import difflib
-
+    """Actualiza en historial_academico los nombres que tienen match seguro con la malla."""
     malla_rows = await db.fetch(
         "SELECT DISTINCT programa, carrera, materia FROM correlativas"
     )
@@ -834,18 +874,11 @@ async def reparar_nombres_historial() -> dict:
         key = (r["programa"], r["carrera"])
         materia_hist = r["materia"].strip()
         canónicos = malla_map.get(key, set())
-        if not canónicos:
+        if not canónicos or materia_hist in canónicos:
             continue
-        if materia_hist in canónicos:
-            continue
-        canon_lower = {m.lower(): m for m in canónicos}
-        if materia_hist.lower() in canon_lower:
-            # Corregir capitalización
-            updates.append((canon_lower[materia_hist.lower()], r["programa"], r["carrera"], materia_hist))
-            continue
-        matches = difflib.get_close_matches(materia_hist, canónicos, n=1, cutoff=0.75)
-        if matches:
-            updates.append((matches[0], r["programa"], r["carrera"], materia_hist))
+        correcto = _safe_match(materia_hist, canónicos)
+        if correcto and correcto != materia_hist:
+            updates.append((correcto, r["programa"], r["carrera"], materia_hist))
 
     if not updates:
         return {"actualizados": 0, "detalle": []}
