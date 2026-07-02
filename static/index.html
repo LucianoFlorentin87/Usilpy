@@ -3010,20 +3010,31 @@ function portalNuevoAlumno() {
   portalCargarMaterias();
 }
 
-function portalCargarMaterias() {
+async function portalCargarMaterias() {
   const lista = document.getElementById('pf-materias-lista');
-  const carrera = document.getElementById('pf-carrera')?.value || '';
-  if (!carrera || !MALLAS[carrera]) {
-    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná una carrera para ver las materias disponibles</p>';
+  const carreraEl = document.getElementById('pf-carrera');
+  const programaEl = document.getElementById('pf-programa');
+  const carreraVal = carreraEl?.value || '';
+  const programaVal = programaEl?.value || '';
+  if (!carreraVal || !programaVal) {
+    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná un programa y carrera para ver las materias disponibles</p>';
     return;
   }
-  // Construye lista plana con id sintético = nombre
-  const malla = MALLAS[carrera];
-  _portalMaterias = [];
-  for (const [sem, materias] of Object.entries(malla.semestres)) {
-    for (const m of materias) {
-      _portalMaterias.push({ id: m, name: m, semestre: sem });
-    }
+  // Buscar la carrera label desde el select (nombre legible)
+  lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Cargando materias…</p>';
+  try {
+    // Obtener carrera canónica: el value del select es el key, necesitamos el label
+    const selOpt = [...(carreraEl?.options || [])].find(o => o.value === carreraVal);
+    const carreraNombre = selOpt?.text || carreraVal;
+    const data = await apiFetch(`/api/academico/materias?programa=${encodeURIComponent(programaVal)}&carrera=${encodeURIComponent(carreraNombre)}`);
+    _portalMaterias = (data || []).map(m => ({
+      id: m.codigo || m.materia,
+      name: m.materia,
+      semestre: m.semestre ? `Ciclo ${m.semestre}` : 'Sin semestre',
+    }));
+  } catch(e) {
+    lista.innerHTML = `<p style="color:var(--error);font-size:.82rem;padding:12px;">${e.message}</p>`;
+    return;
   }
   document.getElementById('pf-materia-buscar').value = '';
   portalFiltrarMaterias();
@@ -3032,20 +3043,27 @@ function portalCargarMaterias() {
 function portalFiltrarMaterias() {
   const q = (document.getElementById('pf-materia-buscar').value || '').toLowerCase();
   const lista = document.getElementById('pf-materias-lista');
-  const carrera = document.getElementById('pf-carrera')?.value || '';
-  if (!carrera || !MALLAS[carrera]) {
-    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná una carrera primero</p>';
+  if (!_portalMaterias.length) {
+    lista.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:16px 0;">Seleccioná un programa y carrera primero</p>';
     return;
   }
-  const malla = MALLAS[carrera];
   const tieneEstado = Object.keys(_portalEstadoMaterias).length > 0;
+
+  // Agrupar por semestre
+  const grupos = {};
+  for (const m of _portalMaterias) {
+    if (q && !m.name.toLowerCase().includes(q)) continue;
+    const sem = m.semestre || 'Sin semestre';
+    if (!grupos[sem]) grupos[sem] = [];
+    grupos[sem].push(m);
+  }
+
   let html = '';
-  for (const [sem, materias] of Object.entries(malla.semestres)) {
-    const filtradas = q ? materias.filter(m => m.toLowerCase().includes(q)) : materias;
-    if (!filtradas.length) continue;
-    const items = filtradas.map(m => {
-      const sel = _portalMateriasSeleccionadas.some(x => x.id === m);
-      const est = tieneEstado ? (_portalEstadoMaterias[m.toLowerCase().trim()] || {estado:'puede_inscribir'}) : null;
+  for (const [sem, items] of Object.entries(grupos)) {
+    html += `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;padding:8px 4px 3px;text-transform:uppercase;">${sem}</div>`;
+    for (const m of items) {
+      const sel = _portalMateriasSeleccionadas.some(x => x.id === m.id);
+      const est = tieneEstado ? (_portalEstadoMaterias[m.name.toLowerCase().trim()] || {estado:'puede_inscribir'}) : null;
       const bloqueada = est && est.estado === 'bloqueada';
       const aprobada  = est && est.estado === 'aprobada';
       const cursando  = est && est.estado === 'cursando';
@@ -3067,16 +3085,14 @@ function portalFiltrarMaterias() {
       }
 
       const deshabilitada = bloqueada || aprobada || cursando;
-      const onclick = deshabilitada ? '' : `onclick="portalToggleMateria('${m.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}','${sem.replace(/'/g,"\\'")}')"`;
-      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;${deshabilitada?'cursor:default;opacity:.7;':'cursor:pointer;'}${estilo}"
+      const onclick = deshabilitada ? '' : `onclick="portalToggleMateria('${m.id.replace(/'/g,"\\'")}','${m.name.replace(/'/g,"\\'")}','${sem.replace(/'/g,"\\'")}')"`;
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;${deshabilitada?'cursor:default;opacity:.7;':'cursor:pointer;'}${estilo}"
         ${onclick} title="${titulo}">
         <span style="font-size:1rem;width:18px;text-align:center;">${icono}</span>
-        <span style="font-size:.83rem;flex:1;">${m}</span>
+        <span style="font-size:.83rem;flex:1;">${m.name}</span>
         ${titulo ? `<span style="font-size:.72rem;color:#94a3b8;">${titulo}</span>` : ''}
       </div>`;
-    }).join('');
-    html += `<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em;padding:8px 4px 3px;text-transform:uppercase;">${sem}</div>`;
-    html += items;
+    }
   }
   if (!html) html = '<p style="text-align:center;color:var(--text-muted);font-size:.82rem;padding:12px 0;">Sin resultados</p>';
   lista.innerHTML = html;

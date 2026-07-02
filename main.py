@@ -1497,6 +1497,13 @@ async def historial_alumno(cedula: str, _user=Depends(get_current_user)):
     return await _ac.historial_alumno(cedula)
 
 
+@app.get("/api/academico/materias")
+async def get_materias(programa: str, carrera: str, _user=Depends(get_current_user)):
+    """Lista de materias únicas de una carrera/programa desde historial_academico."""
+    import academic_service as _ac
+    return await _ac.get_materias_por_carrera(programa, carrera)
+
+
 @app.get("/api/academico/alumno/{cedula}/inscripcion")
 async def estado_inscripcion(cedula: str, _user=Depends(get_current_user)):
     """Estado de inscripción: qué materias puede/no puede inscribir según correlativas."""
