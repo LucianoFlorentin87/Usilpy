@@ -515,15 +515,11 @@
 
         <!-- Selección de materias por programa -->
         <div style="margin-bottom:8px;font-size:.8rem;font-weight:600;color:var(--text);">Materias a inscribir</div>
-        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
-          <input id="pf-materia-buscar" type="text" placeholder="Buscar materia…" style="flex:1;min-width:180px;"
+        <div style="margin-bottom:8px;">
+          <input id="pf-materia-buscar" type="text" placeholder="Buscar materia…" style="width:100%;box-sizing:border-box;"
             oninput="portalFiltrarMaterias()" />
-          <button type="button" class="btn" onclick="portalToggleExterno()" style="font-size:.8rem;padding:6px 12px;white-space:nowrap;">
-            ➕ Agregar de otro programa
-          </button>
         </div>
 
-        <!-- Panel materias externas — justo bajo el buscador -->
         <!-- Panel materias externas -->
         <div id="pf-externo-panel" style="display:none;margin-bottom:10px;border:1px dashed #f59e0b;border-radius:8px;padding:12px;background:#fffbeb;">
           <div style="font-size:.8rem;font-weight:700;color:#92400e;margin-bottom:8px;">📌 Materia de otro programa (por falta de cupo)</div>
@@ -543,6 +539,12 @@
           <div id="pf-ext-lista" style="max-height:180px;overflow-y:auto;border:1px solid #fde68a;border-radius:6px;padding:6px;background:#fff;">
             <p style="color:#92400e;font-size:.82rem;text-align:center;padding:8px 0;">Seleccioná programa y carrera</p>
           </div>
+        </div>
+
+        <div style="margin-bottom:8px;text-align:right;">
+          <button type="button" class="btn btn-outline" onclick="portalToggleExterno()" style="font-size:.8rem;padding:5px 12px;">
+            ➕ Agregar de otro programa
+          </button>
         </div>
 
         <div id="pf-materias-lista" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:#fafbfd;">
