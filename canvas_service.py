@@ -393,3 +393,132 @@ async def get_roll_call_report(course_id: int | str) -> dict:
                     url = part.split(";")[0].strip().strip("<>")
         alumnos.sort(key=lambda a: a["nombre"])
         return {"disponible": True, "alumnos": alumnos}
+
+# ── Roll Call: detalle por fecha (via LTI launch) ─────────────────────────────
+
+async def _rollcall_login(client: "httpx.AsyncClient", course_id: int | str) -> str | None:
+    """Realiza el launch LTI de la herramienta Attendance y deja la sesión en el
+    cookie-jar del client. Retorna la URL base de Roll Call o None si falla."""
+    import html as _html
+    import re as _re
+
+    # 1. Encontrar la herramienta Attendance en el curso (o cuenta padre)
+    tool_id = None
+    resp = await client.get(
+        f"{_base()}/api/v1/courses/{course_id}/external_tools",
+        headers=_headers(),
+        params={"include_parents": True, "per_page": 100},
+    )
+    if resp.status_code == 200:
+        for t in resp.json():
+            name = (t.get("name") or "").lower()
+            url = (t.get("url") or "") + (t.get("domain") or "")
+            if "roll call" in name or "attendance" in name or "rollcall" in url:
+                tool_id = t.get("id")
+                break
+    if not tool_id:
+        return None
+
+    # 2. Sessionless launch
+    resp = await client.get(
+        f"{_base()}/api/v1/courses/{course_id}/external_tools/sessionless_launch",
+        headers=_headers(),
+        params={"id": tool_id},
+    )
+    if resp.status_code != 200:
+        return None
+    launch_url = resp.json().get("url")
+    if not launch_url:
+        return None
+
+    # 3. Seguir el launch: Canvas devuelve un form LTI auto-submit hacia Roll Call
+    r = await client.get(launch_url)
+    m = _re.search(r'<form[^>]+action="([^"]+)"', r.text)
+    if not m:
+        return None
+    action = _html.unescape(m.group(1))
+    fields = {
+        _html.unescape(mm.group(1)): _html.unescape(mm.group(2))
+        for mm in _re.finditer(r'<input[^>]+name="([^"]+)"[^>]*value="([^"]*)"', r.text)
+    }
+    r2 = await client.post(action, data=fields)
+    if r2.status_code >= 400:
+        return None
+    from urllib.parse import urlparse
+    p = urlparse(action)
+    return f"{p.scheme}://{p.netloc}"
+
+
+async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> dict:
+    """Detalle día-por-día de asistencia desde Roll Call.
+
+    Retorna {"disponible": bool, "registros": [{"student_id", "fecha", "estado"}]}
+    donde estado ∈ {"present", "absent", "late"}.
+    """
+    import asyncio
+    from datetime import date, timedelta, datetime as _dt
+
+    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+        base = await _rollcall_login(client, course_id)
+        if not base:
+            return {"disponible": False, "registros": []}
+
+        # Secciones del curso
+        resp = await client.get(
+            f"{_base()}/api/v1/courses/{course_id}/sections",
+            headers=_headers(), params={"per_page": 100},
+        )
+        if resp.status_code != 200:
+            return {"disponible": False, "registros": []}
+        section_ids = [s["id"] for s in resp.json()]
+
+        # Rango de fechas: desde inicio del curso (si se conoce) hasta hoy
+        start = None
+        rc = await client.get(f"{_base()}/api/v1/courses/{course_id}", headers=_headers(), params={"include[]": "term"})
+        if rc.status_code == 200:
+            cjson = rc.json()
+            for raw in (cjson.get("start_at"), (cjson.get("term") or {}).get("start_at")):
+                if raw:
+                    try:
+                        start = _dt.fromisoformat(raw.replace("Z", "+00:00")).date()
+                        break
+                    except Exception:
+                        pass
+        today = date.today()
+        if not start or (today - start).days > dias_atras:
+            start = today - timedelta(days=dias_atras)
+
+        fechas = [start + timedelta(days=i) for i in range((today - start).days + 1)]
+        registros = []
+        sem = asyncio.Semaphore(10)
+
+        async def _fetch(sid, f):
+            async with sem:
+                try:
+                    r = await client.get(
+                        f"{base}/statuses.json",
+                        params={"section_id": sid, "class_date": f.isoformat()},
+                    )
+                    if r.status_code != 200:
+                        return
+                    for st in r.json():
+                        est = st.get("attendance")
+                        if est:
+                            registros.append({
+                                "student_id": st.get("student_id"),
+                                "fecha": f.isoformat(),
+                                "estado": est,
+                            })
+                except Exception:
+                    pass
+
+        await asyncio.gather(*[_fetch(sid, f) for sid in section_ids for f in fechas])
+        # dedup (alumno puede estar en varias secciones)
+        vistos = set()
+        unicos = []
+        for r_ in registros:
+            k = (r_["student_id"], r_["fecha"])
+            if k not in vistos:
+                vistos.add(k)
+                unicos.append(r_)
+        return {"disponible": True, "registros": unicos}

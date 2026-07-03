@@ -362,9 +362,23 @@ async def reporte_asistencia(course_id: int, umbral: float = 70, _: dict = Depen
 async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: str = "", _: dict = Depends(_require_admin)):
     """Descarga el reporte de asistencia como .xlsx con formato."""
     rep = await reporte_asistencia(course_id, umbral, _)
+    try:
+        detalle = await canvas_service.get_roll_call_detail(course_id)
+    except Exception as exc:
+        logger.warning("Roll Call detalle no disponible curso %s: %s", course_id, exc)
+        detalle = {"disponible": False, "registros": []}
+
     from io import BytesIO
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    # Índices del detalle: por alumno y fecha
+    por_alumno: dict = {}
+    fechas_set = set()
+    for reg in detalle["registros"]:
+        por_alumno.setdefault(reg["student_id"], {})[reg["fecha"]] = reg["estado"]
+        fechas_set.add(reg["fecha"])
+    fechas = sorted(fechas_set)
 
     wb = Workbook()
     ws = wb.active
@@ -389,6 +403,8 @@ async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: st
                 f"No habilitados: {rep['no_habilitados']}  ·  Sin registro: {rep['sin_registro']}")
 
     headers = ["#", "Alumno", "Cédula / Login", "% Asistencia", "Habilitado"]
+    if fechas:
+        headers += ["Presentes", "Ausentes", "Tardanzas"]
     ws.append([])
     ws.append(headers)
     hrow = ws.max_row
@@ -401,11 +417,19 @@ async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: st
 
     for i, a in enumerate(rep["alumnos"], 1):
         pct = a["porcentaje"]
-        ws.append([
+        fila = [
             i, a["nombre"], a["sis_user_id"] or a["login_id"] or "—",
             pct if pct is not None else "Sin registro",
             "SÍ" if a["habilitado"] else ("—" if pct is None else "NO"),
-        ])
+        ]
+        if fechas:
+            estados = por_alumno.get(a["user_id"], {})
+            fila += [
+                sum(1 for e in estados.values() if e == "present"),
+                sum(1 for e in estados.values() if e == "absent"),
+                sum(1 for e in estados.values() if e == "late"),
+            ]
+        ws.append(fila)
         r = ws.max_row
         for col in range(1, len(headers) + 1):
             ws.cell(row=r, column=col).border = thin
@@ -426,10 +450,61 @@ async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: st
             estado.font = bad_font
             pct_cell.font = Font(color="B91C1C")
 
-    widths = {"A": 6, "B": 42, "C": 18, "D": 15, "E": 14}
+    widths = {"A": 6, "B": 42, "C": 18, "D": 15, "E": 14, "F": 11, "G": 11, "H": 11}
     for col, w in widths.items():
         ws.column_dimensions[col].width = w
     ws.freeze_panes = f"A{hrow + 1}"
+
+    # ── Hoja 2: detalle día por día ──
+    if fechas:
+        from openpyxl.utils import get_column_letter
+        ws2 = wb.create_sheet("Detalle por fecha")
+        ws2["A1"] = "Detalle de asistencia por clase — P = Presente · A = Ausente · T = Tardanza"
+        ws2["A1"].font = Font(bold=True)
+
+        det_headers = ["Alumno", "Cédula"] + [f[8:10] + "/" + f[5:7] for f in fechas]
+        ws2.append([])
+        ws2.append(det_headers)
+        h2 = ws2.max_row
+        for col in range(1, len(det_headers) + 1):
+            c = ws2.cell(row=h2, column=col)
+            c.fill = header_fill
+            c.font = header_font
+            c.alignment = center
+            c.border = thin
+
+        p_fill = PatternFill("solid", fgColor="DCFCE7")
+        a_fill = PatternFill("solid", fgColor="FEE2E2")
+        t_fill = PatternFill("solid", fgColor="FEF9C3")
+        marcas = {"present": ("P", p_fill, Font(bold=True, color="15803D")),
+                  "absent":  ("A", a_fill, Font(bold=True, color="B91C1C")),
+                  "late":    ("T", t_fill, Font(bold=True, color="A16207"))}
+
+        for a in rep["alumnos"]:
+            estados = por_alumno.get(a["user_id"], {})
+            fila = [a["nombre"], a["sis_user_id"] or a["login_id"] or "—"]
+            fila += [marcas.get(estados.get(f), ("", None, None))[0] for f in fechas]
+            ws2.append(fila)
+            r = ws2.max_row
+            for j, f in enumerate(fechas, start=3):
+                cell = ws2.cell(row=r, column=j)
+                cell.alignment = center
+                cell.border = thin
+                _, fill, font = marcas.get(estados.get(f), ("", None, None))
+                if fill:
+                    cell.fill = fill
+                    cell.font = font
+            ws2.cell(row=r, column=1).border = thin
+            ws2.cell(row=r, column=2).border = thin
+
+        ws2.column_dimensions["A"].width = 42
+        ws2.column_dimensions["B"].width = 14
+        for j in range(3, len(det_headers) + 1):
+            ws2.column_dimensions[get_column_letter(j)].width = 7
+        ws2.freeze_panes = "C" + str(h2 + 1)
+    else:
+        ws_nota = wb.create_sheet("Detalle por fecha")
+        ws_nota["A1"] = "El detalle día-por-día no está disponible para este curso (Roll Call no accesible o sin registros)."
 
     buf = BytesIO()
     wb.save(buf)
