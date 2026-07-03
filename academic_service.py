@@ -773,6 +773,8 @@ async def estado_inscripcion(cedula: str) -> dict:
     aprobadas = {_norm(r["materia"]).lower() for r in historial if r["aprobado"] is True}
     # Set de materias cursadas/en curso
     en_curso  = {_norm(r["materia"]).lower() for r in historial if r["aprobado"] is None and r["nota"]}
+    # Set de materias reprobadas (cursó y no aprobó; puede recursar)
+    reprobadas = {_norm(r["materia"]).lower() for r in historial if r["aprobado"] is False} - aprobadas
 
     # Malla completa de la carrera — desde historial, no desde correlativas
     malla = await get_materias_por_carrera(programa, carrera)
@@ -810,7 +812,12 @@ async def estado_inscripcion(cedula: str) -> dict:
             faltantes = []
         else:
             faltantes = [p for p in prereqs if _norm(p).lower() not in aprobadas]
-            estado = "puede_inscribir" if not faltantes else "bloqueada"
+            if faltantes:
+                estado = "bloqueada"
+            elif key in reprobadas:
+                estado = "reprobada"  # puede recursar
+            else:
+                estado = "puede_inscribir"
 
         materias.append({
             "codigo":    m["codigo"],

@@ -3117,11 +3117,15 @@ function portalFiltrarMaterias() {
       const bloqueada = est && est.estado === 'bloqueada';
       const aprobada  = est && est.estado === 'aprobada';
       const cursando  = est && est.estado === 'cursando';
+      const reprobada = est && est.estado === 'reprobada';
 
       let icono, estilo, titulo = '';
       if (aprobada) {
         icono = '✓'; estilo = 'color:#16a34a;background:#f0fdf4;';
         titulo = 'Ya aprobada';
+      } else if (reprobada) {
+        icono = sel ? '☑' : '🔁'; estilo = sel ? 'background:#eff6ff;border-left:3px solid #3b82f6;' : 'color:#b45309;background:#fffbeb;';
+        titulo = 'Reprobada — puede recursar';
       } else if (cursando) {
         icono = '📖'; estilo = 'color:#2563eb;background:#eff6ff;';
         titulo = 'Cursando actualmente';
@@ -4286,6 +4290,7 @@ async function verInscripcionAlumno({cedula, nombre, carrera}) {
 
     const grupos = {
       puede_inscribir: materias.filter(m => m.estado === 'puede_inscribir'),
+      reprobada:       materias.filter(m => m.estado === 'reprobada'),
       aprobada:        materias.filter(m => m.estado === 'aprobada'),
       cursando:        materias.filter(m => m.estado === 'cursando'),
       bloqueada:       materias.filter(m => m.estado === 'bloqueada'),
@@ -4324,6 +4329,7 @@ async function verInscripcionAlumno({cedula, nombre, carrera}) {
         <span style="color:#64748b;font-size:.85rem;margin-left:8px;">${_esc(carrera)} · CI: ${cedula}</span>
       </div>
       ${renderSeccion('Puede inscribirse', grupos.puede_inscribir, '#d1fae5', '#065f46', '✅')}
+      ${renderSeccion('Reprobadas — puede recursar', grupos.reprobada, '#fef3c7', '#92400e', '🔁')}
       ${renderSeccion('Cursando', grupos.cursando, '#dbeafe', '#1e40af', '📖')}
       ${renderSeccion('Bloqueada — correlativas pendientes', grupos.bloqueada, '#fee2e2', '#991b1b', '🔒', true)}
       ${renderSeccion('Aprobadas', grupos.aprobada, '#f1f5f9', '#475569', '✓')}`;
