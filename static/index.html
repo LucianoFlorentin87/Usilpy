@@ -1248,6 +1248,7 @@
           </div>
           <button class="btn btn-primary" onclick="asisGenerarReporte()">📊 Generar reporte</button>
           <button class="btn" id="btn-exportar-asis" onclick="asisExportarExcel()" style="display:none;">⬇ Descargar Excel</button>
+          <button class="btn btn-secondary" onclick="asisDebug()" title="Diagnóstico del detalle por fecha">🔧</button>
         </div>
 
         <div id="asis-status"></div>
@@ -4834,6 +4835,19 @@ async function asisGenerarReporte() {
   } catch(e) {
     st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)}</span>`;
     _portalLog(`Error en reporte de asistencia: ${e.message}`, 'error');
+  }
+}
+
+async function asisDebug() {
+  const sel = document.getElementById('asis-curso-select');
+  if (!sel.value) { alert('Seleccioná un curso'); return; }
+  const st = document.getElementById('asis-status');
+  st.innerHTML = '<span style="color:#64748b;">⏳ Ejecutando diagnóstico Roll Call...</span>';
+  try {
+    const d = await apiFetch(`/api/canvas/asistencia/${sel.value}/debug`);
+    st.innerHTML = `<pre style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:.75rem;white-space:pre-wrap;word-break:break-all;">${_esc(JSON.stringify(d, null, 2))}</pre>`;
+  } catch(e) {
+    st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)}</span>`;
   }
 }
 

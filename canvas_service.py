@@ -396,11 +396,16 @@ async def get_roll_call_report(course_id: int | str) -> dict:
 
 # ── Roll Call: detalle por fecha (via LTI launch) ─────────────────────────────
 
-async def _rollcall_login(client: "httpx.AsyncClient", course_id: int | str) -> str | None:
+async def _rollcall_login(client: "httpx.AsyncClient", course_id: int | str, debug: dict | None = None) -> str | None:
     """Realiza el launch LTI de la herramienta Attendance y deja la sesión en el
-    cookie-jar del client. Retorna la URL base de Roll Call o None si falla."""
+    cookie-jar del client. Retorna la URL base de Roll Call o None si falla.
+    Si se pasa `debug`, se registra el paso en el que falló."""
     import html as _html
     import re as _re
+
+    def _dbg(k, v):
+        if debug is not None:
+            debug[k] = v
 
     # 1. Encontrar la herramienta Attendance en el curso (o cuenta padre)
     tool_id = None
@@ -409,15 +414,20 @@ async def _rollcall_login(client: "httpx.AsyncClient", course_id: int | str) -> 
         headers=_headers(),
         params={"include_parents": True, "per_page": 100},
     )
+    _dbg("external_tools_status", resp.status_code)
     if resp.status_code == 200:
-        for t in resp.json():
+        tools = resp.json()
+        _dbg("tools", [{"id": t.get("id"), "name": t.get("name"), "domain": t.get("domain")} for t in tools])
+        for t in tools:
             name = (t.get("name") or "").lower()
             url = (t.get("url") or "") + (t.get("domain") or "")
             if "roll call" in name or "attendance" in name or "rollcall" in url:
                 tool_id = t.get("id")
                 break
     if not tool_id:
+        _dbg("fallo", "No se encontró la herramienta Attendance/Roll Call entre las external tools del curso")
         return None
+    _dbg("tool_id", tool_id)
 
     # 2. Sessionless launch
     resp = await client.get(
@@ -425,24 +435,33 @@ async def _rollcall_login(client: "httpx.AsyncClient", course_id: int | str) -> 
         headers=_headers(),
         params={"id": tool_id},
     )
+    _dbg("sessionless_status", resp.status_code)
     if resp.status_code != 200:
+        _dbg("fallo", f"sessionless_launch devolvió {resp.status_code}: {resp.text[:300]}")
         return None
     launch_url = resp.json().get("url")
     if not launch_url:
+        _dbg("fallo", "sessionless_launch sin URL")
         return None
 
     # 3. Seguir el launch: Canvas devuelve un form LTI auto-submit hacia Roll Call
     r = await client.get(launch_url)
+    _dbg("launch_page_status", r.status_code)
     m = _re.search(r'<form[^>]+action="([^"]+)"', r.text)
     if not m:
+        _dbg("fallo", f"La página de launch no contiene form LTI (status {r.status_code}): {r.text[:300]}")
         return None
     action = _html.unescape(m.group(1))
+    _dbg("form_action", action)
     fields = {
         _html.unescape(mm.group(1)): _html.unescape(mm.group(2))
         for mm in _re.finditer(r'<input[^>]+name="([^"]+)"[^>]*value="([^"]*)"', r.text)
     }
+    _dbg("form_fields_count", len(fields))
     r2 = await client.post(action, data=fields)
+    _dbg("lti_post_status", r2.status_code)
     if r2.status_code >= 400:
+        _dbg("fallo", f"POST LTI a Roll Call devolvió {r2.status_code}: {r2.text[:300]}")
         return None
     from urllib.parse import urlparse
     p = urlparse(action)
@@ -458,10 +477,11 @@ async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> d
     import asyncio
     from datetime import date, timedelta, datetime as _dt
 
+    debug: dict = {}
     async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
-        base = await _rollcall_login(client, course_id)
+        base = await _rollcall_login(client, course_id, debug)
         if not base:
-            return {"disponible": False, "registros": []}
+            return {"disponible": False, "registros": [], "debug": debug}
 
         # Secciones del curso
         resp = await client.get(
@@ -469,8 +489,15 @@ async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> d
             headers=_headers(), params={"per_page": 100},
         )
         if resp.status_code != 200:
-            return {"disponible": False, "registros": []}
+            debug["fallo"] = f"No se pudieron listar secciones: {resp.status_code}"
+            return {"disponible": False, "registros": [], "debug": debug}
         section_ids = [s["id"] for s in resp.json()]
+        debug["sections"] = section_ids
+
+        # Sonda: probar una consulta de statuses para detectar problemas de auth
+        probe = await client.get(f"{base}/statuses.json", params={"section_id": section_ids[0], "class_date": "2025-01-01"} if section_ids else {})
+        debug["probe_status"] = probe.status_code
+        debug["probe_body"] = probe.text[:300]
 
         # Rango de fechas: desde inicio del curso (si se conoce) hasta hoy
         start = None
@@ -521,4 +548,5 @@ async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> d
             if k not in vistos:
                 vistos.add(k)
                 unicos.append(r_)
-        return {"disponible": True, "registros": unicos}
+        debug["registros_total"] = len(unicos)
+        return {"disponible": True, "registros": unicos, "debug": debug}

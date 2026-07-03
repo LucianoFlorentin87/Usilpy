@@ -358,6 +358,17 @@ async def reporte_asistencia(course_id: int, umbral: float = 70, _: dict = Depen
     }
 
 
+@app.get("/api/canvas/asistencia/{course_id}/debug")
+async def reporte_asistencia_debug(course_id: int, _: dict = Depends(_require_admin)):
+    """Diagnóstico del acceso a Roll Call (detalle por fecha) para un curso."""
+    det = await canvas_service.get_roll_call_detail(course_id, dias_atras=30)
+    return {
+        "disponible": det["disponible"],
+        "registros": len(det.get("registros", [])),
+        "debug": det.get("debug", {}),
+    }
+
+
 @app.get("/api/canvas/asistencia/{course_id}/excel")
 async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: str = "", _: dict = Depends(_require_admin)):
     """Descarga el reporte de asistencia como .xlsx con formato."""
