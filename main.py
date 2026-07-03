@@ -1518,14 +1518,60 @@ async def buscar_alumno(q: str, _user=Depends(get_current_user)):
     return await _ac.buscar_alumno(q)
 
 
+@app.get("/api/admin/tablas-academicas")
+async def tablas_academicas(_user=Depends(_require_admin)):
+    """Lista las tablas de BD que contienen datos académicos para diagnóstico."""
+    rows = await db.fetch(
+        """SELECT table_name, pg_relation_size(quote_ident(table_name)::regclass) AS size_bytes
+           FROM information_schema.tables
+           WHERE table_schema = 'public'
+           ORDER BY table_name"""
+    )
+    result = {}
+    for r in rows:
+        tname = r["table_name"]
+        try:
+            cnt = await db.fetchval(f'SELECT COUNT(*) FROM "{tname}"')
+        except Exception:
+            cnt = -1
+        result[tname] = cnt
+    return result
+
+
 @app.post("/api/admin/limpiar-datos-academicos")
 async def limpiar_datos_academicos(_user=Depends(_require_admin)):
-    """Elimina TODOS los registros de historial_academico y correlativas. Irreversible."""
-    n_h = await db.fetchval("SELECT COUNT(*) FROM historial_academico")
-    n_c = await db.fetchval("SELECT COUNT(*) FROM correlativas")
-    await db.execute("DELETE FROM historial_academico")
-    await db.execute("DELETE FROM correlativas")
-    return {"eliminados_historial": n_h, "eliminados_correlativas": n_c}
+    """Elimina TODOS los registros de historial_academico (y alias) y correlativas."""
+    # Detectar el nombre real de la tabla de historial
+    candidate_tables = await db.fetch(
+        """SELECT table_name FROM information_schema.tables
+           WHERE table_schema = 'public'
+             AND (table_name ILIKE '%historial%' OR table_name ILIKE '%hist%rico%' OR table_name ILIKE '%academico%')"""
+    )
+    tnames = [r["table_name"] for r in candidate_tables]
+
+    n_h = 0
+    deleted_tables = []
+    for tname in tnames:
+        try:
+            cnt = await db.fetchval(f'SELECT COUNT(*) FROM "{tname}"')
+            await db.execute(f'DELETE FROM "{tname}"')
+            n_h += cnt
+            deleted_tables.append(tname)
+        except Exception as e:
+            pass  # tabla no accesible, ignorar
+
+    n_c = 0
+    try:
+        n_c = await db.fetchval("SELECT COUNT(*) FROM correlativas")
+        await db.execute("DELETE FROM correlativas")
+    except Exception:
+        pass
+
+    return {
+        "eliminados_historial": n_h,
+        "eliminados_correlativas": n_c,
+        "tablas_limpiadas": deleted_tables,
+    }
 
 
 @app.get("/api/admin/mallas/comparar")
