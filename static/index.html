@@ -1226,17 +1226,26 @@
         </p>
 
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
+          <div style="min-width:200px;">
+            <label style="font-size:.82rem;">Período</label>
+            <select id="asis-term-select" onchange="asisFiltrarCursos()" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
+              <option value="">Todos los períodos</option>
+            </select>
+          </div>
+          <div style="min-width:200px;">
+            <label style="font-size:.82rem;">Buscar curso</label>
+            <input type="text" id="asis-curso-buscar" oninput="asisFiltrarCursos()" placeholder="Ej: guarani" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
+          </div>
           <div style="flex:1;min-width:280px;">
-            <label style="font-size:.82rem;">Curso</label>
+            <label style="font-size:.82rem;">Curso <span id="asis-curso-count" style="color:#94a3b8;font-weight:400;"></span></label>
             <select id="asis-curso-select" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
-              <option value="">— Cargá los cursos primero —</option>
+              <option value="">— Cargando cursos… —</option>
             </select>
           </div>
           <div>
             <label style="font-size:.82rem;">% mínimo para examen</label>
             <input type="number" id="asis-umbral" value="70" min="0" max="100" style="width:110px;padding:8px;border:1px solid #ddd;border-radius:6px;">
           </div>
-          <button class="btn btn-secondary" onclick="asisCargarCursos()">↻ Cargar cursos</button>
           <button class="btn btn-primary" onclick="asisGenerarReporte()">📊 Generar reporte</button>
           <button class="btn" id="btn-exportar-asis" onclick="asisExportarExcel()" style="display:none;">⬇ Descargar Excel</button>
         </div>
@@ -1909,6 +1918,7 @@ function showPanel(id, el) {
   if (id === 'cron-config') cargarCronConfig();
   if (id === 'sync-panel') cargarSyncEstado();
   if (id === 'sync-alumnos') syncBuscarAlumnos();
+  if (id === 'panel-canvas-asistencia') asisInit();
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -4724,19 +4734,49 @@ function exportarCursosExcel() {
 
 // ── Reporte de asistencia (Roll Call) ─────────────────────────────────────────
 let _asisReporte = null;
+let _asisCursos = [];
+let _asisInicializado = false;
+
+async function asisInit() {
+  if (_asisInicializado) return;
+  _asisInicializado = true;
+  await asisCargarCursos();
+}
 
 async function asisCargarCursos() {
-  const sel = document.getElementById('asis-curso-select');
   const st = document.getElementById('asis-status');
-  st.innerHTML = '<span style="color:#64748b;">⏳ Cargando cursos desde Canvas...</span>';
+  st.innerHTML = '<span style="color:#64748b;">⏳ Cargando períodos y cursos desde Canvas...</span>';
   try {
-    const cursos = await apiFetch('/api/canvas/all-courses');
-    sel.innerHTML = '<option value="">— Seleccioná un curso —</option>' +
-      cursos.map(c => `<option value="${c.id}">${_esc(c.name)}${c.sis_course_id ? ' ('+_esc(c.sis_course_id)+')' : ''}</option>`).join('');
-    st.innerHTML = `<span style="color:#16a34a;">✓ ${cursos.length} cursos cargados.</span>`;
+    const [terms, cursos] = await Promise.all([
+      apiFetch('/api/canvas/terms'),
+      apiFetch('/api/canvas/all-courses'),
+    ]);
+    _asisCursos = cursos.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    const termSel = document.getElementById('asis-term-select');
+    termSel.innerHTML = '<option value="">Todos los períodos</option>' +
+      terms.map(t => `<option value="${t.id}">${_esc(t.name)}</option>`).join('');
+    asisFiltrarCursos();
+    st.innerHTML = `<span style="color:#16a34a;">✓ ${terms.length} períodos y ${cursos.length} cursos cargados.</span>`;
   } catch(e) {
-    st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)}</span>`;
+    _asisInicializado = false;
+    st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)} <button class="btn btn-secondary" style="padding:2px 10px;font-size:.78rem;" onclick="asisInit()">Reintentar</button></span>`;
   }
+}
+
+function asisFiltrarCursos() {
+  const termId = document.getElementById('asis-term-select').value;
+  const q = (document.getElementById('asis-curso-buscar').value || '').trim().toLowerCase();
+  const sel = document.getElementById('asis-curso-select');
+  const seleccionado = sel.value;
+  const filtrados = _asisCursos.filter(c =>
+    (!termId || String(c.enrollment_term_id) === termId) &&
+    (!q || (c.name||'').toLowerCase().includes(q) || (c.sis_course_id||'').toLowerCase().includes(q))
+  );
+  sel.innerHTML = '<option value="">— Seleccioná un curso —</option>' +
+    filtrados.map(c => `<option value="${c.id}">${_esc(c.name)}${c.term?.name ? ' · '+_esc(c.term.name) : ''}</option>`).join('');
+  if (filtrados.some(c => String(c.id) === seleccionado)) sel.value = seleccionado;
+  else if (filtrados.length === 1) sel.value = String(filtrados[0].id);
+  document.getElementById('asis-curso-count').textContent = `(${filtrados.length} de ${_asisCursos.length})`;
 }
 
 async function asisGenerarReporte() {
