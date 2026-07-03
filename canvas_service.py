@@ -463,9 +463,15 @@ async def _rollcall_login(client: "httpx.AsyncClient", course_id: int | str, deb
     if r2.status_code >= 400:
         _dbg("fallo", f"POST LTI a Roll Call devolvió {r2.status_code}: {r2.text[:300]}")
         return None
+    # Extraer CSRF token de la página de Roll Call (meta tag)
+    mcsrf = _re.search(r'name="csrf-token"\s+content="([^"]+)"', r2.text) or \
+            _re.search(r'content="([^"]+)"\s+name="csrf-token"', r2.text)
+    csrf = _html.unescape(mcsrf.group(1)) if mcsrf else None
+    _dbg("csrf_encontrado", bool(csrf))
+    _dbg("cookies", list(client.cookies.jar and {c.name for c in client.cookies.jar} or []))
     from urllib.parse import urlparse
     p = urlparse(action)
-    return f"{p.scheme}://{p.netloc}"
+    return {"base": f"{p.scheme}://{p.netloc}", "csrf": csrf}
 
 
 async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> dict:
@@ -478,10 +484,19 @@ async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> d
     from datetime import date, timedelta, datetime as _dt
 
     debug: dict = {}
-    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
-        base = await _rollcall_login(client, course_id, debug)
-        if not base:
+    _browser_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        "Accept": "text/html,application/json,application/xhtml+xml,*/*;q=0.8",
+        "Accept-Language": "es-PY,es;q=0.9,en;q=0.8",
+    }
+    async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers=_browser_headers) as client:
+        sesion = await _rollcall_login(client, course_id, debug)
+        if not sesion:
             return {"disponible": False, "registros": [], "debug": debug}
+        base = sesion["base"]
+        _rc_headers = {"Accept": "application/json", "X-Requested-With": "XMLHttpRequest", "Referer": base + "/"}
+        if sesion.get("csrf"):
+            _rc_headers["X-CSRF-Token"] = sesion["csrf"]
 
         # Secciones del curso
         resp = await client.get(
@@ -495,7 +510,9 @@ async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> d
         debug["sections"] = section_ids
 
         # Sonda: probar una consulta de statuses para detectar problemas de auth
-        probe = await client.get(f"{base}/statuses.json", params={"section_id": section_ids[0], "class_date": "2025-01-01"} if section_ids else {})
+        probe = await client.get(f"{base}/statuses.json",
+                                 params={"section_id": section_ids[0], "class_date": "2025-01-01"} if section_ids else {},
+                                 headers=_rc_headers)
         debug["probe_status"] = probe.status_code
         debug["probe_body"] = probe.text[:300]
 
@@ -525,6 +542,7 @@ async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> d
                     r = await client.get(
                         f"{base}/statuses.json",
                         params={"section_id": sid, "class_date": f.isoformat()},
+                        headers=_rc_headers,
                     )
                     if r.status_code != 200:
                         return
