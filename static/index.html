@@ -4430,8 +4430,10 @@ async function syncBuscarAlumnos() {
     const tabla = document.getElementById('sync-alumnos-tabla');
     if (!rows.length) { tabla.innerHTML = '<p style="color:#9ca3af;padding:12px;">Sin resultados.</p>'; return; }
     tabla.innerHTML = `
+      <p style="margin:0 0 8px;font-size:.82rem;color:#64748b;">${rows.length} alumno${rows.length!==1?'s':''} encontrado${rows.length!==1?'s':''}</p>
       <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
         <thead><tr style="background:#1e3a5f;color:#fff;">
+          <th style="padding:8px 12px;text-align:right;width:44px;">#</th>
           <th style="padding:8px 12px;text-align:left;">Nombre</th>
           <th style="padding:8px 12px;text-align:left;">Email</th>
           <th style="padding:8px 12px;text-align:left;">Cédula SIS</th>
@@ -4440,6 +4442,7 @@ async function syncBuscarAlumnos() {
         </tr></thead>
         <tbody>${rows.map((r,i) => `
           <tr style="background:${i%2?'#f8fafc':'#fff'};">
+            <td style="padding:7px 12px;text-align:right;color:#94a3b8;">${i+1}</td>
             <td style="padding:7px 12px;">${_esc(r.nombre||'—')}</td>
             <td style="padding:7px 12px;">${_esc(r.email||'—')}</td>
             <td style="padding:7px 12px;">${_esc(r.sis_user_id||'—')}</td>
