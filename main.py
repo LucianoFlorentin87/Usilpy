@@ -1520,12 +1520,9 @@ async def buscar_alumno(q: str, _user=Depends(get_current_user)):
 
 @app.get("/api/admin/tablas-academicas")
 async def tablas_academicas(_user=Depends(_require_admin)):
-    """Lista las tablas de BD que contienen datos académicos para diagnóstico."""
+    """Lista las tablas públicas de BD con cantidad de filas (diagnóstico)."""
     rows = await db.fetch(
-        """SELECT table_name, pg_relation_size(quote_ident(table_name)::regclass) AS size_bytes
-           FROM information_schema.tables
-           WHERE table_schema = 'public'
-           ORDER BY table_name"""
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name"
     )
     result = {}
     for r in rows:
@@ -1540,25 +1537,28 @@ async def tablas_academicas(_user=Depends(_require_admin)):
 
 @app.post("/api/admin/limpiar-datos-academicos")
 async def limpiar_datos_academicos(_user=Depends(_require_admin)):
-    """Elimina TODOS los registros de historial_academico (y alias) y correlativas."""
-    # Detectar el nombre real de la tabla de historial
-    candidate_tables = await db.fetch(
-        """SELECT table_name FROM information_schema.tables
-           WHERE table_schema = 'public'
-             AND (table_name ILIKE '%historial%' OR table_name ILIKE '%hist%rico%' OR table_name ILIKE '%academico%')"""
-    )
-    tnames = [r["table_name"] for r in candidate_tables]
+    """Elimina TODOS los registros de historial/historico y correlativas."""
+    # Intentar los nombres posibles de la tabla historial
+    HISTORIAL_CANDIDATES = [
+        "historial_academico",
+        "histórico_académico",
+        "historico_academico",
+        "historial_academico_gnd",
+    ]
 
     n_h = 0
     deleted_tables = []
-    for tname in tnames:
+    errors = []
+    for tname in HISTORIAL_CANDIDATES:
         try:
             cnt = await db.fetchval(f'SELECT COUNT(*) FROM "{tname}"')
             await db.execute(f'DELETE FROM "{tname}"')
             n_h += cnt
             deleted_tables.append(tname)
         except Exception as e:
-            pass  # tabla no accesible, ignorar
+            err = str(e)
+            if "does not exist" not in err and "relation" not in err.lower():
+                errors.append(f"{tname}: {err}")
 
     n_c = 0
     try:
@@ -1571,6 +1571,7 @@ async def limpiar_datos_academicos(_user=Depends(_require_admin)):
         "eliminados_historial": n_h,
         "eliminados_correlativas": n_c,
         "tablas_limpiadas": deleted_tables,
+        "errores": errors,
     }
 
 

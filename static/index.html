@@ -4097,9 +4097,11 @@ async function limpiarDatosAcademicos() {
   statusEl.innerHTML = '<p style="color:var(--text-muted)">🗑 Eliminando datos...</p>';
   try {
     const res = await apiFetch('/api/admin/limpiar-datos-academicos', { method: 'POST' });
-    statusEl.innerHTML = `<p style="color:var(--success)">✓ Datos eliminados — historial: <strong>${res.eliminados_historial}</strong> registros, mallas: <strong>${res.eliminados_correlativas}</strong> registros. Ya podés reimportar las planillas.</p>`;
+    const tablas = (res.tablas_limpiadas || []).join(', ') || '(ninguna encontrada)';
+    const errores = (res.errores || []).join('; ');
+    statusEl.innerHTML = `<p style="color:var(--success)">✓ Limpieza completada — historial: <strong>${res.eliminados_historial}</strong> registros, mallas: <strong>${res.eliminados_correlativas}</strong> registros.<br>Tablas limpiadas: <code>${tablas}</code>${errores ? `<br><span style="color:orange">Advertencias: ${errores}</span>` : ''}.<br>Ya podés reimportar las planillas.</p>`;
   } catch(e) {
-    statusEl.innerHTML = `<p style="color:var(--error)">❌ ${e.message}</p>`;
+    statusEl.innerHTML = `<p style="color:var(--error)">❌ Error del servidor: ${e.message || 'ver consola para detalles'}</p>`;
   }
 }
 
