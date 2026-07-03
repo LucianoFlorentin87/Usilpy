@@ -1248,7 +1248,6 @@
           </div>
           <button class="btn btn-primary" onclick="asisGenerarReporte()">📊 Generar reporte</button>
           <button class="btn" id="btn-exportar-asis" onclick="asisExportarExcel()" style="display:none;">⬇ Descargar Excel</button>
-          <button class="btn btn-secondary" onclick="asisDebug()" title="Diagnóstico del detalle por fecha">🔧</button>
         </div>
 
         <div id="asis-status"></div>
@@ -1256,19 +1255,6 @@
         <div id="asis-tabla" style="margin-top:12px;"></div>
       </div>
 
-      <div class="card" style="margin-top:16px;">
-        <h3 style="margin-top:0;">📋 Planilla institucional desde export de Canvas</h3>
-        <p style="color:#64748b;font-size:.88rem;">
-          Generá la planilla completa (una hoja por materia, con fechas, 1/0, total y % de asistencia)
-          a partir del <strong>export de Attendance de Canvas</strong>: en el curso, Attendance → engranaje ⚙ →
-          "Attendance Report" — Canvas te envía por email un CSV. Subilo acá tal cual (sirve para todas las materias juntas).
-        </p>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-          <input type="file" id="asis-export-file" accept=".csv,.xlsx" style="font-size:.85rem;">
-          <button class="btn btn-primary" onclick="asisPlanillaDesdeExport()">📥 Generar planilla</button>
-        </div>
-        <div id="asis-export-status" style="margin-top:10px;"></div>
-      </div>
     </div>
 
     <!-- ══════════ PANEL: CRON CONFIG ══════════ -->
