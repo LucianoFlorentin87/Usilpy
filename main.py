@@ -358,6 +358,90 @@ async def reporte_asistencia(course_id: int, umbral: float = 70, _: dict = Depen
     }
 
 
+@app.get("/api/canvas/asistencia/{course_id}/excel")
+async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: str = "", _: dict = Depends(_require_admin)):
+    """Descarga el reporte de asistencia como .xlsx con formato."""
+    rep = await reporte_asistencia(course_id, umbral, _)
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Asistencia"
+
+    header_fill = PatternFill("solid", fgColor="1E3A5F")
+    header_font = Font(bold=True, color="FFFFFF")
+    ok_fill   = PatternFill("solid", fgColor="DCFCE7")
+    ok_font   = Font(bold=True, color="15803D")
+    bad_fill  = PatternFill("solid", fgColor="FEE2E2")
+    bad_font  = Font(bold=True, color="B91C1C")
+    na_font   = Font(color="9CA3AF")
+    thin = Border(*[Side(style="thin", color="D1D5DB")] * 4)
+    center = Alignment(horizontal="center")
+
+    # Título y resumen
+    ws["A1"] = "Reporte de asistencia (Roll Call)"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A2"] = f"Curso: {curso or course_id}"
+    ws["A3"] = f"Mínimo para habilitar examen: {umbral:g}%"
+    ws["A4"] = (f"Alumnos: {rep['total']}  ·  Habilitados: {rep['habilitados']}  ·  "
+                f"No habilitados: {rep['no_habilitados']}  ·  Sin registro: {rep['sin_registro']}")
+
+    headers = ["#", "Alumno", "Cédula / Login", "% Asistencia", "Habilitado"]
+    ws.append([])
+    ws.append(headers)
+    hrow = ws.max_row
+    for col in range(1, len(headers) + 1):
+        c = ws.cell(row=hrow, column=col)
+        c.fill = header_fill
+        c.font = header_font
+        c.alignment = center
+        c.border = thin
+
+    for i, a in enumerate(rep["alumnos"], 1):
+        pct = a["porcentaje"]
+        ws.append([
+            i, a["nombre"], a["sis_user_id"] or a["login_id"] or "—",
+            pct if pct is not None else "Sin registro",
+            "SÍ" if a["habilitado"] else ("—" if pct is None else "NO"),
+        ])
+        r = ws.max_row
+        for col in range(1, len(headers) + 1):
+            ws.cell(row=r, column=col).border = thin
+        ws.cell(row=r, column=1).alignment = center
+        ws.cell(row=r, column=4).alignment = center
+        ws.cell(row=r, column=5).alignment = center
+        estado = ws.cell(row=r, column=5)
+        pct_cell = ws.cell(row=r, column=4)
+        if pct is None:
+            estado.font = na_font
+            pct_cell.font = na_font
+        elif a["habilitado"]:
+            estado.fill = ok_fill
+            estado.font = ok_font
+            pct_cell.font = Font(color="15803D")
+        else:
+            estado.fill = bad_fill
+            estado.font = bad_font
+            pct_cell.font = Font(color="B91C1C")
+
+    widths = {"A": 6, "B": 42, "C": 18, "D": 15, "E": 14}
+    for col, w in widths.items():
+        ws.column_dimensions[col].width = w
+    ws.freeze_panes = f"A{hrow + 1}"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    safe_name = "".join(ch if ch.isalnum() or ch in "-_ " else "_" for ch in (curso or str(course_id)))[:60].strip() or str(course_id)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="asistencia_{safe_name}.xlsx"'},
+    )
+
+
 @app.get("/api/canvas/users")
 async def list_canvas_users(_: dict = Depends(get_current_user)):
     try:

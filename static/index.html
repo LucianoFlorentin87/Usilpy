@@ -4837,17 +4837,23 @@ async function asisGenerarReporte() {
   }
 }
 
-function asisExportarExcel() {
+async function asisExportarExcel() {
   if (!_asisReporte) return;
   const r = _asisReporte;
-  const headers = ['#', 'Alumno', 'Cédula / Login', '% Asistencia', `Habilitado (≥ ${r.umbral}%)`];
-  const rows = r.alumnos.map((a, i) => [
-    i+1, a.nombre, a.sis_user_id || a.login_id || '',
-    a.porcentaje === null ? 'Sin registro' : a.porcentaje,
-    a.porcentaje === null ? '—' : (a.habilitado ? 'SÍ' : 'NO'),
-  ]);
-  const nombreArchivo = `asistencia_${(r.cursoNombre||'curso').replace(/[^\w\-]+/g,'_')}.csv`;
-  _descargarCSV(nombreArchivo, headers, rows);
+  const url = `/api/canvas/asistencia/${r.course_id}/excel?umbral=${r.umbral}&curso=${encodeURIComponent(r.cursoNombre||'')}`;
+  try {
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
+    if (!resp.ok) throw new Error('Error al generar el Excel');
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `asistencia_${(r.cursoNombre||'curso').replace(/[^\w\- ]+/g,'_').trim()}.xlsx`;
+    a.click();
+    _portalLog('Excel de asistencia descargado.', 'success');
+  } catch(e) {
+    _portalLog(`Error al descargar Excel: ${e.message}`, 'error');
+    alert(e.message);
+  }
 }
 </script>
 
