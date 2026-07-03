@@ -3171,7 +3171,26 @@ function portalExternoPrograma() {
     '<p style="color:#92400e;font-size:.82rem;text-align:center;padding:8px 0;">Seleccioná una carrera</p>';
 }
 
-function portalExternoCarrera() {
+let _pfExtMaterias = [];
+
+async function portalExternoCarrera() {
+  const carreraSel = document.getElementById('pf-ext-carrera');
+  const prog = document.getElementById('pf-ext-programa').value;
+  const lista = document.getElementById('pf-ext-lista');
+  _pfExtMaterias = [];
+  if (!carreraSel.value || !prog) { portalExternoFiltrar(); return; }
+  const carreraLabel = carreraSel.options[carreraSel.selectedIndex]?.text || carreraSel.value;
+  lista.innerHTML = '<p style="color:#92400e;font-size:.82rem;text-align:center;padding:8px 0;">⏳ Cargando materias…</p>';
+  try {
+    const data = await apiFetch(`/api/academico/materias?programa=${encodeURIComponent(prog)}&carrera=${encodeURIComponent(carreraLabel)}`);
+    _pfExtMaterias = (data || []).map(m => ({
+      name: m.materia,
+      semestre: m.semestre ? `Ciclo ${m.semestre}` : 'Sin semestre',
+    }));
+  } catch(e) {
+    lista.innerHTML = `<p style="color:#b91c1c;font-size:.82rem;text-align:center;padding:8px 0;">Error: ${_esc(e.message)}</p>`;
+    return;
+  }
   portalExternoFiltrar();
 }
 
@@ -3179,14 +3198,17 @@ function portalExternoFiltrar() {
   const carrera = document.getElementById('pf-ext-carrera').value;
   const q = (document.getElementById('pf-ext-buscar').value || '').toLowerCase();
   const lista = document.getElementById('pf-ext-lista');
-  if (!carrera || !MALLAS[carrera]) {
-    lista.innerHTML = '<p style="color:#92400e;font-size:.82rem;text-align:center;padding:8px 0;">Seleccioná una carrera</p>';
+  if (!carrera || !_pfExtMaterias.length) {
+    lista.innerHTML = '<p style="color:#92400e;font-size:.82rem;text-align:center;padding:8px 0;">' +
+      (carrera ? 'Esta carrera no tiene materias cargadas en la base de datos.' : 'Seleccioná programa y carrera') + '</p>';
     return;
   }
   const prog = document.getElementById('pf-ext-programa').value;
-  const malla = MALLAS[carrera];
+  // Agrupar por semestre
+  const grupos = {};
+  _pfExtMaterias.forEach(m => { (grupos[m.semestre] = grupos[m.semestre] || []).push(m.name); });
   let html = '';
-  for (const [sem, materias] of Object.entries(malla.semestres)) {
+  for (const [sem, materias] of Object.entries(grupos)) {
     const filtradas = q ? materias.filter(m => m.toLowerCase().includes(q)) : materias;
     if (!filtradas.length) continue;
     html += `<div style="font-size:.7rem;font-weight:700;color:#92400e;padding:6px 4px 2px;text-transform:uppercase;">${sem}</div>`;
