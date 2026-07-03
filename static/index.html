@@ -502,7 +502,6 @@
             <label>Programa</label>
             <select id="pf-programa" onchange="portalProgramaChange()">
               <option value="">— Prog. —</option>
-              <option value="GA">GA</option>
               <option value="GND">GND</option>
               <option value="CPEL">CPEL</option>
             </select>
@@ -553,7 +552,6 @@
               <option value="">— Programa —</option>
               <option value="GND">GND</option>
               <option value="CPEL">CPEL</option>
-              <option value="GA">GA</option>
             </select>
             <select id="pf-ext-carrera" onchange="portalExternoCarrera()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;">
               <option value="">— Carrera —</option>
@@ -674,7 +672,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div>
             <div style="color:#fff;font-size:1rem;font-weight:700;">📦 Kit de Matriculación 2026-2</div>
-            <div style="color:#bfdbfe;font-size:.82rem;margin-top:3px;">Excel completo con períodos, cursos, usuarios e inscripciones listo para completar — GA · GND · CPEL</div>
+            <div style="color:#bfdbfe;font-size:.82rem;margin-top:3px;">Excel completo con períodos, cursos, usuarios e inscripciones listo para completar — GND · CPEL</div>
           </div>
           <button class="btn" onclick="downloadKit()" style="background:#fff;color:#1e3a5f;font-weight:700;white-space:nowrap;">
             ⬇ Descargar kit 2026-2
@@ -2854,14 +2852,6 @@ const MALLAS = {
 
 // Carreras por programa
 const CARRERAS_POR_PROGRAMA = {
-  GA:   [
-    {value:'marketing',      label:'Marketing'},
-    {value:'administracion', label:'Administración de Empresas'},
-    {value:'negocios',       label:'Negocios Internacionales'},
-    {value:'contabilidad',   label:'Contabilidad'},
-    {value:'economia',       label:'Economía'},
-    {value:'hoteleria',      label:'Administración Hotelera y de Turismo'},
-  ],
   CPEL: [
     {value:'cpel_marketing',     label:'Marketing'},
     {value:'cpel_administracion',label:'Administración de Empresas'},
