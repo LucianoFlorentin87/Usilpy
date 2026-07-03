@@ -333,3 +333,63 @@ async def get_course_attendance(course_id: int | str) -> list[dict]:
                     url = part.split(";")[0].strip().strip("<>")
     return attendances
 
+
+async def get_roll_call_report(course_id: int | str) -> dict:
+    """Reporte de asistencia por alumno basado en la tarea oculta 'Roll Call Attendance'.
+
+    El puntaje de esa tarea (0-100) es el % de asistencia calculado por Canvas.
+    Retorna {"disponible": bool, "alumnos": [{user_id, nombre, sis_user_id, login_id, porcentaje}]}.
+    """
+    async with httpx.AsyncClient(timeout=60) as client:
+        # 1. Buscar la tarea de Roll Call
+        assignment_id = None
+        url = f"{_base()}/api/v1/courses/{course_id}/assignments"
+        params = {"per_page": 100}
+        while url:
+            resp = await client.get(url, headers=_headers(), params=params)
+            if resp.status_code in (401, 403, 404):
+                return {"disponible": False, "alumnos": []}
+            resp.raise_for_status()
+            for a in resp.json():
+                if (a.get("name") or "").strip().lower() == "roll call attendance":
+                    assignment_id = a.get("id")
+                    break
+            if assignment_id:
+                break
+            link = resp.headers.get("Link", "")
+            url = None
+            params = {}
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    url = part.split(";")[0].strip().strip("<>")
+        if not assignment_id:
+            return {"disponible": False, "alumnos": []}
+
+        # 2. Traer submissions con datos del alumno
+        alumnos = []
+        url = f"{_base()}/api/v1/courses/{course_id}/assignments/{assignment_id}/submissions"
+        params = {"per_page": 100, "include[]": "user"}
+        while url:
+            resp = await client.get(url, headers=_headers(), params=params)
+            if resp.status_code in (401, 403, 404):
+                break
+            resp.raise_for_status()
+            for s in resp.json():
+                user = s.get("user") or {}
+                if (user.get("name") or "").lower() == "test student":
+                    continue
+                alumnos.append({
+                    "user_id": s.get("user_id"),
+                    "nombre": user.get("sortable_name") or user.get("name") or "",
+                    "sis_user_id": user.get("sis_user_id") or "",
+                    "login_id": user.get("login_id") or "",
+                    "porcentaje": round(float(s.get("score")), 1) if s.get("score") is not None else None,
+                })
+            link = resp.headers.get("Link", "")
+            url = None
+            params = {}
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    url = part.split(";")[0].strip().strip("<>")
+        alumnos.sort(key=lambda a: a["nombre"])
+        return {"disponible": True, "alumnos": alumnos}

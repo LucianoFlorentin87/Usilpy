@@ -330,6 +330,34 @@ async def list_all_courses(_: dict = Depends(_require_admin)):
         raise HTTPException(status_code=502, detail=str(exc))
 
 
+@app.get("/api/canvas/asistencia/{course_id}")
+async def reporte_asistencia(course_id: int, umbral: float = 70, _: dict = Depends(_require_admin)):
+    """Reporte de asistencia (Roll Call) de un curso con % y habilitación a examen."""
+    try:
+        rep = await canvas_service.get_roll_call_report(course_id)
+    except Exception as exc:
+        logger.error("Canvas asistencia error curso %s: %s", course_id, exc)
+        raise HTTPException(status_code=502, detail=str(exc))
+    if not rep["disponible"]:
+        raise HTTPException(status_code=404, detail="Este curso no tiene registros de Roll Call Attendance en Canvas.")
+    alumnos = []
+    for a in rep["alumnos"]:
+        pct = a["porcentaje"]
+        alumnos.append({**a, "habilitado": (pct is not None and pct >= umbral)})
+    total = len(alumnos)
+    habilitados = sum(1 for a in alumnos if a["habilitado"])
+    sin_registro = sum(1 for a in alumnos if a["porcentaje"] is None)
+    return {
+        "course_id": course_id,
+        "umbral": umbral,
+        "total": total,
+        "habilitados": habilitados,
+        "no_habilitados": total - habilitados,
+        "sin_registro": sin_registro,
+        "alumnos": alumnos,
+    }
+
+
 @app.get("/api/canvas/users")
 async def list_canvas_users(_: dict = Depends(get_current_user)):
     try:

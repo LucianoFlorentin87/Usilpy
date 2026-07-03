@@ -348,6 +348,9 @@
     <div class="nav-item" id="nav-canvas-cursos" data-panel="panel-canvas-cursos" onclick="showPanel('panel-canvas-cursos', this)" style="display:none;">
       <span class="nav-icon">🎓</span> Cursos
     </div>
+    <div class="nav-item" id="nav-canvas-asistencia" data-panel="panel-canvas-asistencia" onclick="showPanel('panel-canvas-asistencia', this)" style="display:none;">
+      <span class="nav-icon">🗓️</span> Reporte de asistencia
+    </div>
 
     <div class="nav-section-label" id="nav-section-admin" style="display:none;">Administración</div>
     <div class="nav-item" id="nav-users" data-panel="system-users" onclick="showPanel('system-users', this)" style="display:none;">
@@ -1213,6 +1216,37 @@
       </div>
     </div>
 
+    <!-- ══════════ PANEL: REPORTE DE ASISTENCIA ══════════ -->
+    <div id="panel-panel-canvas-asistencia" class="panel">
+      <div class="card">
+        <h2 class="card-title">🗓️ Reporte de asistencia (Roll Call)</h2>
+        <p style="color:#64748b;font-size:.9rem;margin-bottom:20px;">
+          Porcentaje de asistencia de cada alumno de un curso, calculado desde el Attendance (Roll Call) de Canvas,
+          e indicación de si alcanza el mínimo requerido para habilitar examen.
+        </p>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
+          <div style="flex:1;min-width:280px;">
+            <label style="font-size:.82rem;">Curso</label>
+            <select id="asis-curso-select" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
+              <option value="">— Cargá los cursos primero —</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.82rem;">% mínimo para examen</label>
+            <input type="number" id="asis-umbral" value="70" min="0" max="100" style="width:110px;padding:8px;border:1px solid #ddd;border-radius:6px;">
+          </div>
+          <button class="btn btn-secondary" onclick="asisCargarCursos()">↻ Cargar cursos</button>
+          <button class="btn btn-primary" onclick="asisGenerarReporte()">📊 Generar reporte</button>
+          <button class="btn" id="btn-exportar-asis" onclick="asisExportarExcel()" style="display:none;">⬇ Descargar Excel</button>
+        </div>
+
+        <div id="asis-status"></div>
+        <div id="asis-resumen" style="margin-top:8px;"></div>
+        <div id="asis-tabla" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
     <!-- ══════════ PANEL: CRON CONFIG ══════════ -->
     <div id="panel-cron-config" class="panel">
       <div class="card">
@@ -1753,7 +1787,7 @@ function _applyRoleVisibility(role) {
   const admin    = ['nav-section-admin','nav-users','nav-pending','nav-cron'];
   const academicoAdmin = ['nav-section-academico','nav-historial','nav-buscar-alumno'];
   const academicoUser  = ['nav-section-academico','nav-buscar-alumno'];
-  const canvas         = ['nav-section-canvas','nav-canvas-cursos'];
+  const canvas         = ['nav-section-canvas','nav-canvas-cursos','nav-canvas-asistencia'];
   const all      = [...reportes,...gestion,...portal,...sync,...admin,...academicoAdmin,...canvas];
 
   function show(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = ''; }); }
@@ -1859,6 +1893,7 @@ const panelTitles = {
   'panel-historial':      ['Historial de notas',  'Académico GND'],
   'panel-buscar-alumno':  ['Consultar alumno',     'Académico GND'],
   'panel-canvas-cursos':  ['Cursos',               'Canvas LMS'],
+  'panel-canvas-asistencia': ['Reporte de asistencia', 'Canvas LMS'],
 };
 
 function showPanel(id, el) {
@@ -4685,6 +4720,94 @@ function exportarCursosExcel() {
   const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'canvas_cursos.csv'; a.click();
+}
+
+// ── Reporte de asistencia (Roll Call) ─────────────────────────────────────────
+let _asisReporte = null;
+
+async function asisCargarCursos() {
+  const sel = document.getElementById('asis-curso-select');
+  const st = document.getElementById('asis-status');
+  st.innerHTML = '<span style="color:#64748b;">⏳ Cargando cursos desde Canvas...</span>';
+  try {
+    const cursos = await apiFetch('/api/canvas/all-courses');
+    sel.innerHTML = '<option value="">— Seleccioná un curso —</option>' +
+      cursos.map(c => `<option value="${c.id}">${_esc(c.name)}${c.sis_course_id ? ' ('+_esc(c.sis_course_id)+')' : ''}</option>`).join('');
+    st.innerHTML = `<span style="color:#16a34a;">✓ ${cursos.length} cursos cargados.</span>`;
+  } catch(e) {
+    st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)}</span>`;
+  }
+}
+
+async function asisGenerarReporte() {
+  const sel = document.getElementById('asis-curso-select');
+  const courseId = sel.value;
+  const umbral = parseFloat(document.getElementById('asis-umbral').value) || 70;
+  const st = document.getElementById('asis-status');
+  const resumen = document.getElementById('asis-resumen');
+  const tabla = document.getElementById('asis-tabla');
+  const btnExp = document.getElementById('btn-exportar-asis');
+  if (!courseId) { alert('Seleccioná un curso'); return; }
+  st.innerHTML = '<span style="color:#64748b;">⏳ Consultando asistencia en Canvas...</span>';
+  resumen.innerHTML = ''; tabla.innerHTML = ''; btnExp.style.display = 'none';
+  _portalLog(`Generando reporte de asistencia del curso ${sel.options[sel.selectedIndex].text}…`);
+  try {
+    const r = await apiFetch(`/api/canvas/asistencia/${courseId}?umbral=${umbral}`);
+    _asisReporte = { ...r, cursoNombre: sel.options[sel.selectedIndex].text };
+    st.innerHTML = '';
+    resumen.innerHTML = `
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 16px;"><strong>${r.total}</strong> alumnos</div>
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 16px;color:#15803d;"><strong>${r.habilitados}</strong> habilitados (≥ ${r.umbral}%)</div>
+        <div style="background:#fff1f2;border:1px solid #fda4af;border-radius:8px;padding:10px 16px;color:#9f1239;"><strong>${r.no_habilitados}</strong> no habilitados</div>
+        ${r.sin_registro ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 16px;color:#64748b;"><strong>${r.sin_registro}</strong> sin registro</div>` : ''}
+      </div>`;
+    const filas = r.alumnos.map((a, i) => {
+      const pct = a.porcentaje;
+      const color = pct === null ? '#9ca3af' : a.habilitado ? '#16a34a' : '#dc2626';
+      const badge = pct === null
+        ? '<span style="color:#9ca3af;">Sin registro</span>'
+        : a.habilitado
+          ? '<span style="background:#dcfce7;color:#15803d;padding:2px 10px;border-radius:12px;font-weight:600;">✓ Habilitado</span>'
+          : '<span style="background:#fee2e2;color:#b91c1c;padding:2px 10px;border-radius:12px;font-weight:600;">✗ No habilitado</span>';
+      return `<tr style="background:${i%2?'#f8fafc':'#fff'};">
+        <td style="padding:7px 12px;text-align:right;color:#94a3b8;">${i+1}</td>
+        <td style="padding:7px 12px;">${_esc(a.nombre)}</td>
+        <td style="padding:7px 12px;">${_esc(a.sis_user_id||a.login_id||'—')}</td>
+        <td style="padding:7px 12px;text-align:center;font-weight:700;color:${color};">${pct === null ? '—' : pct + '%'}</td>
+        <td style="padding:7px 12px;text-align:center;">${badge}</td>
+      </tr>`;
+    }).join('');
+    tabla.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+        <thead><tr style="background:#1e3a5f;color:#fff;">
+          <th style="padding:8px 12px;text-align:right;width:44px;">#</th>
+          <th style="padding:8px 12px;text-align:left;">Alumno</th>
+          <th style="padding:8px 12px;text-align:left;">Cédula / Login</th>
+          <th style="padding:8px 12px;text-align:center;">% Asistencia</th>
+          <th style="padding:8px 12px;text-align:center;">Examen</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>`;
+    btnExp.style.display = '';
+    _portalLog(`Reporte de asistencia generado: ${r.total} alumnos, ${r.habilitados} habilitados, ${r.no_habilitados} no habilitados`, 'success');
+  } catch(e) {
+    st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)}</span>`;
+    _portalLog(`Error en reporte de asistencia: ${e.message}`, 'error');
+  }
+}
+
+function asisExportarExcel() {
+  if (!_asisReporte) return;
+  const r = _asisReporte;
+  const headers = ['#', 'Alumno', 'Cédula / Login', '% Asistencia', `Habilitado (≥ ${r.umbral}%)`];
+  const rows = r.alumnos.map((a, i) => [
+    i+1, a.nombre, a.sis_user_id || a.login_id || '',
+    a.porcentaje === null ? 'Sin registro' : a.porcentaje,
+    a.porcentaje === null ? '—' : (a.habilitado ? 'SÍ' : 'NO'),
+  ]);
+  const nombreArchivo = `asistencia_${(r.cursoNombre||'curso').replace(/[^\w\-]+/g,'_')}.csv`;
+  _descargarCSV(nombreArchivo, headers, rows);
 }
 </script>
 
