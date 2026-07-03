@@ -1521,6 +1521,7 @@ async def buscar_alumno(q: str, _user=Depends(get_current_user)):
 @app.get("/api/admin/tablas-academicas")
 async def tablas_academicas(_user=Depends(_require_admin)):
     """Lista las tablas públicas de BD con cantidad de filas (diagnóstico)."""
+    import db
     rows = await db.fetch(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name"
     )
@@ -1538,6 +1539,7 @@ async def tablas_academicas(_user=Depends(_require_admin)):
 @app.post("/api/admin/limpiar-datos-academicos")
 async def limpiar_datos_academicos(_user=Depends(_require_admin)):
     """Elimina TODOS los registros de historial/historico y correlativas."""
+    import db
     # Intentar los nombres posibles de la tabla historial
     HISTORIAL_CANDIDATES = [
         "historial_academico",

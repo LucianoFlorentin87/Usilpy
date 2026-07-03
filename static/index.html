@@ -4095,13 +4095,17 @@ async function limpiarDatosAcademicos() {
   const statusEl = document.getElementById('historial-status');
   statusEl.style.display = '';
   statusEl.innerHTML = '<p style="color:var(--text-muted)">🗑 Eliminando datos...</p>';
+  _portalLog('Iniciando limpieza de datos académicos (historial + mallas)…', 'warn');
   try {
     const res = await apiFetch('/api/admin/limpiar-datos-academicos', { method: 'POST' });
     const tablas = (res.tablas_limpiadas || []).join(', ') || '(ninguna encontrada)';
     const errores = (res.errores || []).join('; ');
     statusEl.innerHTML = `<p style="color:var(--success)">✓ Limpieza completada — historial: <strong>${res.eliminados_historial}</strong> registros, mallas: <strong>${res.eliminados_correlativas}</strong> registros.<br>Tablas limpiadas: <code>${tablas}</code>${errores ? `<br><span style="color:orange">Advertencias: ${errores}</span>` : ''}.<br>Ya podés reimportar las planillas.</p>`;
+    _portalLog(`Limpieza completada — historial: ${res.eliminados_historial} registros, mallas: ${res.eliminados_correlativas} registros (tablas: ${tablas})`, 'success');
+    if (errores) _portalLog(`Advertencias durante la limpieza: ${errores}`, 'warn');
   } catch(e) {
     statusEl.innerHTML = `<p style="color:var(--error)">❌ Error del servidor: ${e.message || 'ver consola para detalles'}</p>`;
+    _portalLog(`Error al limpiar datos académicos: ${e.message}`, 'error');
   }
 }
 
@@ -4125,8 +4129,10 @@ async function repararNombres() {
       html += '</ul></details>';
     }
     statusEl.innerHTML = html;
+    _portalLog(`Sincronización de nombres completada: ${res.actualizados} corregidos`, 'success');
   } catch(e) {
     statusEl.innerHTML = `<p style="color:var(--error)">❌ ${e.message}</p>`;
+    _portalLog(`Error al sincronizar nombres: ${e.message}`, 'error');
   }
 }
 
