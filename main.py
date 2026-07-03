@@ -1661,6 +1661,7 @@ async def gestion_inscribir_teams(file: UploadFile = File(...), _user=Depends(_r
 async def sync_canvas(background_tasks: BackgroundTasks, _user=Depends(_require_admin)):
     """Trigger manual Canvas sync en background — retorna job_id para polling."""
     import sync_service
+    import uuid as _uuid
     job_id = str(_uuid.uuid4())[:8]
     _import_jobs[job_id] = {"status": "running", "result": None}
 
