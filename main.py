@@ -455,53 +455,71 @@ async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: st
         ws.column_dimensions[col].width = w
     ws.freeze_panes = f"A{hrow + 1}"
 
-    # ── Hoja 2: detalle día por día ──
+    # ── Hoja 2: planilla de asistencia por fecha (formato institucional) ──
     if fechas:
         from openpyxl.utils import get_column_letter
-        ws2 = wb.create_sheet("Detalle por fecha")
-        ws2["A1"] = "Detalle de asistencia por clase — P = Presente · A = Ausente · T = Tardanza"
-        ws2["A1"].font = Font(bold=True)
+        from datetime import date as _date
 
-        det_headers = ["Alumno", "Cédula"] + [f[8:10] + "/" + f[5:7] for f in fechas]
-        ws2.append([])
-        ws2.append(det_headers)
-        h2 = ws2.max_row
-        for col in range(1, len(det_headers) + 1):
-            c = ws2.cell(row=h2, column=col)
+        nombre_hoja = "".join(ch for ch in (curso or "DETALLE").upper() if ch not in "[]:*?/\\")[:31] or "DETALLE"
+        ws2 = wb.create_sheet(nombre_hoja)
+
+        n_fechas = len(fechas)
+        ultima_col = 1 + n_fechas + 2  # ESTUDIANTE + fechas + TOTAL + %
+
+        # Fila 1: título del curso (merge en todo el ancho)
+        ws2.cell(row=1, column=1, value=(curso or "").upper() or nombre_hoja)
+        ws2.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ultima_col)
+        t = ws2.cell(row=1, column=1)
+        t.font = Font(bold=True, size=13)
+        t.alignment = Alignment(horizontal="center")
+
+        # Fila 3: cabecera
+        ws2.cell(row=3, column=1, value="ESTUDIANTE")
+        for j, f in enumerate(fechas, start=2):
+            y, m, d = int(f[:4]), int(f[5:7]), int(f[8:10])
+            c = ws2.cell(row=3, column=j, value=_date(y, m, d))
+            c.number_format = "DD/MM"
+        ws2.cell(row=3, column=1 + n_fechas + 1, value="TOTAL ASISTENCIA")
+        ws2.cell(row=3, column=1 + n_fechas + 2, value="% ASISTENCIA")
+        for col in range(1, ultima_col + 1):
+            c = ws2.cell(row=3, column=col)
             c.fill = header_fill
             c.font = header_font
             c.alignment = center
             c.border = thin
 
-        p_fill = PatternFill("solid", fgColor="DCFCE7")
-        a_fill = PatternFill("solid", fgColor="FEE2E2")
-        t_fill = PatternFill("solid", fgColor="FEF9C3")
-        marcas = {"present": ("P", p_fill, Font(bold=True, color="15803D")),
-                  "absent":  ("A", a_fill, Font(bold=True, color="B91C1C")),
-                  "late":    ("T", t_fill, Font(bold=True, color="A16207"))}
-
-        for a in rep["alumnos"]:
+        # Filas de alumnos: 1 = presente/tardanza, 0 = ausente, vacío = sin registro
+        alumnos_orden = sorted(rep["alumnos"], key=lambda a: a["nombre"].upper())
+        for i, a in enumerate(alumnos_orden, start=4):
             estados = por_alumno.get(a["user_id"], {})
-            fila = [a["nombre"], a["sis_user_id"] or a["login_id"] or "—"]
-            fila += [marcas.get(estados.get(f), ("", None, None))[0] for f in fechas]
-            ws2.append(fila)
-            r = ws2.max_row
-            for j, f in enumerate(fechas, start=3):
-                cell = ws2.cell(row=r, column=j)
-                cell.alignment = center
-                cell.border = thin
-                _, fill, font = marcas.get(estados.get(f), ("", None, None))
-                if fill:
-                    cell.fill = fill
-                    cell.font = font
-            ws2.cell(row=r, column=1).border = thin
-            ws2.cell(row=r, column=2).border = thin
+            ws2.cell(row=i, column=1, value=a["nombre"].upper()).border = thin
+            for j, f in enumerate(fechas, start=2):
+                est = estados.get(f)
+                val = None if est is None else (0 if est == "absent" else 1)
+                c = ws2.cell(row=i, column=j, value=val)
+                c.alignment = center
+                c.border = thin
+                if val == 0:
+                    c.font = Font(color="B91C1C")
+            col_ini = get_column_letter(2)
+            col_fin = get_column_letter(1 + n_fechas)
+            ct = ws2.cell(row=i, column=1 + n_fechas + 1, value=f"=SUM({col_ini}{i}:{col_fin}{i})")
+            ct.alignment = center
+            ct.border = thin
+            ct.font = Font(bold=True)
+            cp = ws2.cell(row=i, column=1 + n_fechas + 2,
+                          value=f"={get_column_letter(1 + n_fechas + 1)}{i}/{n_fechas}")
+            cp.number_format = "0%"
+            cp.alignment = center
+            cp.border = thin
+            cp.font = Font(bold=True)
 
-        ws2.column_dimensions["A"].width = 42
-        ws2.column_dimensions["B"].width = 14
-        for j in range(3, len(det_headers) + 1):
-            ws2.column_dimensions[get_column_letter(j)].width = 7
-        ws2.freeze_panes = "C" + str(h2 + 1)
+        ws2.column_dimensions["A"].width = 40
+        for j in range(2, 1 + n_fechas + 1):
+            ws2.column_dimensions[get_column_letter(j)].width = 6.5
+        ws2.column_dimensions[get_column_letter(1 + n_fechas + 1)].width = 18
+        ws2.column_dimensions[get_column_letter(1 + n_fechas + 2)].width = 14
+        ws2.freeze_panes = "B4"
     else:
         ws_nota = wb.create_sheet("Detalle por fecha")
         ws_nota["A1"] = "El detalle día-por-día no está disponible para este curso (Roll Call no accesible o sin registros)."
