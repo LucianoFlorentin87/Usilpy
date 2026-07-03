@@ -358,6 +358,118 @@ async def reporte_asistencia(course_id: int, umbral: float = 70, _: dict = Depen
     }
 
 
+@app.post("/api/canvas/asistencia/planilla-desde-export")
+async def planilla_desde_export(file: UploadFile = File(...), umbral: float = 70, _: dict = Depends(_require_admin)):
+    """Genera la planilla institucional de asistencia (hoja por materia, fechas, 1/0,
+    TOTAL y %) a partir del export CSV/Excel de Attendance (Roll Call) de Canvas."""
+    import pandas as pd
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    raw = await file.read()
+    fname = (file.filename or "").lower()
+    try:
+        if fname.endswith(".csv"):
+            df = pd.read_csv(BytesIO(raw))
+        else:
+            df = pd.read_excel(BytesIO(raw))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {exc}")
+
+    # Normalizar nombres de columnas
+    df.columns = [str(c).strip().lower().replace(" ", "_") for c in df.columns]
+    requeridas = {"course_name", "student_name", "class_date", "attendance"}
+    if not requeridas.issubset(set(df.columns)):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El archivo debe tener las columnas del export de Roll Call: Course Name, Student Name, Class Date, Attendance. Encontradas: {list(df.columns)}",
+        )
+
+    df = df.dropna(subset=["course_name", "student_name", "class_date"])
+    df["attendance"] = df["attendance"].astype(str).str.strip().str.lower()
+    df = df[df["attendance"].isin(["present", "absent", "late"])]
+    df["class_date"] = pd.to_datetime(df["class_date"], errors="coerce")
+    df = df.dropna(subset=["class_date"])
+    if df.empty:
+        raise HTTPException(status_code=400, detail="El archivo no contiene registros de asistencia válidos.")
+
+    header_fill = PatternFill("solid", fgColor="1E3A5F")
+    header_font = Font(bold=True, color="FFFFFF")
+    thin = Border(*[Side(style="thin", color="D1D5DB")] * 4)
+    center = Alignment(horizontal="center")
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    usados = set()
+
+    for curso_nombre, dfc in sorted(df.groupby("course_name"), key=lambda x: str(x[0]).upper()):
+        fechas = sorted(dfc["class_date"].dt.date.unique())
+        alumnos = sorted(dfc["student_name"].astype(str).str.strip().unique(), key=str.upper)
+        # estado por (alumno, fecha) — el último registro gana
+        estado = {}
+        for _, row in dfc.iterrows():
+            estado[(str(row["student_name"]).strip(), row["class_date"].date())] = row["attendance"]
+
+        base_name = "".join(ch for ch in str(curso_nombre).upper() if ch not in "[]:*?/\\")[:31] or "CURSO"
+        nombre_hoja = base_name
+        n = 1
+        while nombre_hoja in usados:
+            n += 1
+            nombre_hoja = f"{base_name[:28]}_{n}"
+        usados.add(nombre_hoja)
+        ws = wb.create_sheet(nombre_hoja)
+
+        n_f = len(fechas)
+        ultima = 1 + n_f + 2
+        ws.cell(row=1, column=1, value=str(curso_nombre).upper())
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ultima)
+        ws.cell(row=1, column=1).font = Font(bold=True, size=13)
+        ws.cell(row=1, column=1).alignment = center
+
+        ws.cell(row=3, column=1, value="ESTUDIANTE")
+        for j, f in enumerate(fechas, start=2):
+            c = ws.cell(row=3, column=j, value=f)
+            c.number_format = "DD/MM"
+        ws.cell(row=3, column=1 + n_f + 1, value="TOTAL ASISTENCIA")
+        ws.cell(row=3, column=1 + n_f + 2, value="% ASISTENCIA")
+        for col in range(1, ultima + 1):
+            c = ws.cell(row=3, column=col)
+            c.fill = header_fill; c.font = header_font; c.alignment = center; c.border = thin
+
+        for i, alumno in enumerate(alumnos, start=4):
+            ws.cell(row=i, column=1, value=alumno.upper()).border = thin
+            for j, f in enumerate(fechas, start=2):
+                est = estado.get((alumno, f))
+                val = None if est is None else (0 if est == "absent" else 1)
+                c = ws.cell(row=i, column=j, value=val)
+                c.alignment = center; c.border = thin
+                if val == 0:
+                    c.font = Font(color="B91C1C")
+            ci, cf = get_column_letter(2), get_column_letter(1 + n_f)
+            ct = ws.cell(row=i, column=1 + n_f + 1, value=f"=SUM({ci}{i}:{cf}{i})")
+            ct.alignment = center; ct.border = thin; ct.font = Font(bold=True)
+            cp = ws.cell(row=i, column=1 + n_f + 2, value=f"={get_column_letter(1 + n_f + 1)}{i}/{n_f}")
+            cp.number_format = "0%"; cp.alignment = center; cp.border = thin; cp.font = Font(bold=True)
+
+        ws.column_dimensions["A"].width = 40
+        for j in range(2, 1 + n_f + 1):
+            ws.column_dimensions[get_column_letter(j)].width = 6.5
+        ws.column_dimensions[get_column_letter(1 + n_f + 1)].width = 18
+        ws.column_dimensions[get_column_letter(1 + n_f + 2)].width = 14
+        ws.freeze_panes = "B4"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="planilla_asistencia.xlsx"'},
+    )
+
+
 @app.get("/api/canvas/asistencia/{course_id}/debug")
 async def reporte_asistencia_debug(course_id: int, _: dict = Depends(_require_admin)):
     """Diagnóstico del acceso a Roll Call (detalle por fecha) para un curso."""

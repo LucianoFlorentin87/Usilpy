@@ -1255,6 +1255,20 @@
         <div id="asis-resumen" style="margin-top:8px;"></div>
         <div id="asis-tabla" style="margin-top:12px;"></div>
       </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3 style="margin-top:0;">📋 Planilla institucional desde export de Canvas</h3>
+        <p style="color:#64748b;font-size:.88rem;">
+          Generá la planilla completa (una hoja por materia, con fechas, 1/0, total y % de asistencia)
+          a partir del <strong>export de Attendance de Canvas</strong>: en el curso, Attendance → engranaje ⚙ →
+          "Attendance Report" — Canvas te envía por email un CSV. Subilo acá tal cual (sirve para todas las materias juntas).
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <input type="file" id="asis-export-file" accept=".csv,.xlsx" style="font-size:.85rem;">
+          <button class="btn btn-primary" onclick="asisPlanillaDesdeExport()">📥 Generar planilla</button>
+        </div>
+        <div id="asis-export-status" style="margin-top:10px;"></div>
+      </div>
     </div>
 
     <!-- ══════════ PANEL: CRON CONFIG ══════════ -->
@@ -4848,6 +4862,37 @@ async function asisDebug() {
     st.innerHTML = `<pre style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:.75rem;white-space:pre-wrap;word-break:break-all;">${_esc(JSON.stringify(d, null, 2))}</pre>`;
   } catch(e) {
     st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)}</span>`;
+  }
+}
+
+async function asisPlanillaDesdeExport() {
+  const inp = document.getElementById('asis-export-file');
+  const st = document.getElementById('asis-export-status');
+  if (!inp.files[0]) { alert('Seleccioná el archivo del export de Attendance'); return; }
+  st.innerHTML = '<span style="color:#64748b;">⏳ Generando planilla...</span>';
+  _portalLog('Generando planilla institucional desde export de Roll Call…');
+  try {
+    const fd = new FormData();
+    fd.append('file', inp.files[0]);
+    const resp = await fetch('/api/canvas/asistencia/planilla-desde-export', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: fd,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({detail: resp.statusText}));
+      throw new Error(err.detail || resp.statusText);
+    }
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'planilla_asistencia.xlsx';
+    a.click();
+    st.innerHTML = '<span style="color:#16a34a;">✓ Planilla generada y descargada.</span>';
+    _portalLog('Planilla de asistencia generada y descargada.', 'success');
+  } catch(e) {
+    st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)}</span>`;
+    _portalLog(`Error al generar planilla: ${e.message}`, 'error');
   }
 }
 
