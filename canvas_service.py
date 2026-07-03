@@ -460,6 +460,7 @@ async def _rollcall_login(client: "httpx.AsyncClient", course_id: int | str, deb
     _dbg("form_fields_count", len(fields))
     r2 = await client.post(action, data=fields)
     _dbg("lti_post_status", r2.status_code)
+    _dbg("lti_final_url", str(r2.url))
     if r2.status_code >= 400:
         _dbg("fallo", f"POST LTI a Roll Call devolvió {r2.status_code}: {r2.text[:300]}")
         return None
@@ -494,9 +495,19 @@ async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> d
         if not sesion:
             return {"disponible": False, "registros": [], "debug": debug}
         base = sesion["base"]
-        _rc_headers = {"Accept": "application/json", "X-Requested-With": "XMLHttpRequest", "Referer": base + "/"}
-        if sesion.get("csrf"):
-            _rc_headers["X-CSRF-Token"] = sesion["csrf"]
+        csrf = sesion.get("csrf")
+
+        # Probar variantes de encabezados automáticamente hasta encontrar la que
+        # Roll Call acepte (el 403 depende de la configuración de su WAF/nginx)
+        variantes = []
+        v1 = {"Accept": "application/json", "X-Requested-With": "XMLHttpRequest", "Referer": base + "/"}
+        if csrf:
+            v1 = {**v1, "X-CSRF-Token": csrf}
+        variantes.append(("json+csrf+xrw", v1))
+        variantes.append(("json+referer", {"Accept": "application/json", "Referer": base + "/"}))
+        variantes.append(("json", {"Accept": "application/json"}))
+        variantes.append(("html", {"Accept": "text/html,application/json;q=0.9,*/*;q=0.8"}))
+        variantes.append(("vacio", {}))
 
         # Secciones del curso
         resp = await client.get(
@@ -509,12 +520,35 @@ async def get_roll_call_detail(course_id: int | str, dias_atras: int = 210) -> d
         section_ids = [s["id"] for s in resp.json()]
         debug["sections"] = section_ids
 
-        # Sonda: probar una consulta de statuses para detectar problemas de auth
-        probe = await client.get(f"{base}/statuses.json",
-                                 params={"section_id": section_ids[0], "class_date": "2025-01-01"} if section_ids else {},
-                                 headers=_rc_headers)
-        debug["probe_status"] = probe.status_code
-        debug["probe_body"] = probe.text[:300]
+        # Sonda: encontrar automáticamente la variante de encabezados aceptada
+        _rc_headers = None
+        from datetime import date as _pd, timedelta as _ptd
+        fecha_sonda = (_pd.today() - _ptd(days=3)).isoformat()
+        for nombre_v, hdrs in variantes:
+            try:
+                probe = await client.get(
+                    f"{base}/statuses.json",
+                    params={"section_id": section_ids[0], "class_date": fecha_sonda},
+                    headers=hdrs,
+                )
+                debug[f"probe_{nombre_v}"] = probe.status_code
+                if probe.status_code == 200:
+                    try:
+                        probe.json()
+                        _rc_headers = hdrs
+                        debug["variante_usada"] = nombre_v
+                        break
+                    except Exception:
+                        debug[f"probe_{nombre_v}_nota"] = "200 pero no es JSON"
+            except Exception as exc:
+                debug[f"probe_{nombre_v}"] = f"error: {exc}"
+        if _rc_headers is None:
+            debug["fallo"] = "Ninguna variante de encabezados fue aceptada por Roll Call (statuses.json)"
+            try:
+                debug["probe_body"] = probe.text[:300]
+            except Exception:
+                pass
+            return {"disponible": False, "registros": [], "debug": debug}
 
         # Rango de fechas: desde inicio del curso (si se conoce) hasta hoy
         start = None
