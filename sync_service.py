@@ -24,21 +24,36 @@ async def run_sync_365(incluir_grupos: bool = True) -> dict:
         logger.error("Error listando usuarios 365: %s", exc)
         return {**stats, "error": str(exc)}
 
+    # Traer grupos de todos los usuarios en paralelo (con límite de concurrencia)
+    import asyncio
+    grupos_por_usuario: dict = {}
+    if incluir_grupos:
+        sem = asyncio.Semaphore(8)
+
+        async def _grupos(uid):
+            async with sem:
+                try:
+                    grupos_por_usuario[uid] = await graph_service.get_user_groups(uid)
+                except Exception as exc:
+                    logger.debug("Grupos no disponibles para %s: %s", uid, exc)
+                    grupos_por_usuario[uid] = None
+
+        await asyncio.gather(*[_grupos(u["id"]) for u in usuarios if u.get("id")])
+
     for u in usuarios:
         azure_id = u.get("id")
         if not azure_id:
             continue
         grupos_txt, equipos_txt = None, None
         if incluir_grupos:
-            try:
-                gs = await graph_service.get_user_groups(azure_id)
+            gs = grupos_por_usuario.get(azure_id)
+            if gs is None:
+                stats["errores"] += 1
+            else:
                 grupos_txt = ", ".join(g["nombre"] for g in gs if g.get("nombre"))
                 equipos_txt = ", ".join(g["nombre"] for g in gs if g.get("es_team") and g.get("nombre"))
                 if gs:
                     stats["con_grupos"] += 1
-            except Exception as exc:
-                logger.debug("Grupos no disponibles para %s: %s", azure_id, exc)
-                stats["errores"] += 1
         try:
             await db.execute("""
                 INSERT INTO sync_usuarios_365

@@ -14,7 +14,15 @@ GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 SCOPES = ["https://graph.microsoft.com/.default"]
 
 
+import time as _time
+
+_token_cache: dict = {"token": None, "exp": 0.0}
+
+
 def _get_token() -> str:
+    # Reusar el token mientras siga vigente (evita re-autenticar por cada llamada)
+    if _token_cache["token"] and _time.time() < _token_cache["exp"] - 60:
+        return _token_cache["token"]
     app = msal.ConfidentialClientApplication(
         settings.azure_client_id,
         authority=f"https://login.microsoftonline.com/{settings.azure_tenant_id}",
@@ -23,6 +31,8 @@ def _get_token() -> str:
     result = app.acquire_token_for_client(scopes=SCOPES)
     if "access_token" not in result:
         raise RuntimeError(f"Azure token error: {result.get('error_description')}")
+    _token_cache["token"] = result["access_token"]
+    _token_cache["exp"] = _time.time() + int(result.get("expires_in", 3600))
     return result["access_token"]
 
 
