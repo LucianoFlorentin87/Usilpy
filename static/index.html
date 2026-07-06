@@ -7,24 +7,45 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
         :root {
-      --bg: #f8fafc;
-      --sidebar-bg: #1e293b;
-      --accent: #0055a2;
-      --accent-dark: #004080;
-      --accent-light: rgba(0, 85, 162, 0.1);
+      --bg: #f4f6fa;
+      --sidebar-bg: #14181f;
+      --accent: #1d4ed8;
+      --accent-dark: #1e40af;
+      --accent-light: rgba(29, 78, 216, 0.1);
       --surface: #ffffff;
       --border: #e2e8f0;
       --text: #1e293b;
       --text-muted: #64748b;
+      --card-shadow: 0 8px 24px -12px rgba(15,23,42,.12), 0 2px 6px -2px rgba(15,23,42,.06);
       --success-bg: #f0fdf4; --success: #166534; --success-border: #bbf7d0;
       --warn-bg: #fffbeb;   --warn: #b45309;   --warn-border: #fde68a;
       --error-bg: #fef2f2;  --error: #b91c1c;  --error-border: #fecaca;
       --skip-bg: #f1f5f9;   --skip: #475569;   --skip-border: #cbd5e1;
     }
-    body { font-family: 'Outfit', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; margin: 0; padding: 0; }
+    html[data-theme="dark"] {
+      --bg: #0b0f17;
+      --sidebar-bg: #0a0d13;
+      --accent: #3b82f6;
+      --accent-dark: #2563eb;
+      --accent-light: rgba(59, 130, 246, 0.15);
+      --surface: #151b26;
+      --border: #26303f;
+      --text: #e2e8f0;
+      --text-muted: #8b98ab;
+      --card-shadow: 0 8px 24px -12px rgba(0,0,0,.5);
+      --success-bg: #052e16; --success: #6ee7a0; --success-border: #14532d;
+      --warn-bg: #2a2005;   --warn: #fcd34d;   --warn-border: #713f12;
+      --error-bg: #2c0b0e;  --error: #fca5a5;  --error-border: #7f1d1d;
+      --skip-bg: #1a2230;   --skip: #94a3b8;   --skip-border: #334155;
+    }
+    html[data-theme="dark"] #topbar { background: rgba(15,20,30,0.85); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    html[data-theme="dark"] .btn-secondary { background: var(--surface); color: var(--text); }
+    html[data-theme="dark"] table thead tr { background: #1a2230 !important; }
+    html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea { background: #101724; color: var(--text); }
+    body { font-family: 'Poppins', 'Outfit', system-ui, -apple-system, sans-serif; transition: background .2s, color .2s; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; margin: 0; padding: 0; }
 
     /* ── Sidebar ── */
     #sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; background: var(--sidebar-bg); display: flex; flex-direction: column; z-index: 500; overflow: hidden; }
@@ -57,14 +78,14 @@
     .panel.active { display: block; }
 
     /* ── Cards ── */
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin-bottom: 18px; box-shadow: 0 1px 4px rgba(0,0,0,.06); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; margin-bottom: 18px; box-shadow: var(--card-shadow); }
     .card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 16px; color: var(--text); }
 
     /* ── Buttons ── */
-    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 12px; border: 1.5px solid transparent; cursor: pointer; font-size: 0.84rem; font-weight: 600; transition: all .15s; letter-spacing: .01em; font-family: 'Outfit', sans-serif; }
-    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 8px rgba(124,58,237,.25); }
+    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 12px; border: 1.5px solid transparent; cursor: pointer; font-size: 0.84rem; font-weight: 600; transition: all .15s; letter-spacing: .01em; font-family: 'Poppins', 'Outfit', sans-serif; }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 4px 14px -4px rgba(29,78,216,.5); }
     .btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); transform: translateY(-1px); }
-    .btn-secondary { background: #fff; color: var(--text); border-color: var(--border); }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
     .btn-secondary:hover { background: var(--bg); border-color: #94a3b8; }
     .btn-success { background: #059669; color: #fff; border-color: #059669; box-shadow: 0 2px 8px rgba(5,150,105,.2); }
     .btn-success:hover { background: #047857; border-color: #047857; transform: translateY(-1px); }
@@ -78,7 +99,7 @@
     .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
     label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); letter-spacing: .02em; }
-    input, select, textarea { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 0.85rem; outline: none; transition: border-color .15s; font-family: 'Outfit', sans-serif; }
+    input, select, textarea { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 0.85rem; outline: none; transition: border-color .15s; font-family: 'Poppins', 'Outfit', sans-serif; background: var(--surface); color: var(--text); }
     input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
 
     /* ── Tables ── */
@@ -377,6 +398,8 @@
   <div id="topbar">
     <h2 id="topbar-title">Dashboard</h2>
     <div style="display:flex; align-items:center; gap:12px;">
+      <button id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema claro/oscuro"
+        style="background:none;border:none;cursor:pointer;font-size:1.15rem;padding:4px 8px;border-radius:8px;line-height:1;">🌙</button>
       <span class="badge" id="topbar-badge">Matriculación</span>
       <div id="user-chip">
         <div class="avatar" id="user-avatar">?</div>
@@ -1879,6 +1902,20 @@ async function doLogin() {
 
 function doAzureLogin() { window.location.href = '/api/auth/azure/login'; }
 function doLogout() { fetch('/api/auth/logout', {method:'POST'}); showLogin(''); }
+
+// ── Tema claro / oscuro ───────────────────────────────────────────────────────
+function _aplicarTema(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const actual = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const nuevo = actual === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('tema', nuevo);
+  _aplicarTema(nuevo);
+}
+_aplicarTema(localStorage.getItem('tema') || 'light');
 
 (function handleFragment() {
   const hash = window.location.hash;
