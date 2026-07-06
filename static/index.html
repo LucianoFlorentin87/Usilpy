@@ -74,6 +74,9 @@
     #content { flex: 1; overflow-y: auto; padding: 24px; }
 
     /* ── Panels ── */
+    .dash-accion { cursor: pointer; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 12px; text-align: center; font-size: .82rem; font-weight: 600; color: var(--text); transition: box-shadow .15s, transform .15s; display:flex; flex-direction:column; gap:8px; align-items:center; }
+    .dash-accion:hover { box-shadow: 0 6px 16px -6px rgba(15,23,42,.2); transform: translateY(-2px); }
+
     .panel { display: none; }
     .panel.active { display: block; }
 
@@ -715,19 +718,36 @@
         <div id="dash-huerfanas" style="margin-top:10px;"></div>
       </div>
 
-      <!-- Acciones rápidas -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
-        <div onclick="showPanel('portal-academico', document.querySelector('[data-panel=portal-academico]'))" style="cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-          <div style="font-size:1.4rem;">✏️</div><div style="font-size:.82rem;font-weight:600;margin-top:4px;">Cargar inscripción</div>
+      <!-- Acciones rápidas + Estado del sistema -->
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:16px;align-items:stretch;">
+        <div class="card" style="margin-bottom:0;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <span style="font-size:1.05rem;">⚡</span>
+            <h3 style="margin:0;">Acciones rápidas</h3>
+            <span style="font-size:.78rem;color:var(--text-muted);">Tareas frecuentes de un clic</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+            <div onclick="showPanel('portal-academico', document.querySelector('[data-panel=portal-academico]'))" class="dash-accion">
+              <div style="font-size:1.5rem;color:#0d9488;">✏️</div><div>Cargar inscripción</div>
+            </div>
+            <div onclick="showPanel('sync-panel', document.querySelector('[data-panel=sync-panel]'))" class="dash-accion">
+              <div style="font-size:1.5rem;color:#0d9488;">🔄</div><div>Sincronizar BD</div>
+            </div>
+            <div onclick="showPanel('panel-canvas-asistencia', document.querySelector('[data-panel=panel-canvas-asistencia]'))" class="dash-accion">
+              <div style="font-size:1.5rem;color:#0d9488;">🗓️</div><div>Reporte asistencia</div>
+            </div>
+            <div onclick="showPanel('panel-buscar-alumno', document.querySelector('[data-panel=panel-buscar-alumno]'))" class="dash-accion">
+              <div style="font-size:1.5rem;color:#0d9488;">🔍</div><div>Consultar alumno</div>
+            </div>
+          </div>
         </div>
-        <div onclick="showPanel('sync-panel', document.querySelector('[data-panel=sync-panel]'))" style="cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-          <div style="font-size:1.4rem;">🔄</div><div style="font-size:.82rem;font-weight:600;margin-top:4px;">Sincronizar BD</div>
-        </div>
-        <div onclick="showPanel('panel-canvas-asistencia', document.querySelector('[data-panel=panel-canvas-asistencia]'))" style="cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-          <div style="font-size:1.4rem;">🗓️</div><div style="font-size:.82rem;font-weight:600;margin-top:4px;">Reporte asistencia</div>
-        </div>
-        <div onclick="showPanel('panel-buscar-alumno', document.querySelector('[data-panel=panel-buscar-alumno]'))" style="cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-          <div style="font-size:1.4rem;">🔍</div><div style="font-size:.82rem;font-weight:600;margin-top:4px;">Consultar alumno</div>
+        <div class="card" style="margin-bottom:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span>📈</span><h3 style="margin:0;">Estado del sistema</h3>
+          </div>
+          <div id="dash-estado-sistema" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start;">
+            <span style="color:var(--text-muted);font-size:.82rem;">Cargando…</span>
+          </div>
         </div>
       </div>
 
@@ -1794,6 +1814,13 @@
       </div>
     </div>
 
+    <footer style="margin-top:28px;padding:16px 4px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:.8rem;color:var(--text-muted);">
+      <span>© 2026 Universidad San Ignacio de Loyola — Gestión Académica</span>
+      <span style="display:flex;gap:16px;">
+        <a onclick="showPanel('dashboard', document.querySelector('[data-panel=dashboard]'))" style="cursor:pointer;color:var(--accent);text-decoration:none;">Dashboard</a>
+        <a onclick="showPanel('auditoria', document.querySelector('[data-panel=auditoria]'))" style="cursor:pointer;color:var(--accent);text-decoration:none;">Auditoría</a>
+      </span>
+    </footer>
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -2103,6 +2130,17 @@ async function loadDashboardPlataformas() {
            <div>Próxima automática: <strong>${_esc(px)}</strong></div>
          </div>`,
         enlace('🔄','Sincronizar','sync-panel') + enlace('📋','Historial','panel-historial') + enlace('🛡️','Auditoría','auditoria'));
+
+    // Estado del sistema
+    const badge = (ok, txt) => `<span style="display:inline-flex;align-items:center;gap:5px;background:${ok?'#16a34a':'#dc2626'};color:#fff;font-size:.75rem;font-weight:600;padding:3px 12px;border-radius:99px;">${ok?'✓':'✗'} ${txt}</span>`;
+    const estadoEl = document.getElementById('dash-estado-sistema');
+    if (estadoEl) {
+      estadoEl.innerHTML =
+        badge((d.canvas.alumnos||0) > 0 || (d.canvas.cursos||0) > 0, 'Canvas') +
+        badge((d.m365.usuarios||0) > 0, 'Azure AD') +
+        badge(!!d.ultima_sync || (d.canvas.alumnos||0) > 0, 'Base de datos') +
+        `<span style="font-size:.78rem;color:var(--text-muted);margin-top:4px;">Última sync: ${_esc(ult)}</span>`;
+    }
 
     // Huérfanas
     const hc = d.huerfanas?.solo_canvas || [];
