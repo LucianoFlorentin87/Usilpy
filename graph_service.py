@@ -63,6 +63,47 @@ async def search_users(query: str, top: int = 20) -> list[dict]:
         return resp.json().get("value", [])
 
 
+async def get_all_users() -> list[dict]:
+    """Trae TODOS los usuarios del directorio (paginado) con los campos que usamos."""
+    users: list[dict] = []
+    url = f"{GRAPH_BASE}/users"
+    params = {
+        "$select": "id,displayName,mail,userPrincipalName,accountEnabled",
+        "$top": 999,
+    }
+    async with httpx.AsyncClient(timeout=60) as client:
+        headers = _headers()
+        while url:
+            resp = await client.get(url, headers=headers, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+            users.extend(data.get("value", []))
+            url = data.get("@odata.nextLink")
+            params = None  # nextLink ya trae los parámetros embebidos
+    return users
+
+
+async def get_user_groups(user_id: str) -> list[dict]:
+    """Grupos y equipos (Teams) a los que pertenece un usuario."""
+    grupos: list[dict] = []
+    url = f"{GRAPH_BASE}/users/{user_id}/memberOf"
+    params = {"$select": "id,displayName,resourceProvisioningOptions", "$top": 999}
+    async with httpx.AsyncClient(timeout=60) as client:
+        headers = _headers()
+        while url:
+            resp = await client.get(url, headers=headers, params=params)
+            if resp.status_code >= 400:
+                break
+            data = resp.json()
+            for g in data.get("value", []):
+                if g.get("@odata.type", "").endswith("group"):
+                    es_team = "Team" in (g.get("resourceProvisioningOptions") or [])
+                    grupos.append({"id": g.get("id"), "nombre": g.get("displayName"), "es_team": es_team})
+            url = data.get("@odata.nextLink")
+            params = None
+    return grupos
+
+
 async def get_user_by_upn(upn: str) -> dict | None:
     """Look up a user by UPN (email). Returns None if not found."""
     async with httpx.AsyncClient() as client:

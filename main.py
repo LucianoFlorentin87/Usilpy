@@ -2036,6 +2036,26 @@ async def sync_canvas_status(job_id: str, _user=Depends(_require_admin)):
     return job
 
 
+@app.post("/api/sync/365")
+async def sync_365(background_tasks: BackgroundTasks, _user=Depends(_require_admin)):
+    """Trigger manual de sincronización del directorio 365/Teams — retorna job_id."""
+    import sync_service
+    import uuid as _uuid
+    job_id = str(_uuid.uuid4())[:8]
+    _import_jobs[job_id] = {"status": "running", "result": None}
+
+    async def _run():
+        try:
+            await sync_service.init_db()
+            result = await sync_service.run_sync_365()
+            _import_jobs[job_id] = {"status": "done", "result": result}
+        except Exception as exc:
+            _import_jobs[job_id] = {"status": "done", "result": {"error": str(exc)}}
+
+    background_tasks.add_task(_run)
+    return {"job_id": job_id, "status": "running"}
+
+
 @app.get("/api/sync/estado")
 async def sync_estado(_user=Depends(_require_admin)):
     """Last sync log + summary counts."""
@@ -2051,7 +2071,8 @@ async def sync_estado(_user=Depends(_require_admin)):
             (SELECT COUNT(*) FROM sync_alumnos)         AS total_alumnos,
             (SELECT COUNT(*) FROM sync_matriculaciones) AS total_matriculaciones,
             (SELECT COUNT(*) FROM sync_calificaciones)  AS total_calificaciones,
-            (SELECT COUNT(*) FROM sync_asistencias)     AS total_asistencias
+            (SELECT COUNT(*) FROM sync_asistencias)     AS total_asistencias,
+            (SELECT COUNT(*) FROM sync_usuarios_365)    AS total_usuarios_365
     """)
     from scheduler import get_next_sync
     return {

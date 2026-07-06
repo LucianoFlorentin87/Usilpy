@@ -58,6 +58,12 @@ async def _sync_job() -> None:
         logger.info("Sync Canvas completado — %s", stats)
     except Exception as exc:
         logger.exception("Error en sync diario de Canvas: %s", exc)
+    # Sincronizar también el directorio 365/Teams
+    try:
+        stats365 = await sync_service.run_sync_365()
+        logger.info("Sync 365 completado — %s", stats365)
+    except Exception as exc:
+        logger.exception("Error en sync diario de 365: %s", exc)
 
 
 def _parse_hora(valor: str, defecto: tuple[int, int]) -> tuple[int, int]:

@@ -11,6 +11,58 @@ import canvas_service
 
 logger = logging.getLogger(__name__)
 
+
+async def run_sync_365(incluir_grupos: bool = True) -> dict:
+    """Sincroniza el directorio de Microsoft 365/Azure AD a sync_usuarios_365:
+    email, UPN, estado activo/inactivo y (opcional) grupos y equipos de cada usuario."""
+    import graph_service
+    await init_db()
+    stats = {"usuarios": 0, "con_grupos": 0, "errores": 0}
+    try:
+        usuarios = await graph_service.get_all_users()
+    except Exception as exc:
+        logger.error("Error listando usuarios 365: %s", exc)
+        return {**stats, "error": str(exc)}
+
+    for u in usuarios:
+        azure_id = u.get("id")
+        if not azure_id:
+            continue
+        grupos_txt, equipos_txt = None, None
+        if incluir_grupos:
+            try:
+                gs = await graph_service.get_user_groups(azure_id)
+                grupos_txt = ", ".join(g["nombre"] for g in gs if g.get("nombre"))
+                equipos_txt = ", ".join(g["nombre"] for g in gs if g.get("es_team") and g.get("nombre"))
+                if gs:
+                    stats["con_grupos"] += 1
+            except Exception as exc:
+                logger.debug("Grupos no disponibles para %s: %s", azure_id, exc)
+                stats["errores"] += 1
+        try:
+            await db.execute("""
+                INSERT INTO sync_usuarios_365
+                    (azure_id, nombre, email, upn, activo, grupos, equipos, ultima_sync)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                ON CONFLICT (azure_id) DO UPDATE SET
+                    nombre = EXCLUDED.nombre, email = EXCLUDED.email,
+                    upn = EXCLUDED.upn, activo = EXCLUDED.activo,
+                    grupos = EXCLUDED.grupos, equipos = EXCLUDED.equipos,
+                    ultima_sync = NOW()
+            """,
+                azure_id, u.get("displayName"),
+                u.get("mail") or u.get("userPrincipalName"),
+                u.get("userPrincipalName"), u.get("accountEnabled"),
+                grupos_txt, equipos_txt,
+            )
+            stats["usuarios"] += 1
+        except Exception as exc:
+            logger.warning("Error guardando usuario 365 %s: %s", azure_id, exc)
+            stats["errores"] += 1
+
+    logger.info("Sync 365 completado — %s", stats)
+    return stats
+
 # ---------------------------------------------------------------------------
 # DDL — tablas
 # ---------------------------------------------------------------------------
@@ -66,6 +118,17 @@ CREATE TABLE IF NOT EXISTS sync_asistencias (
     estado              TEXT,
     ultima_sync         TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(canvas_course_id, canvas_user_id, fecha_clase)
+);
+
+CREATE TABLE IF NOT EXISTS sync_usuarios_365 (
+    azure_id            TEXT PRIMARY KEY,
+    nombre              TEXT,
+    email               TEXT,
+    upn                 TEXT,
+    activo              BOOLEAN,
+    grupos              TEXT,
+    equipos             TEXT,
+    ultima_sync         TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS sync_log (

@@ -1102,7 +1102,10 @@
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
           <button class="btn btn-primary" onclick="ejecutarSync()" style="display:flex;align-items:center;gap:6px;">
-            🔄 Sincronizar ahora
+            🔄 Sincronizar Canvas
+          </button>
+          <button class="btn btn-primary" onclick="ejecutarSync365()" style="display:flex;align-items:center;gap:6px;background:#5b21b6;">
+            👥 Sincronizar 365 / Teams
           </button>
           <button class="btn btn-secondary" onclick="cargarSyncEstado()" style="display:flex;align-items:center;gap:6px;">
             📊 Actualizar estado
@@ -4410,6 +4413,7 @@ async function cargarSyncEstado() {
       {label:'Matriculaciones', valor: t.total_matriculaciones||0, icon:'📋'},
       {label:'Calificaciones', valor: t.total_calificaciones||0, icon:'📊'},
       {label:'Asistencias', valor: t.total_asistencias||0, icon:'✅'},
+      {label:'Usuarios 365', valor: t.total_usuarios_365||0, icon:'👥'},
     ];
     document.getElementById('sync-totales').innerHTML = cards.map(c =>
       `<div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:10px;padding:14px;text-align:center;">
@@ -4437,6 +4441,46 @@ async function cargarSyncEstado() {
     }
   } catch(ex) {
     document.getElementById('sync-ultima').innerHTML = `<span style="color:#dc2626;">Error al cargar estado: ${_esc(ex.message)}</span>`;
+  }
+}
+
+async function ejecutarSync365() {
+  const progressEl = document.getElementById('sync-progress');
+  const resultEl = document.getElementById('sync-result');
+  progressEl.style.display = 'block';
+  resultEl.style.display = 'none';
+  progressEl.innerHTML = `<div style="padding:12px;background:#ede9fe;border-radius:6px;">⏳ Sincronizando directorio 365 / Teams... (puede tardar varios minutos)</div>`;
+  _portalLog('Iniciando sincronización con 365 / Teams...');
+  try {
+    const { job_id } = await apiFetch('/api/sync/365', 'POST');
+    let job;
+    while (true) {
+      await new Promise(r => setTimeout(r, 4000));
+      const r = await fetch(`/api/sync/canvas/status/${job_id}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      job = await r.json();
+      if (job.status === 'done') break;
+    }
+    progressEl.style.display = 'none';
+    resultEl.style.display = 'block';
+    const data = job.result || {};
+    if (data.error) {
+      resultEl.innerHTML = `<div style="background:#fee2e2;border-radius:8px;padding:12px;">❌ Error: ${_esc(data.error)}</div>`;
+      _portalLog(`Error en sync 365: ${data.error}`, 'error');
+    } else {
+      resultEl.innerHTML = `
+        <div style="background:#ede9fe;border-radius:8px;padding:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          <div>👥 <strong>Usuarios:</strong> ${parseInt(data.usuarios)||0}</div>
+          <div>🗂️ <strong>Con grupos/equipos:</strong> ${parseInt(data.con_grupos)||0}</div>
+          <div style="color:${data.errores>0?'#dc2626':'#16a34a'}">⚠ <strong>Errores:</strong> ${data.errores||0}</div>
+        </div>`;
+      _portalLog(`Sync 365 completado — ${data.usuarios||0} usuarios, ${data.con_grupos||0} con grupos`, 'success');
+      await cargarSyncEstado();
+    }
+  } catch(ex) {
+    progressEl.style.display = 'none';
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `<div style="background:#fee2e2;border-radius:8px;padding:12px;">❌ Error: ${_esc(ex.message)}</div>`;
+    _portalLog(`Error en sync 365: ${_esc(ex.message)}`, 'error');
   }
 }
 
