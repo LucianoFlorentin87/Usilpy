@@ -2107,7 +2107,7 @@ async function loadDashboardPlataformas() {
     const tarjeta = (banda, icono, titulo, sub, cuerpo, pie) => `
       <div style="background:var(--surface);border-radius:16px;overflow:hidden;box-shadow:var(--card-shadow);border:1px solid var(--border);display:flex;flex-direction:column;">
         <div style="background:${banda};padding:18px 20px;position:relative;color:#fff;">
-          <div style="position:absolute;top:10px;right:16px;font-size:2.6rem;opacity:.25;">${icono}</div>
+          <div style="position:absolute;top:12px;right:16px;opacity:.3;line-height:0;">${icono}</div>
           <div style="font-weight:700;font-size:1.05rem;">${titulo}</div>
           <div style="font-size:.75rem;opacity:.85;margin-top:2px;">${sub}</div>
         </div>
@@ -2118,13 +2118,13 @@ async function loadDashboardPlataformas() {
     const enlace = (icono, txt, panel) => `<a onclick="showPanel('${panel}', document.querySelector('[data-panel=${panel}]'))" style="cursor:pointer;color:var(--accent);font-size:.8rem;font-weight:600;text-decoration:none;">${icono} ${txt}</a>`;
 
     document.getElementById('dash-plataformas').innerHTML =
-      tarjeta('linear-gradient(135deg,#0a4f8f,#1273c4)', '🎓', 'Canvas LMS', 'Universidad San Ignacio de Loyola',
+      tarjeta('linear-gradient(135deg,#0a4f8f,#1273c4)', `<svg width="52" height="52" viewBox="0 0 48 48" fill="#fff"><circle cx="24" cy="6" r="3.4"/><circle cx="24" cy="42" r="3.4"/><circle cx="6" cy="24" r="3.4"/><circle cx="42" cy="24" r="3.4"/><circle cx="11.3" cy="11.3" r="3.1"/><circle cx="36.7" cy="36.7" r="3.1"/><circle cx="11.3" cy="36.7" r="3.1"/><circle cx="36.7" cy="11.3" r="3.1"/><circle cx="24" cy="24" r="5.2"/></svg>`, 'Canvas LMS', 'Universidad San Ignacio de Loyola',
         stat(d.canvas.cursos, 'Cursos') + stat(d.canvas.alumnos, 'Alumnos') + stat(d.canvas.matriculas, 'Matrículas'),
         enlace('📖','Cursos','panel-canvas-cursos') + enlace('🗓️','Asistencias','panel-canvas-asistencia')) +
-      tarjeta('linear-gradient(135deg,#4c3d99,#6455b8)', '👥', 'Microsoft Teams', 'Azure Active Directory',
+      tarjeta('linear-gradient(135deg,#4c3d99,#6455b8)', `<svg width="52" height="52" viewBox="0 0 48 48" fill="#fff"><circle cx="35" cy="12" r="5"/><rect x="4" y="16" width="24" height="24" rx="4"/><text x="16" y="34" text-anchor="middle" font-size="17" font-weight="bold" fill="#6455b8" font-family="Arial">T</text><path d="M30 20h12a2 2 0 0 1 2 2v10a8 8 0 0 1-8 8h-2V20z" opacity=".8"/></svg>`, 'Microsoft Teams', 'Azure Active Directory',
         stat(d.m365.usuarios, 'Usuarios Azure AD') + stat(d.m365.activos, 'Activos') + stat(d.m365.con_teams, 'Con Teams'),
         enlace('👥','Sincronizar','sync-panel')) +
-      tarjeta('linear-gradient(135deg,#d35f13,#e8790f)', '🛠️', 'Base de datos', 'Sincronización y herramientas',
+      tarjeta('linear-gradient(135deg,#d35f13,#e8790f)', `<svg width="52" height="52" viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3"><ellipse cx="24" cy="10" rx="16" ry="6"/><path d="M8 10v14c0 3.3 7.2 6 16 6s16-2.7 16-6V10"/><path d="M8 24v14c0 3.3 7.2 6 16 6s16-2.7 16-6V24"/></svg>`, 'Base de datos', 'Sincronización y herramientas',
         `<div style="font-size:.82rem;color:var(--text);line-height:1.8;">
            <div>Última sync: <strong>${_esc(ult)}</strong></div>
            <div>Próxima automática: <strong>${_esc(px)}</strong></div>
