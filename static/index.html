@@ -680,6 +680,34 @@
         </div>
       </div>
 
+      <!-- Estado de plataformas -->
+      <div id="dash-plataformas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px;"></div>
+
+      <!-- Cuentas huérfanas -->
+      <div class="card" id="dash-huerfanas-card" style="display:none;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">⚠️ Cuentas huérfanas</h3>
+          <span style="font-size:.78rem;color:#64748b;">Detectadas cruzando la BD sincronizada de Canvas y 365</span>
+        </div>
+        <div id="dash-huerfanas" style="margin-top:10px;"></div>
+      </div>
+
+      <!-- Acciones rápidas -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+        <div onclick="showPanel('portal-academico', document.querySelector('[data-panel=portal-academico]'))" style="cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+          <div style="font-size:1.4rem;">✏️</div><div style="font-size:.82rem;font-weight:600;margin-top:4px;">Cargar inscripción</div>
+        </div>
+        <div onclick="showPanel('sync-panel', document.querySelector('[data-panel=sync-panel]'))" style="cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+          <div style="font-size:1.4rem;">🔄</div><div style="font-size:.82rem;font-weight:600;margin-top:4px;">Sincronizar BD</div>
+        </div>
+        <div onclick="showPanel('panel-canvas-asistencia', document.querySelector('[data-panel=panel-canvas-asistencia]'))" style="cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+          <div style="font-size:1.4rem;">🗓️</div><div style="font-size:.82rem;font-weight:600;margin-top:4px;">Reporte asistencia</div>
+        </div>
+        <div onclick="showPanel('panel-buscar-alumno', document.querySelector('[data-panel=panel-buscar-alumno]'))" style="cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+          <div style="font-size:1.4rem;">🔍</div><div style="font-size:.82rem;font-weight:600;margin-top:4px;">Consultar alumno</div>
+        </div>
+      </div>
+
       <!-- KPI row -->
       <div class="kpi-grid" id="kpi-grid">
         <div class="kpi-card kpi-blue">
@@ -2003,6 +2031,75 @@ async function loadDashboard() {
     await loadDashboardTable();
   } catch(e) {
     console.error('Dashboard error:', e);
+  }
+  loadDashboardPlataformas();  // no bloquea el resto del dashboard
+}
+
+async function loadDashboardPlataformas() {
+  try {
+    const d = await apiFetch('/api/dashboard/plataformas');
+    const ult = d.ultima_sync ? new Date(d.ultima_sync).toLocaleString('es') : 'nunca';
+    const px  = d.proxima_sync ? new Date(d.proxima_sync).toLocaleString('es', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'}) : '—';
+    document.getElementById('dash-plataformas').innerHTML = `
+      <div style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);border-radius:12px;padding:16px;color:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;">Canvas LMS</span><span style="font-size:1.2rem;">🎓</span>
+        </div>
+        <div style="display:flex;gap:18px;margin-top:10px;">
+          <div><div style="font-size:1.5rem;font-weight:700;">${(d.canvas.cursos||0).toLocaleString()}</div><div style="font-size:.75rem;opacity:.85;">Cursos</div></div>
+          <div><div style="font-size:1.5rem;font-weight:700;">${(d.canvas.alumnos||0).toLocaleString()}</div><div style="font-size:.75rem;opacity:.85;">Alumnos</div></div>
+          <div><div style="font-size:1.5rem;font-weight:700;">${(d.canvas.matriculas||0).toLocaleString()}</div><div style="font-size:.75rem;opacity:.85;">Matrículas</div></div>
+        </div>
+      </div>
+      <div style="background:linear-gradient(135deg,#5b21b6,#8b5cf6);border-radius:12px;padding:16px;color:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;">Microsoft 365 / Teams</span><span style="font-size:1.2rem;">👥</span>
+        </div>
+        <div style="display:flex;gap:18px;margin-top:10px;">
+          <div><div style="font-size:1.5rem;font-weight:700;">${(d.m365.usuarios||0).toLocaleString()}</div><div style="font-size:.75rem;opacity:.85;">Usuarios</div></div>
+          <div><div style="font-size:1.5rem;font-weight:700;">${(d.m365.activos||0).toLocaleString()}</div><div style="font-size:.75rem;opacity:.85;">Activos</div></div>
+          <div><div style="font-size:1.5rem;font-weight:700;">${(d.m365.con_teams||0).toLocaleString()}</div><div style="font-size:.75rem;opacity:.85;">Con Teams</div></div>
+        </div>
+      </div>
+      <div style="background:linear-gradient(135deg,#0f172a,#334155);border-radius:12px;padding:16px;color:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;">Base de datos</span><span style="font-size:1.2rem;">🗄️</span>
+        </div>
+        <div style="margin-top:10px;font-size:.82rem;line-height:1.7;">
+          <div>Última sync: <strong>${_esc(ult)}</strong></div>
+          <div>Próxima automática: <strong>${_esc(px)}</strong></div>
+        </div>
+      </div>`;
+
+    // Huérfanas
+    const hc = d.huerfanas?.solo_canvas || [];
+    const h365 = d.huerfanas?.solo_365 || [];
+    const card = document.getElementById('dash-huerfanas-card');
+    if (hc.length || h365.length) {
+      card.style.display = '';
+      const renderLista = (items, tipo) => items.slice(0, 100).map(u =>
+        `<li style="padding:2px 0;">${_esc(u.nombre||'—')} <span style="color:#94a3b8;">· ${_esc(u.email||u.upn||u.sis_user_id||'')}</span></li>`).join('');
+      document.getElementById('dash-huerfanas').innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
+          <details style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;">
+            <summary style="cursor:pointer;font-size:.85rem;font-weight:600;color:#9a3412;">
+              En Canvas sin cuenta 365 — ${hc.length}${hc.length===100?'+':''}
+            </summary>
+            <ul style="margin:8px 0 0 16px;font-size:.8rem;max-height:200px;overflow-y:auto;">${renderLista(hc)}</ul>
+          </details>
+          <details style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;">
+            <summary style="cursor:pointer;font-size:.85rem;font-weight:600;color:#1e40af;">
+              En 365 (activos) sin cuenta Canvas — ${h365.length}${h365.length===100?'+':''}
+            </summary>
+            <ul style="margin:8px 0 0 16px;font-size:.8rem;max-height:200px;overflow-y:auto;">${renderLista(h365)}</ul>
+          </details>
+        </div>
+        <p style="font-size:.75rem;color:#94a3b8;margin:8px 0 0;">Nota: los usuarios de 365 incluyen personal administrativo y docentes; no todos deberían tener cuenta Canvas.</p>`;
+    } else {
+      card.style.display = 'none';
+    }
+  } catch(e) {
+    console.error('Plataformas error:', e);
   }
 }
 

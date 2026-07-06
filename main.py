@@ -1353,6 +1353,67 @@ async def get_dashboard(_: dict = Depends(get_current_user)):
 # Búsqueda de alumnos (Canvas + Azure AD)
 # ---------------------------------------------------------------------------
 
+@app.get("/api/dashboard/plataformas")
+async def dashboard_plataformas(_: dict = Depends(get_current_user)):
+    """Estado de plataformas (BD sincronizada) + cuentas huérfanas Canvas↔365."""
+    import db as _db
+    import sync_service
+    await sync_service.init_db()
+
+    tot = await _db.fetchrow("""
+        SELECT
+            (SELECT COUNT(*) FROM sync_cursos)                            AS canvas_cursos,
+            (SELECT COUNT(*) FROM sync_alumnos)                           AS canvas_alumnos,
+            (SELECT COUNT(*) FROM sync_matriculaciones)                   AS canvas_matriculas,
+            (SELECT COUNT(*) FROM sync_usuarios_365)                      AS m365_usuarios,
+            (SELECT COUNT(*) FROM sync_usuarios_365 WHERE activo IS TRUE) AS m365_activos,
+            (SELECT COUNT(*) FROM sync_usuarios_365 WHERE equipos IS NOT NULL AND equipos <> '') AS m365_con_teams,
+            (SELECT MAX(completado_en) FROM sync_log)                     AS ultima_sync
+    """)
+
+    # Huérfanas: en Canvas pero sin cuenta 365 (por email/login vs upn/email)
+    huerfanas_canvas = await _db.fetch("""
+        SELECT a.nombre, a.email, a.sis_user_id
+        FROM sync_alumnos a
+        WHERE NOT EXISTS (
+            SELECT 1 FROM sync_usuarios_365 u
+            WHERE LOWER(u.upn) = LOWER(COALESCE(a.email, a.login_id))
+               OR LOWER(u.email) = LOWER(COALESCE(a.email, a.login_id))
+        )
+        ORDER BY a.nombre LIMIT 100
+    """)
+    # En 365 (activos) pero sin cuenta Canvas
+    huerfanas_365 = await _db.fetch("""
+        SELECT u.nombre, u.email, u.upn
+        FROM sync_usuarios_365 u
+        WHERE u.activo IS TRUE
+          AND NOT EXISTS (
+            SELECT 1 FROM sync_alumnos a
+            WHERE LOWER(COALESCE(a.email, a.login_id)) = LOWER(u.upn)
+               OR LOWER(COALESCE(a.email, a.login_id)) = LOWER(u.email)
+        )
+        ORDER BY u.nombre LIMIT 100
+    """)
+
+    from scheduler import get_next_sync
+    return {
+        "canvas": {
+            "cursos": tot["canvas_cursos"], "alumnos": tot["canvas_alumnos"],
+            "matriculas": tot["canvas_matriculas"],
+        },
+        "m365": {
+            "usuarios": tot["m365_usuarios"], "activos": tot["m365_activos"],
+            "con_teams": tot["m365_con_teams"],
+        },
+        "ultima_sync": tot["ultima_sync"].isoformat() if tot["ultima_sync"] else None,
+        "proxima_sync": get_next_sync(),
+        "huerfanas": {
+            "solo_canvas": [dict(r) for r in huerfanas_canvas],
+            "solo_365": [dict(r) for r in huerfanas_365],
+        },
+    }
+
+
 @app.get("/api/alumnos/buscar")
 async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get_current_user)):
     """Busca un alumno primero en la BD local (sincronizada de Canvas), y solo si
