@@ -1449,6 +1449,27 @@ async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get
         except Exception as e:
             errores.append(f"BD local: {str(e)[:120]}")
 
+    # Cachear en sync_alumnos los que vinieron de Canvas (para que la próxima
+    # búsqueda salga de la BD sin esperar a la sincronización diaria)
+    try:
+        import db as _db
+        import sync_service
+        await sync_service.init_db()
+        for u in merged.values():
+            cid = u.get("canvas_id") or u.get("id")
+            if not u.get("en_canvas") or not cid:
+                continue
+            await _db.execute(
+                """INSERT INTO sync_alumnos (canvas_user_id, nombre, email, sis_user_id, ultima_sync)
+                   VALUES (?, ?, ?, ?, NOW())
+                   ON CONFLICT (canvas_user_id) DO UPDATE SET
+                       nombre = EXCLUDED.nombre, email = EXCLUDED.email,
+                       sis_user_id = EXCLUDED.sis_user_id, ultima_sync = NOW()""",
+                int(cid), u.get("nombre"), u.get("email"), u.get("sis_id"),
+            )
+    except Exception as e:
+        errores.append(f"Cache BD: {str(e)[:120]}")
+
     return {"resultados": list(merged.values()), "errores": errores}
 
 
