@@ -1355,10 +1355,33 @@ async def get_dashboard(_: dict = Depends(get_current_user)):
 
 @app.get("/api/alumnos/buscar")
 async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get_current_user)):
-    """Busca un alumno por cédula o nombre en Canvas y Azure AD en paralelo."""
+    """Busca un alumno primero en la BD local (sincronizada de Canvas), y solo si
+    no aparece consulta Canvas y Azure AD en vivo."""
     import asyncio
 
     errores = []
+
+    # 1) Buscar primero en la BD sincronizada (rápido, no golpea Canvas)
+    try:
+        import db as _db
+        like = f"%{q}%"
+        rows = await _db.fetch(
+            """SELECT canvas_user_id, nombre, email, sis_user_id, login_id
+               FROM sync_alumnos
+               WHERE sis_user_id ILIKE ? OR nombre ILIKE ? OR email ILIKE ? OR login_id ILIKE ?
+               ORDER BY nombre LIMIT 50""",
+            like, like, like, like,
+        )
+        if rows:
+            resultados = [{
+                "fuente": "bd", "id": r["canvas_user_id"], "canvas_id": r["canvas_user_id"],
+                "nombre": r["nombre"], "email": r["email"],
+                "sis_id": r["sis_user_id"], "cedula": r["sis_user_id"],
+                "en_canvas": True, "en_azure": False,
+            } for r in rows]
+            return {"resultados": resultados, "errores": [], "fuente": "bd"}
+    except Exception as e:
+        errores.append(f"BD local: {str(e)[:120]}")
 
     async def _canvas():
         try:
@@ -2030,7 +2053,12 @@ async def sync_estado(_user=Depends(_require_admin)):
             (SELECT COUNT(*) FROM sync_calificaciones)  AS total_calificaciones,
             (SELECT COUNT(*) FROM sync_asistencias)     AS total_asistencias
     """)
-    return {"ultima_sync": dict(last) if last else None, "totales": dict(totals) if totals else {}}
+    from scheduler import get_next_sync
+    return {
+        "ultima_sync": dict(last) if last else None,
+        "totales": dict(totals) if totals else {},
+        "proxima_sync": get_next_sync(),
+    }
 
 
 @app.get("/api/sync/alumnos")

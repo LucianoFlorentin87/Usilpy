@@ -4430,6 +4430,11 @@ async function cargarSyncEstado() {
     } else {
       document.getElementById('sync-ultima').innerHTML = 'Sin sincronizaciones previas. Hacé clic en <strong>Sincronizar ahora</strong> para iniciar.';
     }
+    if (data.proxima_sync) {
+      const px = new Date(data.proxima_sync).toLocaleString('es');
+      document.getElementById('sync-ultima').innerHTML +=
+        `<br><span style="color:#64748b;">🕒 <strong>Próxima sincronización automática:</strong> ${_esc(px)}</span>`;
+    }
   } catch(ex) {
     document.getElementById('sync-ultima').innerHTML = `<span style="color:#dc2626;">Error al cargar estado: ${_esc(ex.message)}</span>`;
   }

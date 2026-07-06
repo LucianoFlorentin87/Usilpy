@@ -48,15 +48,29 @@ async def _cron_job() -> None:
         })
 
 
-def _setup_jobs() -> None:
-    cron_hora = getattr(settings, "cron_hora", "07:00") or "07:00"
+async def _sync_job() -> None:
+    """Sincronización diaria Canvas→BD (cursos, alumnos, matrículas, notas, asistencias)."""
+    import sync_service
+    logger.info("Sync Canvas iniciando: %s", datetime.now(timezone.utc).isoformat())
     try:
-        hora, minuto = cron_hora.split(":")
-        hora_int, minuto_int = int(hora), int(minuto)
-    except (ValueError, AttributeError):
-        logger.warning("CRON_HORA '%s' inválido, usando 07:00", cron_hora)
-        hora_int, minuto_int = 7, 0
+        await sync_service.init_db()
+        stats = await sync_service.run_sync("cron")
+        logger.info("Sync Canvas completado — %s", stats)
+    except Exception as exc:
+        logger.exception("Error en sync diario de Canvas: %s", exc)
 
+
+def _parse_hora(valor: str, defecto: tuple[int, int]) -> tuple[int, int]:
+    try:
+        h, m = str(valor).split(":")
+        return int(h), int(m)
+    except (ValueError, AttributeError):
+        logger.warning("Hora '%s' inválida, usando %02d:%02d", valor, *defecto)
+        return defecto
+
+
+def _setup_jobs() -> None:
+    hora_int, minuto_int = _parse_hora(getattr(settings, "cron_hora", "07:00") or "07:00", (7, 0))
     trigger = CronTrigger(hour=hora_int, minute=minuto_int, timezone="UTC")
     scheduler.add_job(
         _cron_job,
@@ -66,11 +80,30 @@ def _setup_jobs() -> None:
         misfire_grace_time=3600,
         max_instances=1,
     )
-    logger.info("Cron programado para las %02d:%02d UTC diariamente", hora_int, minuto_int)
+    logger.info("Cron matriculación programado para las %02d:%02d UTC diariamente", hora_int, minuto_int)
+
+    # Sincronización diaria Canvas→BD
+    s_hora, s_min = _parse_hora(getattr(settings, "sync_hora", "05:00") or "05:00", (5, 0))
+    scheduler.add_job(
+        _sync_job,
+        trigger=CronTrigger(hour=s_hora, minute=s_min, timezone="UTC"),
+        id="sync_canvas_diaria",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        max_instances=1,
+    )
+    logger.info("Sync Canvas programado para las %02d:%02d UTC diariamente", s_hora, s_min)
 
 
 def get_next_run() -> str | None:
     job = scheduler.get_job("matriculacion_diaria")
+    if job and job.next_run_time:
+        return job.next_run_time.isoformat()
+    return None
+
+
+def get_next_sync() -> str | None:
+    job = scheduler.get_job("sync_canvas_diaria")
     if job and job.next_run_time:
         return job.next_run_time.isoformat()
     return None

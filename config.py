@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     # Matriculación automática
     semestre_actual: str = "2025-2"
     cron_hora: str = "07:00"   # HH:MM UTC
+    sync_hora: str = "05:00"   # HH:MM UTC — sincronización diaria Canvas→BD
 
     model_config = {
         "env_file": ".env",
