@@ -1886,7 +1886,7 @@ function _applyRoleVisibility(role) {
   if (role === 'admin') {
     show([...reportes,...gestion,...portal,...sync,...admin,...academicoAdmin,...canvas]);
   } else if (role === 'academico') {
-    show([...portal,...academicoUser]);
+    show([...portal,...academicoUser, 'nav-section-canvas','nav-canvas-asistencia']);
   } else {
     show(reportes);
   }

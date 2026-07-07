@@ -321,7 +321,7 @@ async def list_courses(_: dict = Depends(get_current_user)):
 
 
 @app.get("/api/canvas/all-courses")
-async def list_all_courses(_: dict = Depends(_require_admin)):
+async def list_all_courses(_: dict = Depends(_require_admin_or_academico)):
     """Todos los cursos de Canvas. Si Canvas falla (p.ej. token vencido), usa la BD sincronizada."""
     try:
         return await canvas_service.get_all_courses()
@@ -352,7 +352,7 @@ async def list_all_courses(_: dict = Depends(_require_admin)):
 
 
 @app.get("/api/canvas/asistencia/{course_id}")
-async def reporte_asistencia(course_id: int, umbral: float = 70, _: dict = Depends(_require_admin)):
+async def reporte_asistencia(course_id: int, umbral: float = 70, _: dict = Depends(_require_admin_or_academico)):
     """Reporte de asistencia (Roll Call) de un curso con % y habilitación a examen."""
     try:
         rep = await canvas_service.get_roll_call_report(course_id)
@@ -503,7 +503,7 @@ async def reporte_asistencia_debug(course_id: int, _: dict = Depends(_require_ad
 
 
 @app.get("/api/canvas/asistencia/{course_id}/excel")
-async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: str = "", _: dict = Depends(_require_admin)):
+async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: str = "", _: dict = Depends(_require_admin_or_academico)):
     """Descarga el reporte de asistencia como .xlsx con formato."""
     rep = await reporte_asistencia(course_id, umbral, _)
     try:
