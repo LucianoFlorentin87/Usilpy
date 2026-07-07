@@ -586,6 +586,16 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
         raise ValueError("El Excel debe tener una columna 'materia'")
 
     rows_out = []
+    # Resolver cada período UNA sola vez para todo el lote. Así, si alguien
+    # renombra el período en Canvas mientras corre el proceso, todos los cursos
+    # caen en el mismo período (no se crea uno nuevo por curso).
+    _term_cache: dict[str, int | None] = {}
+
+    async def _resolver_term(sem: str) -> int | None:
+        if sem not in _term_cache:
+            term_obj = await canvas_service.get_or_create_term(sem)
+            _term_cache[sem] = term_obj.get("id") if isinstance(term_obj, dict) else None
+        return _term_cache[sem]
 
     for _, row in df.iterrows():
         materia = str(row.get("materia", "")).strip()
@@ -603,8 +613,7 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
 
         # Canvas
         try:
-            term_obj = await canvas_service.get_or_create_term(semestre)
-            term_id = term_obj.get("id") if isinstance(term_obj, dict) else None
+            term_id = await _resolver_term(semestre)
             sis_id = f"USIL-{semestre}-{materia[:60]}"
             existing = await canvas_service.get_course_by_sis_id(sis_id)
             if existing:
