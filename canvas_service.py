@@ -169,9 +169,13 @@ async def find_user_by_sis_id(sis_id: str) -> dict | None:
 
 async def get_course_by_sis_id(sis_id: str) -> dict | None:
     """Look up a Canvas course by SIS course ID. Returns None if not found."""
+    from urllib.parse import quote
+    # El SIS puede tener tildes, espacios y paréntesis: hay que codificarlo
+    # para que la búsqueda no falle y el sistema no intente recrear el curso.
+    sis_enc = quote(f"sis_course_id:{sis_id}", safe="")
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{_base()}/api/v1/courses/sis_course_id:{sis_id}",
+            f"{_base()}/api/v1/courses/{sis_enc}",
             headers=_headers(),
         )
         if resp.status_code == 404:
