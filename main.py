@@ -322,12 +322,33 @@ async def list_courses(_: dict = Depends(get_current_user)):
 
 @app.get("/api/canvas/all-courses")
 async def list_all_courses(_: dict = Depends(_require_admin)):
-    """Todos los cursos de Canvas con id, nombre y sis_course_id (paginado)."""
+    """Todos los cursos de Canvas. Si Canvas falla (p.ej. token vencido), usa la BD sincronizada."""
     try:
         return await canvas_service.get_all_courses()
     except Exception as exc:
-        logger.error("Canvas all-courses error: %s", exc)
-        raise HTTPException(status_code=502, detail=str(exc))
+        logger.warning("Canvas all-courses falló (%s); usando BD sync_cursos", exc)
+        try:
+            import db as _db
+            rows = await _db.fetch(
+                """SELECT canvas_course_id, nombre, sis_course_id, semestre, estado
+                   FROM sync_cursos ORDER BY nombre"""
+            )
+            if not rows:
+                raise HTTPException(status_code=502, detail=f"Canvas no disponible y no hay cursos en la BD. Ejecutá una sincronización. ({str(exc)[:80]})")
+            return [{
+                "id": r["canvas_course_id"],
+                "name": r["nombre"],
+                "sis_course_id": r["sis_course_id"] or "",
+                "term": {"name": r["semestre"] or ""},
+                "enrollment_term_id": None,
+                "workflow_state": r["estado"] or "",
+                "_fuente": "bd",
+            } for r in rows]
+        except HTTPException:
+            raise
+        except Exception as e2:
+            logger.error("Fallback BD cursos falló: %s", e2)
+            raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.get("/api/canvas/asistencia/{course_id}")

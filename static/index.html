@@ -4983,16 +4983,20 @@ async function asisCargarCursos() {
   const st = document.getElementById('asis-status');
   st.innerHTML = '<span style="color:#64748b;">⏳ Cargando períodos y cursos desde Canvas...</span>';
   try {
-    const [terms, cursos] = await Promise.all([
+    const [termsR, cursosR] = await Promise.allSettled([
       apiFetch('/api/canvas/terms'),
       apiFetch('/api/canvas/all-courses'),
     ]);
+    if (cursosR.status !== 'fulfilled') throw new Error(cursosR.reason?.message || 'No se pudieron cargar los cursos');
+    const cursos = cursosR.value || [];
     _asisCursos = cursos.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    const terms = termsR.status === 'fulfilled' ? (termsR.value || []) : [];
     const termSel = document.getElementById('asis-term-select');
     termSel.innerHTML = '<option value="">Todos los períodos</option>' +
       terms.map(t => `<option value="${t.id}">${_esc(t.name)}</option>`).join('');
+    const desdeBD = cursos.some(c => c._fuente === 'bd');
     asisFiltrarCursos();
-    st.innerHTML = `<span style="color:#16a34a;">✓ ${terms.length} períodos y ${cursos.length} cursos cargados.</span>`;
+    st.innerHTML = `<span style="color:#16a34a;">✓ ${cursos.length} cursos cargados${desdeBD ? ' (desde la base de datos — Canvas no disponible)' : ''}.</span>`;
   } catch(e) {
     _asisInicializado = false;
     st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)} <button class="btn btn-secondary" style="padding:2px 10px;font-size:.78rem;" onclick="asisInit()">Reintentar</button></span>`;
