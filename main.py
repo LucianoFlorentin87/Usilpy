@@ -1862,7 +1862,13 @@ async def gestion_crear_cursos(file: UploadFile = File(...), _user=Depends(_requ
     """Upload Excel with materias → creates Canvas courses + Teams teams → returns Excel with IDs"""
     import bulk_service as _bulk
     data = await _read_validated(file)
-    excel_bytes = await _bulk.process_cursos_ids(data, file.filename)
+    try:
+        excel_bytes = await _bulk.process_cursos_ids(data, file.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Error creando cursos: %s", exc)
+        raise HTTPException(status_code=400, detail=f"No se pudo procesar el archivo: {str(exc)[:200]}")
     from fastapi.responses import Response
     return Response(
         content=excel_bytes,

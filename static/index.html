@@ -4798,7 +4798,10 @@ async function crearCursos() {
     const fd = new FormData();
     fd.append('file', file);
     const resp = await fetch('/api/gestion/crear-cursos', { method:'POST', headers:{'Authorization':'Bearer '+getToken()}, body:fd });
-    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Error'); }
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.detail || `El servidor rechazó el archivo (${resp.status}). Verificá que sea la planilla de cursos con la columna "materia".`);
+    }
 
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
