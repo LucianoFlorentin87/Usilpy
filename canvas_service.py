@@ -204,8 +204,44 @@ async def create_course(name: str, sis_id: str, semestre: str = "", term_id: int
             headers=_headers(),
             json=payload,
         )
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            # Incluir el cuerpo de la respuesta para saber QUÉ rechazó Canvas
+            raise RuntimeError(f"Canvas {resp.status_code}: {resp.text[:300]}")
         return resp.json()
+
+
+async def find_course_incl_deleted(sis_id: str, name: str) -> dict | None:
+    """Busca un curso por SIS o nombre incluyendo los borrados (un curso borrado
+    conserva su SIS ID y bloquea la creación de otro igual)."""
+    acct = await _account_id()
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.get(
+            f"{_base()}/api/v1/accounts/{acct}/courses",
+            headers=_headers(),
+            params={
+                "search_term": name[:100],
+                "state[]": ["created", "claimed", "available", "completed", "deleted"],
+                "per_page": 100,
+            },
+        )
+        if resp.status_code != 200:
+            return None
+        for c in resp.json():
+            if (c.get("sis_course_id") or "") == sis_id or (c.get("name") or "") == name:
+                return c
+    return None
+
+
+async def undelete_course(course_id: int | str) -> bool:
+    """Restaura un curso borrado (batch update de la cuenta con event=undelete)."""
+    acct = await _account_id()
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.put(
+            f"{_base()}/api/v1/accounts/{acct}/courses",
+            headers=_headers(),
+            json={"event": "undelete", "course_ids": [int(course_id)]},
+        )
+        return resp.status_code in (200, 201)
 
 
 async def enroll_user(course_id: str, user_id: str, role: str = "StudentEnrollment") -> dict:

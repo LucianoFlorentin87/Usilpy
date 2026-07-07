@@ -620,16 +620,32 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
                 canvas_course_id = str(existing.get("id", ""))
                 canvas_status = "existente"
             else:
-                created = await canvas_service.create_course(
-                    name=f"{semestre} - {materia}",
-                    sis_id=sis_id,
-                    term_id=term_id,
-                )
-                canvas_course_id = str(created.get("id", ""))
-                canvas_status = "creado"
+                nombre_curso = f"{semestre} - {materia}"
+                try:
+                    created = await canvas_service.create_course(
+                        name=nombre_curso,
+                        sis_id=sis_id,
+                        term_id=term_id,
+                    )
+                    canvas_course_id = str(created.get("id", ""))
+                    canvas_status = "creado"
+                except Exception as create_exc:
+                    # Puede haber un curso BORRADO con el mismo SIS bloqueando la creación
+                    borrado = await canvas_service.find_course_incl_deleted(sis_id, nombre_curso)
+                    if borrado and (borrado.get("workflow_state") == "deleted"):
+                        if await canvas_service.undelete_course(borrado["id"]):
+                            canvas_course_id = str(borrado.get("id", ""))
+                            canvas_status = "restaurado (estaba borrado)"
+                        else:
+                            canvas_status = f"error: existe borrado (id={borrado.get('id')}) y no se pudo restaurar"
+                    elif borrado:
+                        canvas_course_id = str(borrado.get("id", ""))
+                        canvas_status = "existente"
+                    else:
+                        raise create_exc
         except Exception as exc:
             logger.error("Canvas error creando curso '%s': %s", materia, exc)
-            canvas_status = f"error: {str(exc)[:120]}"
+            canvas_status = f"error: {str(exc)[:160]}"
 
         # Teams
         try:
