@@ -1094,7 +1094,7 @@ async def get_historial(
     semestre: str | None = Query(None),
     cedula: str | None = Query(None),
     limit: int = Query(500, le=2000),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(_require_admin),
 ):
     try:
         rows = await audit_service.get_historial(semestre=semestre, cedula=cedula, limit=limit)
@@ -1107,7 +1107,7 @@ async def get_historial(
 async def export_audit(
     semestre: str | None = Query(None),
     cedula: str | None = Query(None),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(_require_admin),
 ):
     try:
         excel_bytes = await audit_service.export_to_excel(semestre=semestre, cedula=cedula)
@@ -1361,7 +1361,7 @@ async def add_manual_alias(payload: dict, current: dict = Depends(_require_admin
 # ---------------------------------------------------------------------------
 
 @app.get("/api/dashboard")
-async def get_dashboard(_: dict = Depends(get_current_user)):
+async def get_dashboard(_: dict = Depends(_require_admin)):
     try:
         kpis = await audit_service.get_dashboard_kpis()
         kpis["proxima_ejecucion"] = get_next_run()
@@ -1375,7 +1375,7 @@ async def get_dashboard(_: dict = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/dashboard/plataformas")
-async def dashboard_plataformas(_: dict = Depends(get_current_user)):
+async def dashboard_plataformas(_: dict = Depends(_require_admin)):
     """Estado de plataformas (BD sincronizada) + cuentas huérfanas Canvas↔365."""
     import db as _db
     import sync_service
