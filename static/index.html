@@ -1816,7 +1816,7 @@
 
     <footer style="margin-top:28px;padding:16px 4px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:.8rem;color:var(--text-muted);">
       <span>© 2026 Universidad San Ignacio de Loyola — Gestión Académica</span>
-      <span style="display:flex;gap:16px;">
+      <span id="footer-links" style="display:none;gap:16px;">
         <a onclick="showPanel('dashboard', document.querySelector('[data-panel=dashboard]'))" style="cursor:pointer;color:var(--accent);text-decoration:none;">Dashboard</a>
         <a onclick="showPanel('auditoria', document.querySelector('[data-panel=auditoria]'))" style="cursor:pointer;color:var(--accent);text-decoration:none;">Auditoría</a>
       </span>
@@ -1883,6 +1883,8 @@ function _applyRoleVisibility(role) {
   function hide(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 
   hide(all);
+  const footerLinks = document.getElementById('footer-links');
+  if (footerLinks) footerLinks.style.display = role === 'admin' ? 'flex' : 'none';
   if (role === 'admin') {
     show([...reportes,...gestion,...portal,...sync,...admin,...academicoAdmin,...canvas]);
   } else if (role === 'academico') {
