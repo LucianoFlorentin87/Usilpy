@@ -1179,11 +1179,92 @@ def build_plantilla_matricular() -> bytes:
     )
 
 
+async def _ensure_curso(materia: str, periodo: str, term_cache: dict) -> tuple[str, str, str]:
+    """Garantiza que el curso Canvas + equipo Teams existan para (materia, periodo).
+    Crea el período si falta, crea o restaura el curso, crea el equipo, y guarda
+    los IDs en la tabla cursos. Retorna (canvas_id, teams_id, detalle)."""
+    canvas_course_id = ""
+    teams_team_id = ""
+    detalles = []
+
+    # Período (una sola resolución por lote)
+    if periodo not in term_cache:
+        try:
+            term_obj = await canvas_service.get_or_create_term(periodo)
+            term_cache[periodo] = term_obj.get("id") if isinstance(term_obj, dict) else None
+        except Exception as exc:
+            logger.error("Error resolviendo período '%s': %s", periodo, exc)
+            term_cache[periodo] = None
+    term_id = term_cache[periodo]
+
+    nombre_curso = f"{periodo} - {materia}"
+    sis_id = f"USIL-{periodo}-{materia[:60]}"
+
+    # Curso Canvas
+    try:
+        existing = await canvas_service.get_course_by_sis_id(sis_id)
+        if existing:
+            canvas_course_id = str(existing.get("id", ""))
+            detalles.append("curso existente")
+        else:
+            try:
+                created = await canvas_service.create_course(name=nombre_curso, sis_id=sis_id, term_id=term_id)
+                canvas_course_id = str(created.get("id", ""))
+                detalles.append("curso creado")
+            except Exception as create_exc:
+                borrado = await canvas_service.find_course_incl_deleted(sis_id, nombre_curso)
+                if borrado and borrado.get("workflow_state") == "deleted":
+                    if await canvas_service.undelete_course(borrado["id"]):
+                        canvas_course_id = str(borrado.get("id", ""))
+                        detalles.append("curso restaurado")
+                    else:
+                        detalles.append(f"curso error: borrado sin restaurar (id={borrado.get('id')})")
+                elif borrado:
+                    canvas_course_id = str(borrado.get("id", ""))
+                    detalles.append("curso existente")
+                else:
+                    raise create_exc
+    except Exception as exc:
+        logger.error("Error asegurando curso Canvas '%s': %s", nombre_curso, exc)
+        detalles.append(f"curso error: {str(exc)[:100]}")
+
+    # Equipo Teams
+    try:
+        existing_team = await graph_service.find_team_by_display_name(nombre_curso)
+        if existing_team:
+            teams_team_id = existing_team.get("id", "")
+        else:
+            new_team = await graph_service.create_team(nombre_curso)
+            teams_team_id = new_team.get("id", "")
+            detalles.append("equipo creado")
+    except Exception as exc:
+        logger.error("Error asegurando equipo Teams '%s': %s", nombre_curso, exc)
+        detalles.append(f"teams error: {str(exc)[:100]}")
+
+    # Guardar en BD para las próximas corridas
+    if canvas_course_id or teams_team_id:
+        try:
+            await db.execute(
+                """INSERT INTO cursos (materia, periodo, canvas_id, teams_id, canvas_status, teams_status)
+                   VALUES (?,?,?,?,?,?)
+                   ON CONFLICT (materia, periodo) DO UPDATE SET
+                     canvas_id = EXCLUDED.canvas_id,
+                     teams_id = EXCLUDED.teams_id""",
+                materia, periodo, canvas_course_id, teams_team_id, "auto", "auto",
+            )
+        except Exception as db_exc:
+            logger.warning("No se pudo guardar curso auto-creado en BD: %s", db_exc)
+
+    return canvas_course_id, teams_team_id, "; ".join(detalles)
+
+
 async def process_matricular_sheet(file_bytes: bytes, filename: str) -> bytes:
     """
-    Excel con columnas: cedula, nombre, email, materia, periodo, rol (opcional).
-    Para cada fila:
-      1. Busca canvas_id y teams_id en tabla cursos
+    Matriculación completa. Excel con columnas: cedula, nombre, email, materia,
+    periodo, rol (opcional). Para cada fila:
+      1. Busca canvas_id y teams_id en tabla cursos; si el curso NO existe,
+         lo crea en Canvas (con su período) + equipo Teams, o lo restaura si
+         estaba borrado, y lo guarda en la BD
       2. Crea usuario en Canvas si no existe
       3. Matricula en Canvas
       4. Agrega al grupo de Teams
@@ -1201,6 +1282,7 @@ async def process_matricular_sheet(file_bytes: bytes, filename: str) -> bytes:
         raise ValueError(f"El Excel debe tener columnas: {', '.join(required)}")
 
     rows_out = []
+    _term_cache: dict = {}  # períodos resueltos una sola vez por lote
 
     for _, row in df.iterrows():
         cedula  = str(row.get("cedula", "")).strip()
@@ -1238,13 +1320,17 @@ async def process_matricular_sheet(file_bytes: bytes, filename: str) -> bytes:
         teams_id  = curso_db.get("teams_id", "")  if curso_db else ""
 
         if not canvas_id and not teams_id:
-            rows_out.append({
-                "Cédula": cedula, "Nombre": nombre, "Email": email,
-                "Materia": materia, "Periodo": periodo,
-                "Canvas": f"error: curso '{materia} / {periodo}' no encontrado en BD. Creá el curso primero.",
-                "Teams": "-", "Email Status": "-", "Fecha": ts,
-            })
-            continue
+            # Cadena completa: el curso no está en BD → crearlo/restaurarlo ahora
+            # (período incluido) y seguir con la matriculación normalmente.
+            canvas_id, teams_id, detalle_curso = await _ensure_curso(materia, periodo, _term_cache)
+            if not canvas_id and not teams_id:
+                rows_out.append({
+                    "Cédula": cedula, "Nombre": nombre, "Email": email,
+                    "Materia": materia, "Periodo": periodo,
+                    "Canvas": f"error: no se pudo crear el curso '{materia} / {periodo}' ({detalle_curso})",
+                    "Teams": "-", "Email Status": "-", "Fecha": ts,
+                })
+                continue
 
         # 2. Canvas: crear usuario si no existe y matricular
         if canvas_id:
