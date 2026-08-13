@@ -108,7 +108,7 @@ async def root():
 
 
 @app.post("/api/admin/retry-team/{group_id}")
-async def retry_team_provisioning(group_id: str, _: dict = Depends(get_current_user)):
+async def retry_team_provisioning(group_id: str, _: dict = Depends(_require_admin)):
     """Reintenta convertir un grupo M365 en equipo Teams."""
     import asyncio as _aio
     import graph_service as _gs
@@ -145,14 +145,14 @@ async def health():
     try:
         await _db.fetchval("SELECT 1")
         estado["base_datos"] = "ok"
-    except Exception as exc:
+    except Exception:
+        # Sin detalles: este endpoint es público y no debe filtrar host/usuario
         estado["base_datos"] = "error"
-        estado["detalle"] = str(exc)[:200]
     return estado
 
 
 @app.get("/api/canvas-ping")
-async def canvas_ping():
+async def canvas_ping(_: dict = Depends(_require_admin)):
     """Diagnóstico público de Canvas — sin auth."""
     import canvas_service as _cs
     from config import get_settings
@@ -169,7 +169,7 @@ async def canvas_ping():
 
 
 @app.get("/api/diagnostico")
-async def diagnostico(_: dict = Depends(get_current_user)):
+async def diagnostico(_: dict = Depends(_require_admin)):
     """Diagnóstico de variables de entorno y conectividad real con Canvas y Azure."""
     from config import get_settings
     import canvas_service as _cs
@@ -306,7 +306,7 @@ async def logout():
 # ---------------------------------------------------------------------------
 
 @app.get("/api/canvas/terms")
-async def list_terms(_: dict = Depends(get_current_user)):
+async def list_terms(_: dict = Depends(_require_admin_or_academico)):
     try:
         return await canvas_service.get_terms()
     except Exception as exc:
@@ -316,7 +316,7 @@ async def list_terms(_: dict = Depends(get_current_user)):
 
 
 @app.post("/api/canvas/terms")
-async def create_term(payload: dict, _: dict = Depends(get_current_user)):
+async def create_term(payload: dict, _: dict = Depends(_require_admin_or_academico)):
     try:
         return await canvas_service.get_or_create_term(payload["name"])
     except Exception as exc:
@@ -694,7 +694,7 @@ async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: st
 
 
 @app.get("/api/canvas/users")
-async def list_canvas_users(_: dict = Depends(get_current_user)):
+async def list_canvas_users(_: dict = Depends(_require_admin)):
     try:
         return await canvas_service.get_users()
     except Exception as exc:
@@ -704,7 +704,7 @@ async def list_canvas_users(_: dict = Depends(get_current_user)):
 
 
 @app.post("/api/canvas/users")
-async def create_canvas_user(payload: dict, _: dict = Depends(get_current_user)):
+async def create_canvas_user(payload: dict, _: dict = Depends(_require_admin)):
     try:
         return await canvas_service.create_user(
             name=payload["nombre"],
@@ -718,7 +718,7 @@ async def create_canvas_user(payload: dict, _: dict = Depends(get_current_user))
 
 
 @app.post("/api/canvas/courses/{course_id}/enrollments")
-async def enroll(course_id: str, payload: dict, _: dict = Depends(get_current_user)):
+async def enroll(course_id: str, payload: dict, _: dict = Depends(_require_admin)):
     try:
         return await canvas_service.enroll_user(
             course_id=course_id,
@@ -736,7 +736,7 @@ async def enroll(course_id: str, payload: dict, _: dict = Depends(get_current_us
 # ---------------------------------------------------------------------------
 
 @app.get("/api/azure/users")
-async def list_azure_users(_: dict = Depends(get_current_user)):
+async def list_azure_users(_: dict = Depends(_require_admin)):
     try:
         return await graph_service.get_users()
     except Exception as exc:
@@ -746,7 +746,7 @@ async def list_azure_users(_: dict = Depends(get_current_user)):
 
 
 @app.post("/api/azure/users")
-async def create_azure_user(payload: dict, _: dict = Depends(get_current_user)):
+async def create_azure_user(payload: dict, _: dict = Depends(_require_admin)):
     try:
         return await graph_service.create_user(
             display_name=payload["display_name"],
@@ -761,7 +761,7 @@ async def create_azure_user(payload: dict, _: dict = Depends(get_current_user)):
 
 
 @app.get("/api/azure/groups")
-async def list_groups(_: dict = Depends(get_current_user)):
+async def list_groups(_: dict = Depends(_require_admin)):
     try:
         return await graph_service.get_groups()
     except Exception as exc:
@@ -771,7 +771,7 @@ async def list_groups(_: dict = Depends(get_current_user)):
 
 
 @app.post("/api/azure/groups")
-async def create_group(payload: dict, _: dict = Depends(get_current_user)):
+async def create_group(payload: dict, _: dict = Depends(_require_admin)):
     try:
         return await graph_service.create_group(
             display_name=payload["display_name"],
@@ -788,7 +788,7 @@ async def create_group(payload: dict, _: dict = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/teams")
-async def list_teams(_: dict = Depends(get_current_user)):
+async def list_teams(_: dict = Depends(_require_admin)):
     try:
         return await graph_service.get_teams()
     except Exception as exc:
@@ -798,7 +798,7 @@ async def list_teams(_: dict = Depends(get_current_user)):
 
 
 @app.post("/api/teams")
-async def create_team_endpoint(payload: dict, _: dict = Depends(get_current_user)):
+async def create_team_endpoint(payload: dict, _: dict = Depends(_require_admin)):
     try:
         return await graph_service.create_team(
             display_name=payload["display_name"],
@@ -811,7 +811,7 @@ async def create_team_endpoint(payload: dict, _: dict = Depends(get_current_user
 
 
 @app.post("/api/teams/members")
-async def add_team_member_endpoint(payload: dict, _: dict = Depends(get_current_user)):
+async def add_team_member_endpoint(payload: dict, _: dict = Depends(_require_admin)):
     try:
         ok = await graph_service.add_member_to_team(payload["team_id"], payload["user_id"])
         if not ok:
@@ -853,7 +853,7 @@ async def _read_validated(file: UploadFile) -> bytes:
 
 
 @app.post("/api/bulk/usuarios")
-async def bulk_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+async def bulk_usuarios(file: UploadFile = File(...), _: dict = Depends(_require_admin)):
     _validate_file(file)
     file_bytes = await _read_validated(file)
     try:
@@ -864,7 +864,7 @@ async def bulk_usuarios(file: UploadFile = File(...), _: dict = Depends(get_curr
 
 
 @app.post("/api/bulk/inscripciones")
-async def bulk_inscripciones(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+async def bulk_inscripciones(file: UploadFile = File(...), _: dict = Depends(_require_admin)):
     _validate_file(file)
     file_bytes = await _read_validated(file)
     try:
@@ -875,7 +875,7 @@ async def bulk_inscripciones(file: UploadFile = File(...), _: dict = Depends(get
 
 
 @app.get("/api/bulk/template")
-async def bulk_template(_: dict = Depends(get_current_user)):
+async def bulk_template(_: dict = Depends(_require_admin)):
     if not os.path.exists(TEMPLATE_PATH):
         raise HTTPException(status_code=404, detail="Plantilla no encontrada en el servidor")
     return FileResponse(
@@ -886,7 +886,7 @@ async def bulk_template(_: dict = Depends(get_current_user)):
 
 
 @app.get("/api/bulk/template/{tipo}")
-async def bulk_template_tipo(tipo: str, _: dict = Depends(get_current_user)):
+async def bulk_template_tipo(tipo: str, _: dict = Depends(_require_admin)):
     """Genera y devuelve una plantilla Excel vacía según el tipo solicitado."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
@@ -927,7 +927,7 @@ async def bulk_template_tipo(tipo: str, _: dict = Depends(get_current_user)):
 
 
 @app.post("/api/bulk/cursos")
-async def bulk_cursos(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+async def bulk_cursos(file: UploadFile = File(...), _: dict = Depends(_require_admin)):
     _validate_file(file)
     file_bytes = await _read_validated(file)
     try:
@@ -938,7 +938,7 @@ async def bulk_cursos(file: UploadFile = File(...), _: dict = Depends(get_curren
 
 
 @app.post("/api/bulk/canvas/usuarios")
-async def bulk_canvas_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+async def bulk_canvas_usuarios(file: UploadFile = File(...), _: dict = Depends(_require_admin)):
     _validate_file(file)
     file_bytes = await _read_validated(file)
     try:
@@ -949,7 +949,7 @@ async def bulk_canvas_usuarios(file: UploadFile = File(...), _: dict = Depends(g
 
 
 @app.post("/api/bulk/azure/usuarios")
-async def bulk_azure_usuarios(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+async def bulk_azure_usuarios(file: UploadFile = File(...), _: dict = Depends(_require_admin)):
     _validate_file(file)
     file_bytes = await _read_validated(file)
     try:
@@ -960,7 +960,7 @@ async def bulk_azure_usuarios(file: UploadFile = File(...), _: dict = Depends(ge
 
 
 @app.post("/api/bulk/canvas/inscripciones")
-async def bulk_canvas_inscripciones(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+async def bulk_canvas_inscripciones(file: UploadFile = File(...), _: dict = Depends(_require_admin)):
     _validate_file(file)
     file_bytes = await _read_validated(file)
     try:
@@ -971,7 +971,7 @@ async def bulk_canvas_inscripciones(file: UploadFile = File(...), _: dict = Depe
 
 
 @app.post("/api/bulk/teams")
-async def bulk_teams(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+async def bulk_teams(file: UploadFile = File(...), _: dict = Depends(_require_admin)):
     _validate_file(file)
     file_bytes = await _read_validated(file)
     try:
@@ -982,7 +982,7 @@ async def bulk_teams(file: UploadFile = File(...), _: dict = Depends(get_current
 
 
 @app.post("/api/bulk/reporte-excel")
-async def bulk_reporte_excel(report: dict, _: dict = Depends(get_current_user)):
+async def bulk_reporte_excel(report: dict, _: dict = Depends(_require_admin)):
     try:
         excel_bytes = bulk_service.build_report_excel(report)
     except Exception as exc:
@@ -1002,7 +1002,7 @@ async def bulk_reporte_excel(report: dict, _: dict = Depends(get_current_user)):
 async def run_matriculacion(
     background_tasks: BackgroundTasks,
     semestre: str | None = None,
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(_require_admin),
 ):
     """Start enrollment (OneDrive). Returns ejecucion_id immediately; poll /progress/{id}."""
     import uuid
@@ -1018,7 +1018,7 @@ async def run_matriculacion(
 async def dry_run_matriculacion(
     background_tasks: BackgroundTasks,
     semestre: str | None = None,
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(_require_admin),
 ):
     """Simulate enrollment (OneDrive). Returns ejecucion_id immediately."""
     import uuid
@@ -1035,7 +1035,7 @@ async def matriculacion_upload(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     semestre: str | None = None,
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(_require_admin),
 ):
     """Start enrollment from uploaded Excel. Returns ejecucion_id immediately."""
     ext = os.path.splitext(file.filename or "")[1].lower()
@@ -1057,7 +1057,7 @@ async def matriculacion_upload_dry_run(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     semestre: str | None = None,
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(_require_admin),
 ):
     """Simulate enrollment from uploaded Excel. Returns ejecucion_id immediately."""
     ext = os.path.splitext(file.filename or "")[1].lower()
@@ -1077,7 +1077,7 @@ async def matriculacion_upload_dry_run(
 @app.get("/api/matriculacion/progress/{ejecucion_id}")
 async def get_matriculacion_progress(
     ejecucion_id: str,
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(_require_admin),
 ):
     """Poll real-time progress of a running or completed enrollment batch."""
     p = matriculacion_service.get_progress(ejecucion_id)
@@ -1374,8 +1374,11 @@ async def add_manual_alias(payload: dict, current: dict = Depends(_require_admin
 # Dashboard
 # ---------------------------------------------------------------------------
 
+_require_admin_or_viewer = require_role("admin", "viewer")
+
+
 @app.get("/api/dashboard")
-async def get_dashboard(_: dict = Depends(_require_admin)):
+async def get_dashboard(_: dict = Depends(_require_admin_or_viewer)):
     try:
         kpis = await audit_service.get_dashboard_kpis()
         kpis["proxima_ejecucion"] = get_next_run()
@@ -1450,7 +1453,7 @@ async def dashboard_plataformas(_: dict = Depends(_require_admin)):
 
 
 @app.get("/api/alumnos/buscar")
-async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get_current_user)):
+async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(_require_admin_or_academico)):
     """Busca un alumno primero en la BD local (sincronizada de Canvas), y solo si
     no aparece consulta Canvas y Azure AD en vivo."""
     import asyncio
@@ -1570,7 +1573,7 @@ async def buscar_alumno(q: str = Query(..., min_length=2), _: dict = Depends(get
 
 
 @app.get("/api/canvas/courses/activos")
-async def list_courses_activos(programa: str | None = None, _: dict = Depends(get_current_user)):
+async def list_courses_activos(programa: str | None = None, _: dict = Depends(_require_admin_or_academico)):
     """Cursos activos de Canvas, opcionalmente filtrados por programa."""
     if not get_settings().canvas_base_url:
         raise HTTPException(status_code=503, detail="Canvas no configurado")
@@ -1602,7 +1605,7 @@ async def list_courses_activos(programa: str | None = None, _: dict = Depends(ge
 async def parsear_planilla(
     file: UploadFile = File(...),
     semestre: str | None = None,
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(_require_admin_or_academico),
 ):
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in {".xlsx", ".xls"}:
@@ -1616,7 +1619,7 @@ async def parsear_planilla(
 
 
 @app.post("/api/parseo/enviar-cola")
-async def enviar_parseo_cola(payload: dict, current: dict = Depends(get_current_user)):
+async def enviar_parseo_cola(payload: dict, current: dict = Depends(_require_admin_or_academico)):
     alumnos = payload.get("alumnos", [])
     if not alumnos:
         raise HTTPException(status_code=400, detail="No hay alumnos para enviar")
@@ -1646,7 +1649,7 @@ async def enviar_parseo_cola(payload: dict, current: dict = Depends(get_current_
 
 
 @app.post("/api/parseo/exportar")
-async def exportar_parseo(payload: dict, _: dict = Depends(get_current_user)):
+async def exportar_parseo(payload: dict, _: dict = Depends(_require_admin_or_academico)):
     alumnos = payload.get("alumnos", [])
     try:
         excel_bytes = parseo_service.exportar_excel(alumnos)
@@ -1965,21 +1968,21 @@ async def import_status(job_id: str, _user=Depends(_require_admin)):
 
 
 @app.get("/api/academico/alumno/{cedula}")
-async def historial_alumno(cedula: str, _user=Depends(get_current_user)):
+async def historial_alumno(cedula: str, _user=Depends(_require_admin_or_academico)):
     """Retorna historial académico completo de un alumno."""
     import academic_service as _ac
     return await _ac.historial_alumno(cedula)
 
 
 @app.get("/api/academico/materias")
-async def get_materias(programa: str, carrera: str, _user=Depends(get_current_user)):
+async def get_materias(programa: str, carrera: str, _user=Depends(_require_admin_or_academico)):
     """Lista de materias únicas de una carrera/programa desde historial_academico."""
     import academic_service as _ac
     return await _ac.get_materias_por_carrera(programa, carrera)
 
 
 @app.get("/api/academico/alumno/{cedula}/inscripcion")
-async def estado_inscripcion(cedula: str, _user=Depends(get_current_user)):
+async def estado_inscripcion(cedula: str, _user=Depends(_require_admin_or_academico)):
     """Estado de inscripción: qué materias puede/no puede inscribir según correlativas."""
     import academic_service as _ac
     return await _ac.estado_inscripcion(cedula)
@@ -2071,7 +2074,7 @@ async def validar_correlativas(
     materia: str,
     carrera: str,
     programa: str = "GND",
-    _user=Depends(get_current_user),
+    _user=Depends(_require_admin_or_academico),
 ):
     """Verifica si el alumno puede inscribirse a la materia (correlativas)."""
     import academic_service as _ac

@@ -1892,7 +1892,8 @@ function _applyRoleVisibility(role) {
   } else if (role === 'academico') {
     show([...portal,...academicoUser, 'nav-section-canvas','nav-canvas-asistencia']);
   } else {
-    show(reportes);
+    // viewer: solo el dashboard de KPIs (la auditoría es exclusiva de admin)
+    show(['nav-section-reportes','nav-dashboard']);
   }
 }
 
