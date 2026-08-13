@@ -90,8 +90,9 @@ async def init_pool(retries: int = 4, delay: float = 2.0) -> None:
             ultimo_error = exc
             if intento < retries:
                 espera = delay * (2 ** (intento - 1))
-                logger.warning("DB intento %d/%d falló (%s). Reintentando en %.0fs…",
-                               intento, retries, str(exc)[:120], espera)
+                logger.warning("DB intento %d/%d falló contra host=%s user=%s (%s). Reintentando en %.0fs…",
+                               intento, retries, kwargs["host"], kwargs["user"],
+                               str(exc)[:120], espera)
                 await asyncio.sleep(espera)
     raise ultimo_error  # type: ignore[misc]
 
