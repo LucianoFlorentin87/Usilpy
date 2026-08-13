@@ -10,30 +10,29 @@
 -- RLS NO afecta en nada al funcionamiento del sistema: solo bloquea el acceso
 -- anónimo por la API REST.
 --
--- Ejecutar en: Supabase → SQL Editor → pegar y correr.
+-- Ejecutar en: Supabase → SQL Editor → pegar todo y correr (Run).
 
-ALTER TABLE public.system_users          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.historial_academico   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.correlativas          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cursos                ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.audit_log             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ejecuciones           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pending_enrollments   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.course_aliases        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.course_unresolved     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sync_alumnos          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sync_asistencias      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sync_calificaciones   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sync_cursos           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sync_log              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sync_matriculaciones  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sync_usuarios_365     ENABLE ROW LEVEL SECURITY;
+-- Recorre TODAS las tablas del esquema public y les activa RLS.
+-- Así no falla si alguna tabla no existe o si se agregan nuevas.
+DO $$
+DECLARE
+    t record;
+BEGIN
+    FOR t IN
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+    LOOP
+        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t.tablename);
+        RAISE NOTICE 'RLS activado en: %', t.tablename;
+    END LOOP;
+END $$;
 
 -- Sin políticas (POLICY) definidas, RLS deniega todo a los roles anon y
 -- authenticated. Es exactamente lo que queremos: nadie entra por la API REST.
 
--- Verificación: todas deben quedar en rowsecurity = true
-SELECT tablename, rowsecurity
+-- Verificación: todas deben quedar con rls_activado = true
+SELECT tablename AS tabla, rowsecurity AS rls_activado
 FROM pg_tables
 WHERE schemaname = 'public'
 ORDER BY tablename;
