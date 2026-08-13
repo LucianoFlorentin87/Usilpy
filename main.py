@@ -137,6 +137,20 @@ async def retry_team_provisioning(group_id: str, _: dict = Depends(get_current_u
     return {"status": "timeout", "group": group_name, "detail": "El equipo puede aparecer en Teams en unos minutos"}
 
 
+@app.get("/api/health")
+async def health():
+    """Estado del servicio y de la conexión a la base de datos (sin auth)."""
+    import db as _db
+    estado = {"servicio": "ok", "base_datos": "desconocido"}
+    try:
+        await _db.fetchval("SELECT 1")
+        estado["base_datos"] = "ok"
+    except Exception as exc:
+        estado["base_datos"] = "error"
+        estado["detalle"] = str(exc)[:200]
+    return estado
+
+
 @app.get("/api/canvas-ping")
 async def canvas_ping():
     """Diagnóstico público de Canvas — sin auth."""
