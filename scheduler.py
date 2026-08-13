@@ -115,6 +115,33 @@ def get_next_sync() -> str | None:
     return None
 
 
+async def _enable_rls() -> None:
+    """Activa Row Level Security en todas las tablas del esquema public.
+
+    Supabase expone las tablas de `public` por su API REST (PostgREST), donde
+    alcanza la clave `anon` — que no es secreta — para leerlas y escribirlas.
+    Con RLS activado y sin políticas, esa puerta queda cerrada.
+
+    No afecta a la aplicación: nos conectamos con el rol `postgres`, dueño de
+    las tablas, y los dueños omiten RLS.
+    """
+    import db as _db
+    await _db.execute("""
+        DO $$
+        DECLARE t record;
+        BEGIN
+            FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+            LOOP
+                EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t.tablename);
+            END LOOP;
+        END $$;
+    """)
+    pendientes = await _db.fetchval(
+        "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public' AND NOT rowsecurity"
+    )
+    logger.info("RLS verificado en esquema public — tablas sin RLS: %s", pendientes)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     # Init DB pool first, then tables
@@ -144,6 +171,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         # Seed initial admin from .env if no users exist yet
         if settings.admin_password_hash:
             await user_service.seed_admin(settings.admin_username, settings.admin_password_hash)
+        # Cerrar el acceso anónimo por la API REST de Supabase
+        try:
+            await _enable_rls()
+        except Exception as rls_exc:
+            logger.warning("No se pudo activar RLS automáticamente: %s", rls_exc)
     except Exception as exc:
         logger.error(
             "No se pudo inicializar la BD al arrancar (%s). La aplicación inicia "
