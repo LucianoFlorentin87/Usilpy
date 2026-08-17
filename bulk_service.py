@@ -17,6 +17,10 @@ from typing import BinaryIO
 
 logger = logging.getLogger(__name__)
 
+
+class _Omitido(Exception):
+    """Marca interna: la plataforma no fue solicitada en este lote."""
+
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -575,10 +579,18 @@ def build_plantilla_teams() -> bytes:
     )
 
 
-async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
-    """Reads Excel with columns materia, semestre (optional), programa (optional).
-    Creates Canvas course + Teams team for each row.
-    Returns bytes of Excel with IDs and statuses."""
+async def process_cursos_ids(file_bytes: bytes, filename: str, destino: str = "ambas") -> bytes:
+    """Crea cursos y/o equipos a partir de un Excel con columna `materia`.
+
+    destino: "ambas" (Canvas + Teams), "canvas" (solo el LMS) o "teams"
+    (solo el equipo — el caso de los diplomados, que no usan Canvas).
+    Devuelve un Excel con los IDs y el estado de cada plataforma.
+    """
+    destino = (destino or "ambas").strip().lower()
+    if destino not in ("ambas", "canvas", "teams"):
+        destino = "ambas"
+    hacer_canvas = destino in ("ambas", "canvas")
+    hacer_teams = destino in ("ambas", "teams")
     df = pd.read_excel(io.BytesIO(file_bytes))
     df = _normalize_cols(df)
 
@@ -613,6 +625,8 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
 
         # Canvas
         try:
+            if not hacer_canvas:
+                raise _Omitido()
             term_id = await _resolver_term(semestre)
             sis_id = f"USIL-{semestre}-{materia[:60]}"
             existing = await canvas_service.get_course_by_sis_id(sis_id)
@@ -643,12 +657,16 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
                         canvas_status = "existente"
                     else:
                         raise create_exc
+        except _Omitido:
+            canvas_status = "no solicitado"
         except Exception as exc:
             logger.error("Canvas error creando curso '%s': %s", materia, exc)
             canvas_status = f"error: {str(exc)[:160]}"
 
         # Teams
         try:
+            if not hacer_teams:
+                raise _Omitido()
             team_name = f"{semestre} - {materia}"
             existing_team = await graph_service.find_team_by_display_name(team_name)
             if existing_team:
@@ -658,6 +676,8 @@ async def process_cursos_ids(file_bytes: bytes, filename: str) -> bytes:
                 new_team = await graph_service.create_team(team_name)
                 teams_team_id = new_team.get("id", "")
                 teams_status = "creado"
+        except _Omitido:
+            teams_status = "no solicitado"
         except Exception as exc:
             logger.error("Teams error creando equipo '%s': %s", materia, exc)
             teams_status = f"error: {str(exc)[:120]}"
@@ -1338,7 +1358,16 @@ async def process_matricular_sheet(file_bytes: bytes, filename: str) -> bytes:
                 sis_id = cedula
                 canvas_user = await canvas_service.find_user_by_sis_id(sis_id)
                 if not canvas_user and email:
-                    canvas_user = await canvas_service.create_user(nombre or cedula, email, sis_id)
+                    # Puede existir ya con ese correo (aunque sin la cédula cargada).
+                    canvas_user = await canvas_service.find_user_by_login(email)
+                if not canvas_user and email:
+                    try:
+                        canvas_user = await canvas_service.create_user(nombre or cedula, email, sis_id)
+                    except Exception as alta_exc:
+                        # Alta rechazada por duplicado → reutilizar la cuenta existente
+                        canvas_user = await canvas_service.find_user_by_login(email)
+                        if not canvas_user:
+                            raise alta_exc
                 if canvas_user:
                     user_ref = str(canvas_user.get("id", ""))
                     await canvas_service.enroll_user(canvas_id, user_ref, rol)

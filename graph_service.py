@@ -40,6 +40,18 @@ def _headers() -> dict:
     return {"Authorization": f"Bearer {_get_token()}", "Content-Type": "application/json"}
 
 
+def _verificar(resp, contexto: str = "") -> None:
+    """Levanta un error incluyendo el cuerpo de la respuesta.
+
+    `raise_for_status()` sólo dice "400 Bad Request" y esconde el motivo real
+    que devuelve la API, que es justo lo que hace falta para diagnosticar.
+    """
+    if resp.status_code >= 400:
+        detalle = (resp.text or "")[:300].replace("\n", " ")
+        raise RuntimeError(f"Graph {resp.status_code}{' en ' + contexto if contexto else ''}: {detalle}")
+
+
+
 # ── Users ─────────────────────────────────────────────────────────────────────
 
 async def get_users(top: int = 50) -> list[dict]:
@@ -49,7 +61,7 @@ async def get_users(top: int = 50) -> list[dict]:
             headers=_headers(),
             params={"$top": top, "$select": "id,displayName,mail,userPrincipalName"},
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json().get("value", [])
 
 
@@ -69,7 +81,7 @@ async def search_users(query: str, top: int = 20) -> list[dict]:
         )
         if resp.status_code in (400, 404):
             return []
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json().get("value", [])
 
 
@@ -85,7 +97,7 @@ async def get_all_users() -> list[dict]:
         headers = _headers()
         while url:
             resp = await client.get(url, headers=headers, params=params)
-            resp.raise_for_status()
+            _verificar(resp)
             data = resp.json()
             users.extend(data.get("value", []))
             url = data.get("@odata.nextLink")
@@ -124,7 +136,7 @@ async def get_user_by_upn(upn: str) -> dict | None:
         )
         if resp.status_code == 404:
             return None
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -141,7 +153,7 @@ async def create_user(display_name: str, mail_nickname: str, upn: str, password:
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(f"{GRAPH_BASE}/users", headers=_headers(), json=payload)
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -157,7 +169,7 @@ async def create_group(display_name: str, description: str = "") -> dict:
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(f"{GRAPH_BASE}/groups", headers=_headers(), json=payload)
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -168,7 +180,7 @@ async def get_groups(top: int = 50) -> list[dict]:
             headers=_headers(),
             params={"$top": top, "$select": "id,displayName,mail"},
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json().get("value", [])
 
 
@@ -215,7 +227,7 @@ async def get_teams(top: int = 50) -> list[dict]:
             headers=_headers(),
             params={"$filter": filter_q, "$select": "id,displayName", "$top": top},
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json().get("value", [])
 
 
@@ -230,7 +242,7 @@ async def find_team_by_display_name(name: str) -> dict | None:
             headers=_headers(),
             params={"$filter": filter_q, "$select": "id,displayName"},
         )
-        resp.raise_for_status()
+        _verificar(resp)
         items = resp.json().get("value", [])
         return items[0] if items else None
 
@@ -309,7 +321,7 @@ async def create_team(display_name: str, description: str = "") -> dict:
             if not tr.is_success:
                 logger.error("PUT /groups/%s/team attempt %d: %s %s", group_id, attempt, tr.status_code, tr.text[:400])
                 raise RuntimeError(f"PUT /team error {tr.status_code}: {tr.text[:400]}")
-            tr.raise_for_status()
+            _verificar(tr)
 
         # Fallback: group created but team provisioning timed out — return group id
         group["id"] = group_id

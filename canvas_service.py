@@ -12,6 +12,18 @@ def _headers() -> dict:
     return {"Authorization": f"Bearer {get_settings().canvas_api_token}"}
 
 
+def _verificar(resp, contexto: str = "") -> None:
+    """Levanta un error incluyendo el cuerpo de la respuesta.
+
+    `raise_for_status()` sólo dice "400 Bad Request" y esconde el motivo real
+    que devuelve la API, que es justo lo que hace falta para diagnosticar.
+    """
+    if resp.status_code >= 400:
+        detalle = (resp.text or "")[:300].replace("\n", " ")
+        raise RuntimeError(f"Canvas {resp.status_code}{' en ' + contexto if contexto else ''}: {detalle}")
+
+
+
 async def _account_id() -> str:
     """Discover the root account ID dynamically."""
     global _account_id_cache
@@ -19,7 +31,7 @@ async def _account_id() -> str:
         return _account_id_cache
     async with httpx.AsyncClient() as client:
         resp = await client.get(f"{_base()}/api/v1/accounts", headers=_headers())
-        resp.raise_for_status()
+        _verificar(resp)
         accounts = resp.json()
         if accounts:
             _account_id_cache = str(accounts[0]["id"])
@@ -38,7 +50,7 @@ async def get_terms(per_page: int = 100) -> list[dict]:
             headers=_headers(),
             params={"per_page": per_page},
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json().get("enrollment_terms", [])
 
 
@@ -63,7 +75,7 @@ async def create_term(name: str, start_at: str = "", end_at: str = "") -> dict:
             headers=_headers(),
             json=payload,
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -82,7 +94,7 @@ async def get_courses(per_page: int = 50) -> list[dict]:
             headers=_headers(),
             params={"per_page": per_page, "enrollment_type": "teacher"},
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -94,7 +106,7 @@ async def get_users(per_page: int = 50) -> list[dict]:
             headers=_headers(),
             params={"per_page": per_page},
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -119,7 +131,7 @@ async def create_user(name: str, email: str, sis_id: str = "") -> dict:
             headers=_headers(),
             json=payload,
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -132,8 +144,31 @@ async def find_user_by_sis_id(sis_id: str) -> dict | None:
         )
         if resp.status_code == 404:
             return None
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
+
+
+async def find_user_by_login(login: str) -> dict | None:
+    """Busca un usuario por su login/correo. Sirve cuando el alta falla porque
+    la cuenta ya existe: en vez de dar error, reutilizamos la que está."""
+    if not login:
+        return None
+    acct = await _account_id()
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(
+            f"{_base()}/api/v1/accounts/{acct}/users",
+            headers=_headers(),
+            params={"search_term": login, "per_page": 20,
+                    "include[]": ["email"]},
+        )
+        if resp.status_code != 200:
+            return None
+        objetivo = login.strip().lower()
+        for u in resp.json():
+            if (u.get("login_id") or "").strip().lower() == objetivo or \
+               (u.get("email") or "").strip().lower() == objetivo:
+                return u
+    return None
 
 
 async def get_course_by_sis_id(sis_id: str) -> dict | None:
@@ -149,7 +184,7 @@ async def get_course_by_sis_id(sis_id: str) -> dict | None:
         )
         if resp.status_code == 404:
             return None
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -227,7 +262,7 @@ async def enroll_user(course_id: str, user_id: str, role: str = "StudentEnrollme
             headers=_headers(),
             json=payload,
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -238,7 +273,7 @@ async def get_enrollments(course_id: str) -> list[dict]:
             headers=_headers(),
             params={"per_page": 100},
         )
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -253,7 +288,7 @@ async def search_users(query: str, per_page: int = 20) -> list[dict]:
         )
         if resp.status_code in (400, 404):
             return []
-        resp.raise_for_status()
+        _verificar(resp)
         return resp.json()
 
 
@@ -322,7 +357,7 @@ async def get_course_enrollments(course_id: int | str, per_page: int = 100) -> l
             resp = await client.get(url, headers=_headers(), params=params)
             if resp.status_code == 404:
                 break
-            resp.raise_for_status()
+            _verificar(resp)
             enrollments.extend(resp.json())
             link = resp.headers.get("Link", "")
             url = None
@@ -364,7 +399,7 @@ async def get_course_attendance(course_id: int | str) -> list[dict]:
             resp = await client.get(url, headers=_headers(), params=params)
             if resp.status_code in (404, 401, 403):
                 break
-            resp.raise_for_status()
+            _verificar(resp)
             data = resp.json()
             if not data:
                 break
@@ -393,7 +428,7 @@ async def get_roll_call_report(course_id: int | str) -> dict:
             resp = await client.get(url, headers=_headers(), params=params)
             if resp.status_code in (401, 403, 404):
                 return {"disponible": False, "alumnos": []}
-            resp.raise_for_status()
+            _verificar(resp)
             for a in resp.json():
                 if (a.get("name") or "").strip().lower() == "roll call attendance":
                     assignment_id = a.get("id")
@@ -417,7 +452,7 @@ async def get_roll_call_report(course_id: int | str) -> dict:
             resp = await client.get(url, headers=_headers(), params=params)
             if resp.status_code in (401, 403, 404):
                 break
-            resp.raise_for_status()
+            _verificar(resp)
             for s in resp.json():
                 user = s.get("user") or {}
                 if (user.get("name") or "").lower() == "test student":

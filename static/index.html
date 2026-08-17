@@ -1008,6 +1008,22 @@
           <input type="file" id="cursos-file" accept=".xlsx,.xls" style="display:none;" onchange="document.getElementById('cursos-file-label').textContent = this.files[0]?.name || 'Hacé clic para elegir'">
         </div>
 
+        <div style="margin-bottom:14px;">
+          <label>¿Dónde crear?</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:500;color:var(--text);margin:0;">
+              <input type="radio" name="cursos-destino" value="ambas" checked style="margin:0;width:auto;"> Canvas y Teams
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:500;color:var(--text);margin:0;">
+              <input type="radio" name="cursos-destino" value="canvas" style="margin:0;width:auto;"> Solo Canvas
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:500;color:var(--text);margin:0;">
+              <input type="radio" name="cursos-destino" value="teams" style="margin:0;width:auto;"> Solo Teams
+            </label>
+          </div>
+          <div style="font-size:.79rem;color:var(--text-muted);margin-top:6px;">Los diplomados que no usan Canvas se crean con «Solo Teams».</div>
+        </div>
+
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-primary" onclick="crearCursos()" style="display:flex;align-items:center;gap:6px;">
             <span>▶</span> Crear cursos y equipos
@@ -5074,6 +5090,7 @@ async function crearCursos() {
   try {
     const fd = new FormData();
     fd.append('file', file);
+    fd.append('destino', document.querySelector('input[name="cursos-destino"]:checked')?.value || 'ambas');
     const resp = await fetch('/api/gestion/crear-cursos', { method:'POST', headers:{'Authorization':'Bearer '+getToken()}, body:fd });
     if (!resp.ok) {
       const e = await resp.json().catch(() => ({}));
@@ -5337,6 +5354,7 @@ async function ccVerCurso(courseId) {
     document.getElementById('cc-det-nombre').textContent = d.nombre || `Curso ${courseId}`;
     const docentes = (d.docentes || []).filter(Boolean).join(', ') || '—';
     document.getElementById('cc-det-info').innerHTML =
+      (d.aviso ? `<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.82rem;">${_esc(d.aviso)}</div>` : '') +
       `ID <strong>${parseInt(d.id)}</strong> · Período <strong>${_esc(d.periodo||'—')}</strong> · ` +
       `Subcuenta <strong>${_esc(d.subcuenta||'—')}</strong> · Estado <strong>${_esc(d.estado||'—')}</strong><br>` +
       `Docentes: ${_esc(docentes)} · SIS: ${_esc(d.sis_course_id||'—')}`;
