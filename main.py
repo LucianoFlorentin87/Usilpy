@@ -1952,6 +1952,21 @@ async def sync_get_alumnos(q: str = "", limit: int = 50, _user=Depends(_require_
     return rows
 
 
+@app.get("/api/academico/alumno/{cedula}/ficha")
+async def ficha_alumno(cedula: str, _: dict = Depends(_require_admin_or_academico)):
+    """Ficha 360: datos, avance de carrera, historial, qué puede cursar,
+    materias que traban el avance y actividad en Canvas — todo junto."""
+    import academic_service as _ac
+    ficha = await _ac.ficha_alumno(cedula)
+    try:
+        canvas = await alumno_canvas_por_cedula(cedula, _)
+        ficha["canvas"] = canvas.get("cursos", [])
+    except Exception as exc:
+        logger.warning("Canvas no disponible para ficha de %s: %s", cedula, exc)
+        ficha["canvas"] = []
+    return ficha
+
+
 @app.get("/api/academico/alumno/{cedula}/canvas")
 async def alumno_canvas_por_cedula(cedula: str, _: dict = Depends(_require_admin_or_academico)):
     """Cursos, notas y asistencias del alumno en Canvas, buscando por su cédula.

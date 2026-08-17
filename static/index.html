@@ -1285,6 +1285,8 @@
               style="padding:8px 18px;border:none;background:none;cursor:pointer;font-weight:500;color:#64748b;font-size:.9rem;">
               Cursos en Canvas
             </button>
+            <button class="btn btn-primary" style="margin-left:auto;margin-bottom:6px;padding:6px 14px;font-size:.82rem;"
+              onclick="if(_alumnoActual) abrirFicha(_alumnoActual.cedula)">Ver ficha completa</button>
           </div>
           <div id="historial-alumno-tabla"></div>
           <div id="inscripcion-alumno-tabla" style="display:none;"></div>
@@ -4455,7 +4457,125 @@ function switchTab(tab) {
     panel.style.display = active ? '' : 'none';
   });
   if (tab === 'inscripcion' && _alumnoActual) verInscripcionAlumno(_alumnoActual);
-  if (tab === 'canvas' && _alumnoActual) verCanvasAlumno(_alumnoActual);
+  if (tab === 'canvas' && _alumnoActual) verCanvasAlumno(_alumnoActual.cedula);
+}
+
+let _fichaActual = null;
+
+// ── Ficha 360 del alumno ──────────────────────────────────────────────────────
+function cerrarFicha() { document.getElementById('ficha-overlay').style.display = 'none'; }
+
+async function abrirFicha(cedula) {
+  const ov = document.getElementById('ficha-overlay');
+  const body = document.getElementById('ficha-body');
+  ov.style.display = '';
+  document.getElementById('ficha-nombre').textContent = 'Cargando…';
+  document.getElementById('ficha-sub').textContent = '';
+  body.innerHTML = '<p style="color:var(--text-muted);">Reuniendo información académica…</p>';
+  try {
+    const f = await apiFetch(`/api/academico/alumno/${encodeURIComponent(cedula)}/ficha`);
+    _fichaActual = f;
+    const r = f.resumen;
+    document.getElementById('ficha-nombre').textContent = f.nombre || `Cédula ${f.cedula}`;
+    document.getElementById('ficha-sub').textContent =
+      `${f.cedula}${f.carrera ? ' · ' + f.carrera : ''}${f.programa ? ' · ' + f.programa : ''}`;
+
+    const tarjeta = (valor, etiqueta, color) => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:700;color:${color||'var(--text)'};">${valor}</div>
+        <div style="font-size:.74rem;color:var(--text-muted);margin-top:2px;">${etiqueta}</div>
+      </div>`;
+
+    const seccion = (titulo, contenido) => `
+      <div style="margin-top:22px;">
+        <div style="font-size:.9rem;font-weight:600;margin-bottom:10px;">${titulo}</div>
+        ${contenido}
+      </div>`;
+
+    // Avance visual
+    const barra = `
+      <div style="margin-top:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-muted);margin-bottom:5px;">
+          <span>Avance de carrera</span><span>${r.aprobada} de ${r.total_materias} materias</span>
+        </div>
+        <div style="height:8px;background:var(--bg);border-radius:99px;overflow:hidden;">
+          <div style="height:100%;width:${r.avance_pct}%;background:var(--accent);border-radius:99px;"></div>
+        </div>
+      </div>`;
+
+    const listaMaterias = (estado, color) => {
+      const items = f.materias.filter(m => m.estado === estado);
+      if (!items.length) return '';
+      return `<details style="margin-bottom:6px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">
+        <summary style="cursor:pointer;font-size:.84rem;font-weight:600;color:${color};">
+          ${{aprobada:'Aprobadas',reprobada:'Reprobadas — puede recursar',cursando:'Cursando',
+             puede_inscribir:'Puede inscribirse',bloqueada:'Bloqueadas por correlativas'}[estado]} (${items.length})
+        </summary>
+        <ul style="margin:8px 0 2px 18px;font-size:.82rem;line-height:1.7;">
+          ${items.map(m => `<li>${_esc(m.materia)}${m.faltantes?.length ? ` <span style="color:var(--text-muted);">— falta: ${_esc(m.faltantes.join(', '))}</span>` : ''}</li>`).join('')}
+        </ul></details>`;
+    };
+
+    const alertas = [];
+    if (f.bloqueantes?.length) {
+      const unicas = [...new Set(f.bloqueantes.map(b => b.reprobada))];
+      alertas.push(`Tiene ${unicas.length} materia${unicas.length!==1?'s':''} reprobada${unicas.length!==1?'s':''} que traba${unicas.length!==1?'n':''} el avance: <strong>${_esc(unicas.join(', '))}</strong>`);
+    }
+    const bajaAsist = (f.canvas||[]).filter(c => c.total_clases > 0 && (c.presentes/c.total_clases) < 0.7);
+    if (bajaAsist.length) {
+      alertas.push(`Asistencia por debajo del 70% en: <strong>${_esc(bajaAsist.map(c=>c.nombre).join(', '))}</strong>`);
+    }
+
+    const canvasTabla = (f.canvas||[]).length ? `
+      <div class="tabla-scroll" style="overflow:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+        <thead><tr style="background:var(--surface);">
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Materia</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Período</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Nota</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Asistencia</th>
+        </tr></thead>
+        <tbody>${f.canvas.map((c,i)=>{
+          const p = c.total_clases>0 ? Math.round(c.presentes/c.total_clases*100) : null;
+          const col = p===null ? 'var(--text-muted)' : (p>=70 ? '#16a34a' : '#dc2626');
+          return `<tr style="background:${i%2?'var(--bg)':'var(--surface)'};">
+            <td style="padding:7px 10px;">${_esc(c.nombre||'')}</td>
+            <td style="padding:7px 10px;color:var(--text-muted);">${_esc(c.semestre||'—')}</td>
+            <td style="padding:7px 10px;text-align:center;font-weight:600;">${c.nota_final ?? c.nota_actual ?? '—'}</td>
+            <td style="padding:7px 10px;text-align:center;color:${col};font-weight:600;">${p===null?'—':p+'%'}</td>
+          </tr>`;}).join('')}
+        </tbody></table></div>`
+      : '<p style="color:var(--text-muted);font-size:.84rem;">Sin cursos sincronizados de Canvas.</p>';
+
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;">
+        ${tarjeta(r.avance_pct + '%', 'Avance', 'var(--accent)')}
+        ${tarjeta(r.promedio ?? '—', 'Promedio')}
+        ${tarjeta(r.aprobada, 'Aprobadas', '#16a34a')}
+        ${tarjeta(r.reprobada, 'Reprobadas', '#dc2626')}
+        ${tarjeta(r.cursando, 'Cursando', '#2563eb')}
+        ${tarjeta(r.puede_inscribir, 'Puede cursar')}
+        ${tarjeta(r.bloqueada, 'Bloqueadas', '#b45309')}
+      </div>
+      ${barra}
+      ${alertas.length ? seccion('Atención', alertas.map(a=>
+        `<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:10px 14px;font-size:.84rem;margin-bottom:6px;">${a}</div>`).join('')) : ''}
+      ${seccion('Situación por materia', ['puede_inscribir','reprobada','bloqueada','cursando','aprobada']
+        .map(e => listaMaterias(e, {aprobada:'#16a34a',reprobada:'#dc2626',cursando:'#2563eb',
+              puede_inscribir:'#15803d',bloqueada:'#b45309'}[e])).join(''))}
+      ${seccion('Actividad en Canvas', canvasTabla)}
+    `;
+  } catch(e) {
+    body.innerHTML = `<p style="color:var(--error);">${_esc(e.message)}</p>`;
+  }
+}
+
+function fichaExportar() {
+  if (!_fichaActual) return;
+  const f = _fichaActual;
+  const headers = ['Materia','Estado','Falta aprobar'];
+  const rows = f.materias.map(m => [m.materia, m.estado, (m.faltantes||[]).join(', ')]);
+  _descargarCSV(`ficha_${f.cedula}.csv`, headers, rows);
 }
 
 // Actividad del alumno en Canvas (cursos, notas y asistencia) por cédula
@@ -4512,7 +4632,11 @@ async function buscarAlumno() {
     <div onclick="seleccionarAlumno('${a.cedula}','${(a.nombre||'').replace(/'/g,"\\'")}','${a.carrera||''}')"
          style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
       <div><strong>${_esc(a.nombre || a.cedula)}</strong> <span style="color:#64748b;font-size:.85rem;">CI: ${a.cedula}</span></div>
-      <div style="font-size:.82rem;color:#6366f1;">${_esc(a.carrera || '')} · ${_esc(a.programa || '')}</div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:.82rem;color:var(--text-muted);">${_esc(a.carrera || '')} · ${_esc(a.programa || '')}</span>
+        <button class="btn btn-secondary" style="padding:3px 10px;font-size:.76rem;"
+          onclick="event.stopPropagation();abrirFicha('${a.cedula}')">Ficha 360</button>
+      </div>
     </div>`).join('');
 }
 
@@ -4840,7 +4964,7 @@ async function syncBuscarAlumnos() {
             <td style="padding:7px 12px;">${_esc(r.sis_user_id||'—')}</td>
             <td style="padding:7px 12px;">${parseInt(r.canvas_user_id)||'—'}</td>
             <td style="padding:7px 12px;">
-              <button class="btn btn-secondary" style="padding:3px 10px;font-size:.78rem;" data-uid="${parseInt(r.canvas_user_id)||0}" data-nombre="${_esc(r.nombre||'')}" onclick="syncVerAlumno(parseInt(this.dataset.uid),this.dataset.nombre)">Ver detalle</button>
+              <button class="btn btn-secondary" style="padding:3px 10px;font-size:.78rem;" data-uid="${parseInt(r.canvas_user_id)||0}" data-nombre="${_esc(r.nombre||'')}" data-ci="${_esc(r.sis_user_id||'')}" onclick="this.dataset.ci ? abrirFicha(this.dataset.ci) : syncVerAlumno(parseInt(this.dataset.uid),this.dataset.nombre)">Ver ficha</button>
             </td>
           </tr>`).join('')}
         </tbody>
@@ -5404,6 +5528,27 @@ async function asisExportarExcel() {
   }
 }
 </script>
+
+<!-- Ficha 360 del alumno -->
+<div id="ficha-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,12,16,.55);z-index:9998;
+     backdrop-filter:blur(2px);" onclick="if(event.target===this)cerrarFicha()">
+  <div style="position:absolute;inset:3% 50% 3% 50%;transform:translateX(-50%);width:min(1100px,94vw);
+       background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+       display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;
+         justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div>
+        <div id="ficha-nombre" style="font-size:1.15rem;font-weight:600;">—</div>
+        <div id="ficha-sub" style="font-size:.84rem;color:var(--text-muted);margin-top:3px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="fichaExportar()">Exportar</button>
+        <button class="btn btn-secondary" onclick="cerrarFicha()">Cerrar</button>
+      </div>
+    </div>
+    <div id="ficha-body" style="padding:20px 24px;overflow-y:auto;flex:1;"></div>
+  </div>
+</div>
 
 <!-- Floating real-time log -->
 <style>

@@ -975,3 +975,53 @@ async def buscar_alumno(q: str) -> list[dict]:
            LIMIT 20""",
         like, like,
     )
+
+
+async def ficha_alumno(cedula: str) -> dict:
+    """Vista 360 de la vida académica de un alumno: datos, resumen de avance,
+    historial, qué puede cursar y su actividad en Canvas, todo en una consulta."""
+    historial = await historial_alumno(cedula)
+    estado = await estado_inscripcion(cedula)
+
+    datos = await db.fetchrow(
+        """SELECT MAX(nombre) AS nombre, MAX(carrera) AS carrera, MAX(programa) AS programa
+           FROM historial_academico WHERE cedula = ?""",
+        cedula,
+    ) or {}
+
+    materias = estado.get("materias", [])
+    cuenta = {"aprobada": 0, "reprobada": 0, "cursando": 0, "bloqueada": 0, "puede_inscribir": 0}
+    for m in materias:
+        if m["estado"] in cuenta:
+            cuenta[m["estado"]] += 1
+    total = len(materias)
+    avance = round(cuenta["aprobada"] / total * 100) if total else 0
+
+    notas = [float(r["nota_num"]) for r in historial
+             if r.get("nota_num") is not None and r.get("aprobado") is True]
+    promedio = round(sum(notas) / len(notas), 2) if notas else None
+
+    # Materias reprobadas que son prerrequisito de otras: traban el avance
+    bloqueantes = []
+    reprobadas = {m["materia"].lower() for m in materias if m["estado"] == "reprobada"}
+    if reprobadas:
+        for m in materias:
+            for falta in (m.get("faltantes") or []):
+                if falta.lower() in reprobadas:
+                    bloqueantes.append({"reprobada": falta, "traba": m["materia"]})
+
+    return {
+        "cedula": cedula,
+        "nombre": datos.get("nombre") or "",
+        "carrera": estado.get("carrera") or datos.get("carrera") or "",
+        "programa": estado.get("programa") or datos.get("programa") or "",
+        "resumen": {
+            "total_materias": total,
+            "avance_pct": avance,
+            "promedio": promedio,
+            **cuenta,
+        },
+        "materias": materias,
+        "historial": historial,
+        "bloqueantes": bloqueantes,
+    }
