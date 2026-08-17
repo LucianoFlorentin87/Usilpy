@@ -105,7 +105,16 @@ _require_admin_or_academico = require_role("admin", "academico")
 
 @app.get("/")
 async def root():
-    return FileResponse("static/index.html")
+    # Sin caché: la interfaz es un único HTML y el navegador se quedaba con la
+    # versión vieja después de cada despliegue.
+    return FileResponse(
+        "static/index.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.post("/api/admin/retry-team/{group_id}")

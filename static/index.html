@@ -413,6 +413,7 @@
       <button id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema claro/oscuro"
         style="background:none;border:none;cursor:pointer;font-size:1.15rem;padding:4px 8px;border-radius:8px;line-height:1;">🌙</button>
       <span class="badge" id="topbar-badge">Matriculación</span>
+      <span id="build-stamp" style="font-size:.65rem;color:var(--text-muted);letter-spacing:.04em;"></span>
       <div id="user-chip">
         <div class="avatar" id="user-avatar">?</div>
         <span class="user-name" id="user-name-label"></span>
@@ -1991,6 +1992,16 @@ function toggleTheme() {
   _aplicarTema(nuevo);
 }
 _aplicarTema(localStorage.getItem('tema') || 'light');
+
+// Sello de build: confirma que el navegador tomó la versión nueva del HTML
+(async () => {
+  try {
+    const r = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store' });
+    const lm = r.headers.get('Last-Modified');
+    const el = document.getElementById('build-stamp');
+    if (el && lm) el.textContent = 'v ' + new Date(lm).toLocaleString('es', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  } catch(_) {}
+})();
 
 (function handleFragment() {
   const hash = window.location.hash;
