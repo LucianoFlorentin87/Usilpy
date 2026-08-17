@@ -2052,6 +2052,7 @@ function showPanel(id, el) {
   if (id === 'sync-panel') cargarSyncEstado();
   if (id === 'sync-alumnos') syncBuscarAlumnos();
   if (id === 'panel-canvas-asistencia') asisInit();
+  if (id === 'panel-canvas-cursos') ccInit();
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -4959,6 +4960,13 @@ let _canvasCursos = [];
 
 let _ccCursos = [];
 let _ccDetalle = null;
+let _ccCargado = false;
+
+async function ccInit() {
+  if (_ccCargado) return;
+  _ccCargado = true;
+  await cargarCursosCanvas();
+}
 
 async function cargarCursosCanvas() {
   const st = document.getElementById('canvas-cursos-status');
@@ -5027,7 +5035,14 @@ function ccFiltrar() {
 
   const tabla = document.getElementById('canvas-cursos-tabla');
   if (!filtrados.length) {
-    tabla.innerHTML = '<p style="color:var(--text-muted);padding:12px;">Sin resultados para ese filtro.</p>';
+    if (!_ccCursos.length) {
+      tabla.innerHTML = '<p style="color:var(--text-muted);padding:12px;">Todavía no se cargaron los cursos. Hacé clic en <strong>Recargar</strong>.</p>';
+    } else if (/^\d+$/.test(q)) {
+      // El ID puede existir en Canvas pero no estar en el listado de la cuenta
+      tabla.innerHTML = `<p style="color:var(--text-muted);padding:12px;">No está en el listado. <button class="btn btn-secondary" style="padding:3px 10px;font-size:.78rem;" onclick="ccVerCurso(${parseInt(q)})">Buscar el curso ${_esc(q)} en Canvas</button></p>`;
+    } else {
+      tabla.innerHTML = '<p style="color:var(--text-muted);padding:12px;">Sin resultados para ese filtro.</p>';
+    }
     return;
   }
   const filas = filtrados.map((c, i) => `

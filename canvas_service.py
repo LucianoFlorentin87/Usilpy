@@ -292,7 +292,7 @@ async def get_all_courses(per_page: int = 100) -> list[dict]:
     params = {
         "per_page": per_page,
         "include[]": ["total_students", "term", "teachers", "account_name"],
-        "state[]": ["available", "unpublished", "completed"],
+        "state[]": ["created", "claimed", "available", "unpublished", "completed"],
     }
     async with httpx.AsyncClient(timeout=60) as client:
         while url:
