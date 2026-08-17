@@ -1300,7 +1300,7 @@
             <input id="cc-buscar" type="text" oninput="ccFiltrar()" placeholder="Ej: 1806 o guarani"
                    style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
           </div>
-          <button class="btn btn-primary" onclick="cargarCursosCanvas()">↻ Recargar</button>
+          <button class="btn btn-primary" onclick="cargarCursosCanvas(true)">↻ Actualizar desde Canvas</button>
           <button class="btn" id="btn-exportar-canvas" onclick="exportarCursosExcel()" style="display:none;">⬇ Exportar Excel</button>
         </div>
 
@@ -4968,17 +4968,17 @@ async function ccInit() {
   await cargarCursosCanvas();
 }
 
-async function cargarCursosCanvas() {
+async function cargarCursosCanvas(refrescar = false) {
   const st = document.getElementById('canvas-cursos-status');
   const tabla = document.getElementById('canvas-cursos-tabla');
   const btnExp = document.getElementById('btn-exportar-canvas');
-  st.innerHTML = '<span style="color:var(--text-muted);">⏳ Cargando cursos desde Canvas...</span>';
+  st.innerHTML = `<span style="color:var(--text-muted);">⏳ ${refrescar ? 'Actualizando desde Canvas (puede tardar)…' : 'Cargando cursos…'}</span>`;
   tabla.innerHTML = '';
   btnExp.style.display = 'none';
   _portalLog('Consultando cursos Canvas...');
   try {
     const [cursosR, subsR] = await Promise.allSettled([
-      apiFetch('/api/canvas/all-courses'),
+      apiFetch('/api/canvas/all-courses' + (refrescar ? '?refrescar=1' : '')),
       apiFetch('/api/canvas/subcuentas'),
     ]);
     if (cursosR.status !== 'fulfilled') throw new Error(cursosR.reason?.message || 'Error al cargar cursos');
@@ -4998,10 +4998,14 @@ async function cargarCursosCanvas() {
     document.getElementById('cc-subcuenta').innerHTML = '<option value="">Todas las subcuentas</option>' +
       subs.map(s => `<option value="${_esc(s.name)}">${_esc(s.name)}</option>`).join('');
 
-    st.innerHTML = '';
+    const desdeBD = _ccCursos.length && _ccCursos[0]._fuente === 'bd';
+    const cuando = _ccCursos[0]?._ultima_sync ? new Date(_ccCursos[0]._ultima_sync).toLocaleString('es') : null;
+    st.innerHTML = desdeBD && cuando
+      ? `<span style="font-size:.8rem;color:var(--text-muted);">Datos de la base — última actualización: ${_esc(cuando)}</span>`
+      : '<span style="font-size:.8rem;color:#16a34a;">✓ Actualizado desde Canvas</span>';
     ccFiltrar();
     btnExp.style.display = '';
-    _portalLog(`${_ccCursos.length} cursos cargados desde Canvas.`, 'info');
+    _portalLog(`${_ccCursos.length} cursos cargados (${desdeBD ? 'base de datos' : 'Canvas'}).`, 'info');
   } catch(e) {
     st.innerHTML = `<span style="color:var(--error);">❌ Error: ${_esc(e.message)}</span>`;
     _portalLog(`Error cargando cursos Canvas: ${e.message}`, 'error');
@@ -5036,7 +5040,7 @@ function ccFiltrar() {
   const tabla = document.getElementById('canvas-cursos-tabla');
   if (!filtrados.length) {
     if (!_ccCursos.length) {
-      tabla.innerHTML = '<p style="color:var(--text-muted);padding:12px;">Todavía no se cargaron los cursos. Hacé clic en <strong>Recargar</strong>.</p>';
+      tabla.innerHTML = '<p style="color:var(--text-muted);padding:12px;">No hay cursos en la base todavía. Usá <strong>Actualizar desde Canvas</strong> para traerlos.</p>';
     } else if (/^\d+$/.test(q)) {
       // El ID puede existir en Canvas pero no estar en el listado de la cuenta
       tabla.innerHTML = `<p style="color:var(--text-muted);padding:12px;">No está en el listado. <button class="btn btn-secondary" style="padding:3px 10px;font-size:.78rem;" onclick="ccVerCurso(${parseInt(q)})">Buscar el curso ${_esc(q)} en Canvas</button></p>`;
@@ -5185,7 +5189,7 @@ async function asisCargarCursos() {
       terms.map(t => `<option value="${t.id}">${_esc(t.name)}</option>`).join('');
     const desdeBD = cursos.some(c => c._fuente === 'bd');
     asisFiltrarCursos();
-    st.innerHTML = `<span style="color:#16a34a;">✓ ${cursos.length} cursos cargados${desdeBD ? ' (desde la base de datos — Canvas no disponible)' : ''}.</span>`;
+    st.innerHTML = `<span style="color:#16a34a;">✓ ${cursos.length} cursos cargados${desdeBD ? ' (desde la base de datos)' : ''}.</span>`;
   } catch(e) {
     _asisInicializado = false;
     st.innerHTML = `<span style="color:red;">❌ ${_esc(e.message)} <button class="btn btn-secondary" style="padding:2px 10px;font-size:.78rem;" onclick="asisInit()">Reintentar</button></span>`;

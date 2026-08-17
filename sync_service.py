@@ -89,11 +89,13 @@ CREATE TABLE IF NOT EXISTS sync_cursos (
     sis_course_id       TEXT,
     semestre            TEXT,
     programa            TEXT,
+    subcuenta           TEXT,
     estado              TEXT,
     teams_group_id      TEXT,
     total_alumnos       INT DEFAULT 0,
     ultima_sync         TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE sync_cursos ADD COLUMN IF NOT EXISTS subcuenta TEXT;
 
 CREATE TABLE IF NOT EXISTS sync_alumnos (
     canvas_user_id      BIGINT PRIMARY KEY,
@@ -196,12 +198,13 @@ async def run_sync(tipo: str = "manual") -> dict:
             try:
                 await db.execute("""
                     INSERT INTO sync_cursos
-                        (canvas_course_id, nombre, sis_course_id, semestre, estado, total_alumnos, ultima_sync)
-                    VALUES (?, ?, ?, ?, ?, ?, NOW())
+                        (canvas_course_id, nombre, sis_course_id, semestre, subcuenta, estado, total_alumnos, ultima_sync)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
                     ON CONFLICT (canvas_course_id) DO UPDATE SET
                         nombre        = EXCLUDED.nombre,
                         sis_course_id = EXCLUDED.sis_course_id,
                         semestre      = EXCLUDED.semestre,
+                        subcuenta     = EXCLUDED.subcuenta,
                         estado        = EXCLUDED.estado,
                         total_alumnos = EXCLUDED.total_alumnos,
                         ultima_sync   = NOW()
@@ -210,6 +213,7 @@ async def run_sync(tipo: str = "manual") -> dict:
                     course.get("name", ""),
                     course.get("sis_course_id") or "",
                     (course.get("term") or {}).get("name") or "",
+                    course.get("account_name") or "",
                     course.get("workflow_state", ""),
                     course.get("total_students") or 0,
                 )
