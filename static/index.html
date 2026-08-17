@@ -5279,18 +5279,27 @@ async function cargarCursosCanvas(refrescar = false) {
   btnExp.style.display = 'none';
   _portalLog('Consultando cursos Canvas...');
   try {
-    const [cursosR, subsR] = await Promise.allSettled([
+    const [cursosR, subsR, termsR] = await Promise.allSettled([
       apiFetch('/api/canvas/all-courses' + (refrescar ? '?refrescar=1' : '')),
       apiFetch('/api/canvas/subcuentas'),
+      apiFetch('/api/canvas/terms'),
     ]);
     if (cursosR.status !== 'fulfilled') throw new Error(cursosR.reason?.message || 'Error al cargar cursos');
     _ccCursos = cursosR.value || [];
     _canvasCursos = _ccCursos;
 
-    // Períodos únicos presentes en los cursos
-    const periodos = [...new Set(_ccCursos.map(c => c.term?.name).filter(Boolean))].sort();
+    // Períodos: TODOS los de Canvas (aunque sus cursos aún no estén sincronizados),
+    // más los que aparezcan en los cursos que ya tenemos.
+    const enCursos = new Set(_ccCursos.map(c => c.term?.name).filter(Boolean));
+    const deCanvas = termsR.status === 'fulfilled'
+      ? (termsR.value || []).map(t => t.name).filter(Boolean) : [];
+    const periodos = [...new Set([...deCanvas, ...enCursos])]
+      .sort((a, b) => a.localeCompare(b, 'es'));
     document.getElementById('cc-periodo').innerHTML = '<option value="">Todos los períodos</option>' +
-      periodos.map(p => `<option value="${_esc(p)}">${_esc(p)}</option>`).join('');
+      periodos.map(p => {
+        const sinDatos = !enCursos.has(p);
+        return `<option value="${_esc(p)}">${_esc(p)}${sinDatos ? ' — sin sincronizar' : ''}</option>`;
+      }).join('');
 
     // Subcuentas: las de la API si están, si no las que aparecen en los cursos
     let subs = subsR.status === 'fulfilled' ? (subsR.value || []) : [];
@@ -5346,6 +5355,11 @@ function ccFiltrar() {
     } else if (/^\d+$/.test(q)) {
       // El ID puede existir en Canvas pero no estar en el listado de la cuenta
       tabla.innerHTML = `<p style="color:var(--text-muted);padding:12px;">No está en el listado. <button class="btn btn-secondary" style="padding:3px 10px;font-size:.78rem;" onclick="ccVerCurso(${parseInt(q)})">Buscar el curso ${_esc(q)} en Canvas</button></p>`;
+    } else if (per) {
+      tabla.innerHTML = `<p style="color:var(--text-muted);padding:12px;">
+        El período <strong>${_esc(per)}</strong> no tiene cursos en la base todavía.
+        <button class="btn btn-secondary" style="padding:3px 10px;font-size:.78rem;margin-left:6px;"
+          onclick="cargarCursosCanvas(true)">Actualizar desde Canvas</button></p>`;
     } else {
       tabla.innerHTML = '<p style="color:var(--text-muted);padding:12px;">Sin resultados para ese filtro.</p>';
     }
