@@ -1899,6 +1899,21 @@
 
 <script>
 // ── Security helpers ──────────────────────────────────────────────────────────
+// Estados que Canvas devuelve en inglés → castellano
+const _ESTADOS_ES = {
+  // matrícula
+  active: 'Activa', invited: 'Invitada', completed: 'Completada',
+  inactive: 'Inactiva', deleted: 'Eliminada', rejected: 'Rechazada',
+  creation_pending: 'Pendiente de alta',
+  // curso
+  available: 'Publicado', unpublished: 'Sin publicar', claimed: 'Sin publicar',
+  created: 'Creado', concluded: 'Finalizado',
+};
+function _estadoES(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  return _ESTADOS_ES[String(v).toLowerCase()] || v;
+}
+
 function _esc(str) {
   return String(str ?? '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -4602,8 +4617,8 @@ async function abrirFicha(cedula) {
             <td style="padding:7px 10px;">${_esc(cu.nombre||'')}</td>
             <td style="padding:7px 10px;color:var(--text-muted);">${parseInt(cu.canvas_course_id)||'—'}</td>
             <td style="padding:7px 10px;color:var(--text-muted);">${_esc(cu.semestre||'—')}</td>
-            <td style="padding:7px 10px;text-align:center;">${badge(cu.estado_matricula||'—', (cu.estado_matricula||'')==='active')}</td>
-            <td style="padding:7px 10px;text-align:center;">${badge(cu.estado_curso||'—', (cu.estado_curso||'')==='available')}</td>
+            <td style="padding:7px 10px;text-align:center;">${badge(_estadoES(cu.estado_matricula), (cu.estado_matricula||'')==='active')}</td>
+            <td style="padding:7px 10px;text-align:center;">${badge(_estadoES(cu.estado_curso), (cu.estado_curso||'')==='available')}</td>
             <td style="padding:7px 10px;text-align:center;font-weight:600;">${cu.nota_final ?? cu.nota_actual ?? '—'}</td>
             <td style="padding:7px 10px;text-align:center;color:${col};font-weight:600;">${p===null?'—':p+'%'}</td>
           </tr>`;}).join('')}
@@ -4614,7 +4629,13 @@ async function abrirFicha(cedula) {
       ${seccion('Diagnóstico', bloqueDiag)}
       ${seccion('Cuentas', bloqueCuentas)}
       ${seccion('Matrículas en Canvas', canvasTabla)}
-      ${seccion('Avance académico', `
+      ${seccion('Avance académico', (!r.total_materias || !f.materias?.length) ? `
+        <div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:12px 15px;font-size:.85rem;line-height:1.55;">
+          <strong>Sin historial académico cargado para este alumno.</strong><br>
+          El avance, el promedio y la situación por materia se calculan desde las planillas
+          de calificaciones. Importalas en <strong>Datos → Historial y mallas</strong> para
+          que esta sección se complete. Los datos de Canvas de arriba sí están actualizados.
+        </div>` : `
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:10px;">
           ${tarjeta(r.avance_pct + '%', 'Avance', 'var(--accent)')}
           ${tarjeta(r.promedio ?? '—', 'Promedio')}
@@ -4626,7 +4647,7 @@ async function abrirFicha(cedula) {
         </div>${barra}`)}
       ${alertas.length ? seccion('Riesgo académico', alertas.map(a=>
         `<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:10px 14px;font-size:.84rem;margin-bottom:6px;">${a}</div>`).join('')) : ''}
-      ${seccion('Situación por materia', ['puede_inscribir','reprobada','bloqueada','cursando','aprobada']
+      ${!f.materias?.length ? '' : seccion('Situación por materia', ['puede_inscribir','reprobada','bloqueada','cursando','aprobada']
         .map(e => listaMaterias(e, {aprobada:'#16a34a',reprobada:'#dc2626',cursando:'#2563eb',
               puede_inscribir:'#15803d',bloqueada:'#b45309'}[e])).join(''))}
     `;
@@ -4646,7 +4667,7 @@ function fichaExportar() {
   rows.push(['Cuenta', 'Microsoft 365', c.m365.existe ? (c.m365.activo === false ? 'deshabilitada' : 'activa') : 'NO existe', c.m365.upn || '']);
   (f.canvas||[]).forEach(cu => rows.push([
     'Matrícula Canvas', `${cu.nombre} (ID ${cu.canvas_course_id})`,
-    `matrícula: ${cu.estado_matricula||'—'} / curso: ${cu.estado_curso||'—'}`,
+    `matrícula: ${_estadoES(cu.estado_matricula)} / curso: ${_estadoES(cu.estado_curso)}`,
     cu.semestre || '']));
   (f.materias||[]).forEach(m => rows.push([
     'Materia', m.materia, m.estado, (m.faltantes||[]).join(', ')]));
@@ -5381,7 +5402,7 @@ async function ccVerCurso(courseId) {
     document.getElementById('cc-det-info').innerHTML =
       (d.aviso ? `<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.82rem;">${_esc(d.aviso)}</div>` : '') +
       `ID <strong>${parseInt(d.id)}</strong> · Período <strong>${_esc(d.periodo||'—')}</strong> · ` +
-      `Subcuenta <strong>${_esc(d.subcuenta||'—')}</strong> · Estado <strong>${_esc(d.estado||'—')}</strong><br>` +
+      `Subcuenta <strong>${_esc(d.subcuenta||'—')}</strong> · Estado <strong>${_esc(_estadoES(d.estado))}</strong><br>` +
       `Docentes: ${_esc(docentes)} · SIS: ${_esc(d.sis_course_id||'—')}`;
 
     if (!d.alumnos.length) {
@@ -5408,7 +5429,7 @@ async function ccVerCurso(courseId) {
             <td style="padding:7px 12px;">${_esc(a.nombre)}</td>
             <td style="padding:7px 12px;">${_esc(a.cedula||'—')}</td>
             <td style="padding:7px 12px;">${_esc(a.email||'—')}</td>
-            <td style="padding:7px 12px;text-align:center;">${_esc(a.estado||'—')}</td>
+            <td style="padding:7px 12px;text-align:center;">${_esc(_estadoES(a.estado))}</td>
             <td style="padding:7px 12px;text-align:center;font-weight:600;">${nota(a.nota_actual)}</td>
             <td style="padding:7px 12px;text-align:center;font-weight:600;">${nota(a.nota_final)}</td>
           </tr>`).join('')}
@@ -5426,7 +5447,7 @@ function ccExportarAlumnos() {
   if (!_ccDetalle || !_ccDetalle.alumnos?.length) { alert('No hay matriculados para exportar'); return; }
   const d = _ccDetalle;
   const headers = ['#','Alumno','Cédula','Usuario/correo','Estado','Nota actual','Nota final'];
-  const rows = d.alumnos.map((a,i)=>[i+1, a.nombre, a.cedula||'', a.email||'', a.estado||'',
+  const rows = d.alumnos.map((a,i)=>[i+1, a.nombre, a.cedula||'', a.email||'', _estadoES(a.estado),
                                      a.nota_actual ?? '', a.nota_final ?? '']);
   const nombre = `matriculados_${String(d.nombre||d.id).replace(/[^\w\- ]+/g,'_').trim()}.csv`;
   _descargarCSV(nombre, headers, rows);
