@@ -393,14 +393,17 @@ async def list_all_courses(refrescar: bool = False, _: dict = Depends(_require_a
             pass
         raise HTTPException(status_code=502, detail=f"Canvas no disponible y no hay cursos en la BD ({str(exc)[:80]})")
 
-    # Persistir para que la próxima carga sea instantánea
+    # Persistir en un solo lote (uno por uno serían miles de viajes a la BD)
     try:
         await sync_service.init_db()
-        for c in cursos:
-            cid = c.get("id")
-            if not cid:
-                continue
-            await _db.execute(
+        filas = [
+            (c["id"], c.get("name", ""), c.get("sis_course_id") or "",
+             (c.get("term") or {}).get("name") or "", c.get("account_name") or "",
+             c.get("workflow_state", ""), c.get("total_students") or 0)
+            for c in cursos if c.get("id")
+        ]
+        if filas:
+            await _db.executemany(
                 """INSERT INTO sync_cursos
                        (canvas_course_id, nombre, sis_course_id, semestre, subcuenta,
                         estado, total_alumnos, ultima_sync)
@@ -410,9 +413,7 @@ async def list_all_courses(refrescar: bool = False, _: dict = Depends(_require_a
                        semestre=EXCLUDED.semestre, subcuenta=EXCLUDED.subcuenta,
                        estado=EXCLUDED.estado, total_alumnos=EXCLUDED.total_alumnos,
                        ultima_sync=NOW()""",
-                cid, c.get("name", ""), c.get("sis_course_id") or "",
-                (c.get("term") or {}).get("name") or "", c.get("account_name") or "",
-                c.get("workflow_state", ""), c.get("total_students") or 0,
+                filas,
             )
     except Exception as exc:
         logger.warning("No se pudieron guardar los cursos en la BD: %s", exc)

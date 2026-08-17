@@ -5275,8 +5275,8 @@ async function cargarCursosCanvas(refrescar = false) {
   const tabla = document.getElementById('canvas-cursos-tabla');
   const btnExp = document.getElementById('btn-exportar-canvas');
   st.innerHTML = `<span style="color:var(--text-muted);">⏳ ${refrescar ? 'Actualizando desde Canvas (puede tardar)…' : 'Cargando cursos…'}</span>`;
-  tabla.innerHTML = '';
-  btnExp.style.display = 'none';
+  if (!_ccCursos.length) tabla.innerHTML = '';   // sólo vaciar si aún no hay nada que mostrar
+  btnExp.style.display = _ccCursos.length ? '' : 'none';
   _portalLog('Consultando cursos Canvas...');
   try {
     const [cursosR, subsR, termsR] = await Promise.allSettled([
