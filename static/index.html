@@ -1278,15 +1278,49 @@
     <div id="panel-panel-canvas-cursos" class="panel">
       <div class="card">
         <h2 class="card-title">🎓 Cursos Canvas</h2>
-        <p style="color:#64748b;font-size:.9rem;margin-bottom:20px;">Listado de todos los cursos en Canvas LMS con su ID y nombre.</p>
+        <p style="color:#64748b;font-size:.9rem;margin-bottom:16px;">
+          Buscá por ID, nombre o SIS, filtrá por período y subcuenta, y hacé clic en un curso para ver sus matriculados.
+        </p>
 
-        <div style="display:flex;gap:10px;margin-bottom:20px;">
-          <button class="btn btn-primary" onclick="cargarCursosCanvas()">↻ Cargar cursos</button>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+          <div style="min-width:190px;">
+            <label style="font-size:.8rem;">Período</label>
+            <select id="cc-periodo" onchange="ccFiltrar()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+              <option value="">Todos los períodos</option>
+            </select>
+          </div>
+          <div style="min-width:190px;">
+            <label style="font-size:.8rem;">Subcuenta</label>
+            <select id="cc-subcuenta" onchange="ccFiltrar()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+              <option value="">Todas las subcuentas</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:220px;">
+            <label style="font-size:.8rem;">Buscar <span style="color:var(--text-muted);font-weight:400;">(ID, nombre o SIS)</span></label>
+            <input id="cc-buscar" type="text" oninput="ccFiltrar()" placeholder="Ej: 1806 o guarani"
+                   style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+          </div>
+          <button class="btn btn-primary" onclick="cargarCursosCanvas()">↻ Recargar</button>
           <button class="btn" id="btn-exportar-canvas" onclick="exportarCursosExcel()" style="display:none;">⬇ Exportar Excel</button>
         </div>
 
         <div id="canvas-cursos-status"></div>
         <div id="canvas-cursos-tabla" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- Detalle 360 del curso seleccionado -->
+      <div class="card" id="cc-detalle-card" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h3 style="margin:0;" id="cc-det-nombre">—</h3>
+            <div id="cc-det-info" style="font-size:.83rem;color:var(--text-muted);margin-top:4px;"></div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" onclick="ccExportarAlumnos()">⬇ Exportar matriculados</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('cc-detalle-card').style.display='none'">✕ Cerrar</button>
+          </div>
+        </div>
+        <div id="cc-det-alumnos" style="margin-top:14px;"></div>
       </div>
     </div>
 
@@ -4923,57 +4957,180 @@ async function guardarCron() {
 
 let _canvasCursos = [];
 
+let _ccCursos = [];
+let _ccDetalle = null;
+
 async function cargarCursosCanvas() {
   const st = document.getElementById('canvas-cursos-status');
   const tabla = document.getElementById('canvas-cursos-tabla');
   const btnExp = document.getElementById('btn-exportar-canvas');
-  st.innerHTML = '<span style="color:#64748b;">⏳ Cargando cursos desde Canvas...</span>';
+  st.innerHTML = '<span style="color:var(--text-muted);">⏳ Cargando cursos desde Canvas...</span>';
   tabla.innerHTML = '';
   btnExp.style.display = 'none';
   _portalLog('Consultando cursos Canvas...');
   try {
-    const r = await apiFetch('/api/canvas/all-courses');
-    _canvasCursos = r;
-    if (!r.length) { st.innerHTML = '<span style="color:#64748b;">Sin cursos encontrados.</span>'; return; }
+    const [cursosR, subsR] = await Promise.allSettled([
+      apiFetch('/api/canvas/all-courses'),
+      apiFetch('/api/canvas/subcuentas'),
+    ]);
+    if (cursosR.status !== 'fulfilled') throw new Error(cursosR.reason?.message || 'Error al cargar cursos');
+    _ccCursos = cursosR.value || [];
+    _canvasCursos = _ccCursos;
+
+    // Períodos únicos presentes en los cursos
+    const periodos = [...new Set(_ccCursos.map(c => c.term?.name).filter(Boolean))].sort();
+    document.getElementById('cc-periodo').innerHTML = '<option value="">Todos los períodos</option>' +
+      periodos.map(p => `<option value="${_esc(p)}">${_esc(p)}</option>`).join('');
+
+    // Subcuentas: las de la API si están, si no las que aparecen en los cursos
+    let subs = subsR.status === 'fulfilled' ? (subsR.value || []) : [];
+    if (!subs.length) {
+      subs = [...new Set(_ccCursos.map(c => c.account_name).filter(Boolean))].sort().map(n => ({id:n, name:n}));
+    }
+    document.getElementById('cc-subcuenta').innerHTML = '<option value="">Todas las subcuentas</option>' +
+      subs.map(s => `<option value="${_esc(s.name)}">${_esc(s.name)}</option>`).join('');
+
     st.innerHTML = '';
-    const filas = r.map((c, i) => `<tr style="background:${i%2===0?'#fff':'#f8fafc'};">
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;text-align:center;">${i+1}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#1e293b;">${c.id}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#1e293b;">${_esc(c.name)}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#64748b;">${_esc(c.sis_course_id||'—')}</td>
-    </tr>`).join('');
-    tabla.innerHTML = `
-      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
-        <div style="background:#0d1b2e;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="color:#fff;font-weight:700;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;">Cursos Canvas</span>
-          <span style="color:#5c7a9e;font-size:.8rem;">${r.length} cursos</span>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:.87rem;">
-          <thead><tr style="background:#f1f5f9;">
-            <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e2e8f0;color:#475569;font-size:.78rem;text-transform:uppercase;">#</th>
-            <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;color:#475569;font-size:.78rem;text-transform:uppercase;">ID Canvas</th>
-            <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;color:#475569;font-size:.78rem;text-transform:uppercase;">Nombre del curso</th>
-            <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;color:#475569;font-size:.78rem;text-transform:uppercase;">SIS Course ID</th>
-          </tr></thead>
-          <tbody>${filas}</tbody>
-        </table>
-      </div>`;
+    ccFiltrar();
     btnExp.style.display = '';
-    _portalLog(`${r.length} cursos cargados desde Canvas.`, 'info');
+    _portalLog(`${_ccCursos.length} cursos cargados desde Canvas.`, 'info');
   } catch(e) {
-    st.innerHTML = `<span style="color:red;">❌ Error: ${_esc(e.message)}</span>`;
+    st.innerHTML = `<span style="color:var(--error);">❌ Error: ${_esc(e.message)}</span>`;
     _portalLog(`Error cargando cursos Canvas: ${e.message}`, 'error');
   }
 }
 
+function ccFiltrar() {
+  const per = document.getElementById('cc-periodo').value;
+  const sub = document.getElementById('cc-subcuenta').value;
+  const q   = (document.getElementById('cc-buscar').value || '').trim().toLowerCase();
+
+  const filtrados = _ccCursos.filter(c => {
+    if (per && (c.term?.name || '') !== per) return false;
+    if (sub && (c.account_name || '') !== sub) return false;
+    if (q) {
+      const heno = `${c.id} ${c.name || ''} ${c.sis_course_id || ''} ${c.course_code || ''}`.toLowerCase();
+      if (!heno.includes(q)) return false;
+    }
+    return true;
+  });
+  _canvasCursos = filtrados;
+
+  const tabla = document.getElementById('canvas-cursos-tabla');
+  if (!filtrados.length) {
+    tabla.innerHTML = '<p style="color:var(--text-muted);padding:12px;">Sin resultados para ese filtro.</p>';
+    return;
+  }
+  const filas = filtrados.map((c, i) => `
+    <tr style="background:${i%2?'var(--bg)':'var(--surface)'};cursor:pointer;" onclick="ccVerCurso(${parseInt(c.id)})"
+        title="Ver matriculados">
+      <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text-muted);text-align:center;">${i+1}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid var(--border);font-weight:600;">${parseInt(c.id)}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid var(--border);">${_esc(c.name || '')}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text-muted);">${_esc(c.term?.name || '—')}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text-muted);">${_esc(c.account_name || '—')}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid var(--border);text-align:center;">${c.total_students ?? '—'}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text-muted);font-size:.8rem;">${_esc(c.sis_course_id || '—')}</td>
+    </tr>`).join('');
+
+  tabla.innerHTML = `
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="background:#0d1b2e;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:#fff;font-weight:700;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;">Cursos Canvas</span>
+        <span style="color:#5c7a9e;font-size:.8rem;">${filtrados.length} de ${_ccCursos.length} cursos</span>
+      </div>
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.86rem;">
+        <thead><tr style="background:var(--bg);">
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">#</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">ID Canvas</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">Nombre del curso</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">Período</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">Subcuenta</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">Alumnos</th>
+          <th style="padding:10px 12px;text-align:left;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">SIS</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+      </div>
+    </div>`;
+}
+
+async function ccVerCurso(courseId) {
+  const card = document.getElementById('cc-detalle-card');
+  const cont = document.getElementById('cc-det-alumnos');
+  card.style.display = '';
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
+  document.getElementById('cc-det-nombre').textContent = 'Cargando…';
+  document.getElementById('cc-det-info').textContent = '';
+  cont.innerHTML = '<p style="color:var(--text-muted);">⏳ Consultando matriculados en Canvas…</p>';
+  try {
+    const d = await apiFetch(`/api/canvas/curso/${courseId}/detalle`);
+    _ccDetalle = d;
+    document.getElementById('cc-det-nombre').textContent = d.nombre || `Curso ${courseId}`;
+    const docentes = (d.docentes || []).filter(Boolean).join(', ') || '—';
+    document.getElementById('cc-det-info').innerHTML =
+      `ID <strong>${parseInt(d.id)}</strong> · Período <strong>${_esc(d.periodo||'—')}</strong> · ` +
+      `Subcuenta <strong>${_esc(d.subcuenta||'—')}</strong> · Estado <strong>${_esc(d.estado||'—')}</strong><br>` +
+      `Docentes: ${_esc(docentes)} · SIS: ${_esc(d.sis_course_id||'—')}`;
+
+    if (!d.alumnos.length) {
+      cont.innerHTML = '<p style="color:var(--text-muted);padding:10px 0;">Este curso no tiene alumnos matriculados.</p>';
+      return;
+    }
+    const nota = v => (v === null || v === undefined) ? '—' : `${v}`;
+    cont.innerHTML = `
+      <div style="margin-bottom:8px;font-size:.85rem;color:var(--text-muted);">${d.alumnos.length} alumno${d.alumnos.length!==1?'s':''} matriculado${d.alumnos.length!==1?'s':''}</div>
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+        <thead><tr style="background:#1e3a5f;color:#fff;">
+          <th style="padding:8px 12px;text-align:right;width:44px;">#</th>
+          <th style="padding:8px 12px;text-align:left;">Alumno</th>
+          <th style="padding:8px 12px;text-align:left;">Cédula</th>
+          <th style="padding:8px 12px;text-align:left;">Usuario / correo</th>
+          <th style="padding:8px 12px;text-align:center;">Estado</th>
+          <th style="padding:8px 12px;text-align:center;">Nota actual</th>
+          <th style="padding:8px 12px;text-align:center;">Nota final</th>
+        </tr></thead>
+        <tbody>${d.alumnos.map((a,i)=>`
+          <tr style="background:${i%2?'var(--bg)':'var(--surface)'};">
+            <td style="padding:7px 12px;text-align:right;color:var(--text-muted);">${i+1}</td>
+            <td style="padding:7px 12px;">${_esc(a.nombre)}</td>
+            <td style="padding:7px 12px;">${_esc(a.cedula||'—')}</td>
+            <td style="padding:7px 12px;">${_esc(a.email||'—')}</td>
+            <td style="padding:7px 12px;text-align:center;">${_esc(a.estado||'—')}</td>
+            <td style="padding:7px 12px;text-align:center;font-weight:600;">${nota(a.nota_actual)}</td>
+            <td style="padding:7px 12px;text-align:center;font-weight:600;">${nota(a.nota_final)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      </div>`;
+    _portalLog(`Curso ${d.nombre}: ${d.alumnos.length} matriculados`, 'info');
+  } catch(e) {
+    cont.innerHTML = `<p style="color:var(--error);">❌ ${_esc(e.message)}</p>`;
+    _portalLog(`Error al abrir el curso: ${e.message}`, 'error');
+  }
+}
+
+function ccExportarAlumnos() {
+  if (!_ccDetalle || !_ccDetalle.alumnos?.length) { alert('No hay matriculados para exportar'); return; }
+  const d = _ccDetalle;
+  const headers = ['#','Alumno','Cédula','Usuario/correo','Estado','Nota actual','Nota final'];
+  const rows = d.alumnos.map((a,i)=>[i+1, a.nombre, a.cedula||'', a.email||'', a.estado||'',
+                                     a.nota_actual ?? '', a.nota_final ?? '']);
+  const nombre = `matriculados_${String(d.nombre||d.id).replace(/[^\w\- ]+/g,'_').trim()}.csv`;
+  _descargarCSV(nombre, headers, rows);
+}
+
 function exportarCursosExcel() {
-  if (!_canvasCursos.length) return;
-  const rows = [['#','ID Canvas','Nombre','SIS Course ID'],
-    ..._canvasCursos.map((c,i) => [i+1, c.id, c.name, c.sis_course_id||''])];
-  let csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
-  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'canvas_cursos.csv'; a.click();
+  if (!_canvasCursos.length) { alert('No hay cursos para exportar'); return; }
+  // Exporta lo que está filtrado en pantalla, con período y subcuenta
+  const headers = ['#','ID Canvas','Nombre','Período','Subcuenta','Alumnos','SIS Course ID'];
+  const rows = _canvasCursos.map((c,i) => [
+    i+1, c.id, c.name || '', c.term?.name || '', c.account_name || '',
+    c.total_students ?? '', c.sis_course_id || '',
+  ]);
+  _descargarCSV('canvas_cursos.csv', headers, rows);
 }
 
 // ── Reporte de asistencia (Roll Call) ─────────────────────────────────────────

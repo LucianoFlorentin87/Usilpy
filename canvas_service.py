@@ -86,37 +86,6 @@ async def get_courses(per_page: int = 50) -> list[dict]:
         return resp.json()
 
 
-async def get_all_courses() -> list[dict]:
-    """Fetch ALL courses in the account with pagination, returning id + name + sis_course_id."""
-    try:
-        acct = await _account_id()
-    except Exception as e:
-        raise RuntimeError(f"No se pudo obtener account ID de Canvas: {e}") from e
-
-    courses: list[dict] = []
-    url = f"{_base()}/api/v1/accounts/{acct}/courses"
-    params = {"per_page": 100, "state[]": ["available", "unpublished", "completed"]}
-    async with httpx.AsyncClient(timeout=60) as client:
-        while url:
-            resp = await client.get(url, headers=_headers(), params=params)
-            if not resp.is_success:
-                raise RuntimeError(f"Canvas API error {resp.status_code}: {resp.text[:300]}")
-            batch = resp.json()
-            if not isinstance(batch, list):
-                raise RuntimeError(f"Canvas devolvió formato inesperado: {str(batch)[:200]}")
-            courses.extend({"id": c["id"], "name": c["name"], "sis_course_id": c.get("sis_course_id", "")} for c in batch)
-            # Follow Link header for next page
-            link = resp.headers.get("Link", "")
-            next_url = None
-            for part in link.split(","):
-                if 'rel="next"' in part:
-                    next_url = part.split(";")[0].strip().strip("<>")
-                    break
-            url = next_url
-            params = {}
-    return courses
-
-
 async def get_users(per_page: int = 50) -> list[dict]:
     acct = await _account_id()
     async with httpx.AsyncClient() as client:
@@ -288,17 +257,52 @@ async def search_users(query: str, per_page: int = 20) -> list[dict]:
         return resp.json()
 
 
-async def get_all_courses(per_page: int = 100) -> list[dict]:
-    """Fetch all courses from the account with pagination."""
-    courses = []
+async def get_subaccounts() -> list[dict]:
+    """Sub-cuentas de la cuenta raíz (para filtrar cursos por facultad/programa)."""
     acct = await _account_id()
-    url = f"{_base()}/api/v1/accounts/{acct}/courses"
-    params = {"per_page": per_page, "include[]": ["total_students", "term"]}
+    subs = []
+    url = f"{_base()}/api/v1/accounts/{acct}/sub_accounts"
+    params = {"per_page": 100, "recursive": True}
     async with httpx.AsyncClient(timeout=60) as client:
         while url:
             resp = await client.get(url, headers=_headers(), params=params)
-            resp.raise_for_status()
-            courses.extend(resp.json())
+            if resp.status_code != 200:
+                break
+            subs.extend(resp.json())
+            link = resp.headers.get("Link", "")
+            url = None
+            params = {}
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    url = part.split(";")[0].strip().strip("<>")
+    # incluir la cuenta raíz para poder filtrar por ella también
+    root = {"id": int(acct), "name": "Cuenta principal"}
+    return [root] + [{"id": s.get("id"), "name": s.get("name")} for s in subs]
+
+
+async def get_all_courses(per_page: int = 100) -> list[dict]:
+    """Todos los cursos de la cuenta, con período, subcuenta, docentes y matriculados."""
+    try:
+        acct = await _account_id()
+    except Exception as e:
+        raise RuntimeError(f"No se pudo obtener account ID de Canvas: {e}") from e
+
+    courses: list[dict] = []
+    url = f"{_base()}/api/v1/accounts/{acct}/courses"
+    params = {
+        "per_page": per_page,
+        "include[]": ["total_students", "term", "teachers", "account_name"],
+        "state[]": ["available", "unpublished", "completed"],
+    }
+    async with httpx.AsyncClient(timeout=60) as client:
+        while url:
+            resp = await client.get(url, headers=_headers(), params=params)
+            if not resp.is_success:
+                raise RuntimeError(f"Canvas API error {resp.status_code}: {resp.text[:300]}")
+            batch = resp.json()
+            if not isinstance(batch, list):
+                raise RuntimeError(f"Canvas devolvió formato inesperado: {str(batch)[:200]}")
+            courses.extend(batch)
             link = resp.headers.get("Link", "")
             url = None
             params = {}

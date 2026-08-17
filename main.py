@@ -1,5 +1,6 @@
 import io
 import logging
+import httpx
 import os
 import time
 from collections import defaultdict
@@ -363,6 +364,65 @@ async def list_all_courses(_: dict = Depends(_require_admin_or_academico)):
         except Exception as e2:
             logger.error("Fallback BD cursos falló: %s", e2)
             raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.get("/api/canvas/subcuentas")
+async def list_subaccounts(_: dict = Depends(_require_admin_or_academico)):
+    """Sub-cuentas de Canvas para filtrar cursos."""
+    try:
+        return await canvas_service.get_subaccounts()
+    except Exception as exc:
+        logger.warning("No se pudieron listar subcuentas: %s", exc)
+        return []
+
+
+@app.get("/api/canvas/curso/{course_id}/detalle")
+async def detalle_curso(course_id: int, _: dict = Depends(_require_admin_or_academico)):
+    """Vista 360 de un curso: datos generales + alumnos matriculados con su nota."""
+    import asyncio as _aio
+
+    async def _curso():
+        async with httpx.AsyncClient(timeout=60) as c:
+            r = await c.get(
+                f"{canvas_service._base()}/api/v1/courses/{course_id}",
+                headers=canvas_service._headers(),
+                params={"include[]": ["term", "teachers", "total_students", "account_name"]},
+            )
+            return r.json() if r.status_code == 200 else {}
+
+    try:
+        curso, enrollments = await _aio.gather(_curso(), canvas_service.get_course_enrollments(course_id))
+    except Exception as exc:
+        logger.error("Error detalle curso %s: %s", course_id, exc)
+        raise HTTPException(status_code=502, detail=str(exc)[:200])
+
+    alumnos = []
+    for e in enrollments:
+        u = e.get("user") or {}
+        g = e.get("grades") or {}
+        alumnos.append({
+            "canvas_user_id": e.get("user_id"),
+            "nombre": u.get("sortable_name") or u.get("name") or "",
+            "cedula": u.get("sis_user_id") or e.get("sis_user_id") or "",
+            "email": u.get("login_id") or "",
+            "estado": e.get("enrollment_state") or "",
+            "nota_actual": g.get("current_score"),
+            "nota_final": g.get("final_score"),
+        })
+    alumnos.sort(key=lambda a: a["nombre"])
+
+    return {
+        "id": course_id,
+        "nombre": curso.get("name", ""),
+        "sis_course_id": curso.get("sis_course_id") or "",
+        "codigo": curso.get("course_code") or "",
+        "periodo": (curso.get("term") or {}).get("name") or "",
+        "subcuenta": curso.get("account_name") or "",
+        "estado": curso.get("workflow_state") or "",
+        "docentes": [t.get("display_name") for t in (curso.get("teachers") or [])],
+        "total_alumnos": len(alumnos),
+        "alumnos": alumnos,
+    }
 
 
 @app.get("/api/canvas/asistencia/{course_id}")
