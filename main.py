@@ -1952,6 +1952,39 @@ async def sync_get_alumnos(q: str = "", limit: int = 50, _user=Depends(_require_
     return rows
 
 
+@app.get("/api/academico/alumno/{cedula}/canvas")
+async def alumno_canvas_por_cedula(cedula: str, _: dict = Depends(_require_admin_or_academico)):
+    """Cursos, notas y asistencias del alumno en Canvas, buscando por su cédula.
+
+    Permite ver en una sola pantalla el historial académico (planillas) y la
+    actividad en Canvas, sin que el usuario tenga que saber de dónde sale cada dato.
+    """
+    import db as _db
+    import sync_service
+    await sync_service.init_db()
+    alumno = await _db.fetchrow(
+        "SELECT * FROM sync_alumnos WHERE sis_user_id = ? OR login_id = ? LIMIT 1",
+        cedula, cedula,
+    )
+    if not alumno:
+        return {"encontrado": False, "cursos": []}
+    uid = alumno["canvas_user_id"]
+    cursos = await _db.fetch("""
+        SELECT c.canvas_course_id, c.nombre, c.semestre, m.estado,
+               cal.nota_actual, cal.nota_final, cal.letra_actual,
+               (SELECT COUNT(*) FROM sync_asistencias a
+                WHERE a.canvas_course_id = c.canvas_course_id AND a.canvas_user_id = ? AND a.estado = 'present') AS presentes,
+               (SELECT COUNT(*) FROM sync_asistencias a
+                WHERE a.canvas_course_id = c.canvas_course_id AND a.canvas_user_id = ?) AS total_clases
+        FROM sync_matriculaciones m
+        JOIN sync_cursos c ON c.canvas_course_id = m.canvas_course_id
+        LEFT JOIN sync_calificaciones cal ON cal.canvas_course_id = m.canvas_course_id AND cal.canvas_user_id = m.canvas_user_id
+        WHERE m.canvas_user_id = ?
+        ORDER BY c.semestre DESC, c.nombre
+    """, uid, uid, uid)
+    return {"encontrado": True, "alumno": dict(alumno), "cursos": cursos}
+
+
 @app.get("/api/sync/alumno/{canvas_user_id}")
 async def sync_get_alumno(canvas_user_id: int, _user=Depends(_require_admin)):
     import db as _db

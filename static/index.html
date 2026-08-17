@@ -361,13 +361,10 @@
 
     <div class="nav-section-label" id="nav-section-consultas" style="display:none;">Consultas</div>
     <div class="nav-item" id="nav-buscar-alumno" data-panel="panel-buscar-alumno" onclick="showPanel('panel-buscar-alumno', this)" style="display:none;">
-      <span class="nav-icon">🔍</span> Consultar alumno
+      <span class="nav-icon">🔍</span> Alumnos
     </div>
     <div class="nav-item" id="nav-canvas-cursos" data-panel="panel-canvas-cursos" onclick="showPanel('panel-canvas-cursos', this)" style="display:none;">
       <span class="nav-icon">🎓</span> Cursos
-    </div>
-    <div class="nav-item" id="nav-alumnos" data-panel="sync-alumnos" onclick="showPanel('sync-alumnos', this)" style="display:none;">
-      <span class="nav-icon">👨‍🎓</span> Alumnos
     </div>
     <div class="nav-item" id="nav-canvas-asistencia" data-panel="panel-canvas-asistencia" onclick="showPanel('panel-canvas-asistencia', this)" style="display:none;">
       <span class="nav-icon">🗓️</span> Reporte de asistencia
@@ -734,7 +731,7 @@
               <div style="font-size:1.4rem;opacity:.85;">🗓️</div><div>Reporte asistencia</div>
             </div>
             <div onclick="showPanel('panel-buscar-alumno', document.querySelector('[data-panel=panel-buscar-alumno]'))" class="dash-accion">
-              <div style="font-size:1.4rem;opacity:.85;">🔍</div><div>Consultar alumno</div>
+              <div style="font-size:1.4rem;opacity:.85;">🔍</div><div>Alumnos</div>
             </div>
           </div>
         </div>
@@ -1264,8 +1261,8 @@
     <!-- ══════════ PANEL: CONSULTAR ALUMNO ══════════ -->
     <div id="panel-panel-buscar-alumno" class="panel">
       <div class="card">
-        <h3 style="margin-bottom:4px;">Consultar alumno</h3>
-        <p style="color:#64748b;margin-bottom:20px;">Buscá un alumno por cédula o nombre y mirá su historial académico completo.</p>
+        <h3 style="margin-bottom:4px;">Alumnos</h3>
+        <p style="color:#64748b;margin-bottom:20px;">Buscá por cédula o nombre para ver su historial académico, qué puede cursar y su actividad en Canvas.</p>
 
         <div style="display:flex;gap:10px;max-width:560px;margin-bottom:20px;">
           <input type="text" id="buscar-alumno-input" placeholder="Cédula o nombre..." style="flex:1;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:.95rem;">
@@ -1278,15 +1275,20 @@
           <div style="display:flex;gap:4px;border-bottom:2px solid #e2e8f0;margin-bottom:16px;">
             <button id="tab-historial" onclick="switchTab('historial')"
               style="padding:8px 18px;border:none;background:none;cursor:pointer;font-weight:600;color:#2563eb;border-bottom:2px solid #2563eb;margin-bottom:-2px;font-size:.9rem;">
-              📋 Historial
+              Historial
             </button>
             <button id="tab-inscripcion" onclick="switchTab('inscripcion')"
               style="padding:8px 18px;border:none;background:none;cursor:pointer;font-weight:500;color:#64748b;font-size:.9rem;">
-              ✅ Puede inscribir
+              Puede inscribir
+            </button>
+            <button id="tab-canvas" onclick="switchTab('canvas')"
+              style="padding:8px 18px;border:none;background:none;cursor:pointer;font-weight:500;color:#64748b;font-size:.9rem;">
+              Cursos en Canvas
             </button>
           </div>
           <div id="historial-alumno-tabla"></div>
           <div id="inscripcion-alumno-tabla" style="display:none;"></div>
+          <div id="canvas-alumno-tabla" style="display:none;"></div>
         </div>
       </div>
     </div>
@@ -1924,8 +1926,8 @@ function showApp(user) {
 function _applyRoleVisibility(role) {
   // Agrupado por FUNCIÓN (qué hace el usuario), no por origen de los datos.
   const inicio    = ['nav-section-inicio', 'nav-dashboard'];
-  const consultas = ['nav-section-consultas', 'nav-buscar-alumno', 'nav-canvas-cursos',
-                     'nav-alumnos', 'nav-canvas-asistencia'];
+  const consultas = ['nav-section-consultas', 'nav-buscar-alumno',
+                     'nav-canvas-cursos', 'nav-canvas-asistencia'];
   const gestion   = ['nav-section-gestion', 'nav-portal', 'nav-crear-cursos',
                      'nav-matriculacion', 'nav-pending'];
   const datos     = ['nav-section-datos', 'nav-historial', 'nav-sync'];
@@ -2062,7 +2064,7 @@ const panelTitles = {
   'sync-panel':          ['Sincronizar Canvas',     'Datos'],
   'sync-alumnos':        ['Alumnos',                'Consultas'],
   'panel-historial':      ['Historial y mallas',   'Datos'],
-  'panel-buscar-alumno':  ['Consultar alumno',     'Consultas'],
+  'panel-buscar-alumno':  ['Alumnos',               'Consultas'],
   'panel-canvas-cursos':  ['Cursos',               'Consultas'],
   'panel-canvas-asistencia': ['Reporte de asistencia', 'Consultas'],
 };
@@ -4441,7 +4443,7 @@ async function repararNombres() {
 let _alumnoActual = null;
 
 function switchTab(tab) {
-  const tabs = ['historial','inscripcion'];
+  const tabs = ['historial','inscripcion','canvas'];
   tabs.forEach(t => {
     const btn = document.getElementById(`tab-${t}`);
     const panel = document.getElementById(`${t}-alumno-tabla`);
@@ -4453,6 +4455,46 @@ function switchTab(tab) {
     panel.style.display = active ? '' : 'none';
   });
   if (tab === 'inscripcion' && _alumnoActual) verInscripcionAlumno(_alumnoActual);
+  if (tab === 'canvas' && _alumnoActual) verCanvasAlumno(_alumnoActual);
+}
+
+// Actividad del alumno en Canvas (cursos, notas y asistencia) por cédula
+async function verCanvasAlumno(cedula) {
+  const cont = document.getElementById('canvas-alumno-tabla');
+  cont.innerHTML = '<p style="color:var(--text-muted);">Consultando…</p>';
+  try {
+    const d = await apiFetch(`/api/academico/alumno/${encodeURIComponent(cedula)}/canvas`);
+    if (!d.encontrado || !d.cursos.length) {
+      cont.innerHTML = '<p style="color:var(--text-muted);padding:8px 0;">Sin cursos de Canvas para este alumno. Si es reciente, sincronizá Canvas desde <strong>Datos</strong>.</p>';
+      return;
+    }
+    const pct = c => c.total_clases > 0 ? Math.round((c.presentes / c.total_clases) * 100) : null;
+    cont.innerHTML = `
+      <div class="tabla-scroll" style="overflow:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.86rem;">
+        <thead><tr style="background:var(--surface);">
+          <th style="padding:9px 12px;text-align:left;border-bottom:2px solid var(--border);">Materia</th>
+          <th style="padding:9px 12px;text-align:left;border-bottom:2px solid var(--border);">Período</th>
+          <th style="padding:9px 12px;text-align:center;border-bottom:2px solid var(--border);">Nota actual</th>
+          <th style="padding:9px 12px;text-align:center;border-bottom:2px solid var(--border);">Nota final</th>
+          <th style="padding:9px 12px;text-align:center;border-bottom:2px solid var(--border);">Asistencia</th>
+        </tr></thead>
+        <tbody>${d.cursos.map((c,i)=>{
+          const p = pct(c);
+          const col = p === null ? 'var(--text-muted)' : (p >= 70 ? '#16a34a' : '#dc2626');
+          return `<tr style="background:${i%2?'var(--bg)':'var(--surface)'};">
+            <td style="padding:8px 12px;">${_esc(c.nombre||'')}</td>
+            <td style="padding:8px 12px;color:var(--text-muted);">${_esc(c.semestre||'—')}</td>
+            <td style="padding:8px 12px;text-align:center;">${c.nota_actual ?? '—'}</td>
+            <td style="padding:8px 12px;text-align:center;font-weight:600;">${c.nota_final ?? '—'}</td>
+            <td style="padding:8px 12px;text-align:center;color:${col};font-weight:600;">${p === null ? '—' : p + '%'}</td>
+          </tr>`;}).join('')}
+        </tbody>
+      </table>
+      </div>`;
+  } catch(e) {
+    cont.innerHTML = `<p style="color:var(--error);">${_esc(e.message)}</p>`;
+  }
 }
 
 async function buscarAlumno() {
