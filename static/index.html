@@ -5005,15 +5005,24 @@ function ccFiltrar() {
   const sub = document.getElementById('cc-subcuenta').value;
   const q   = (document.getElementById('cc-buscar').value || '').trim().toLowerCase();
 
-  const filtrados = _ccCursos.filter(c => {
-    if (per && (c.term?.name || '') !== per) return false;
-    if (sub && (c.account_name || '') !== sub) return false;
-    if (q) {
-      const heno = `${c.id} ${c.name || ''} ${c.sis_course_id || ''} ${c.course_code || ''}`.toLowerCase();
-      if (!heno.includes(q)) return false;
-    }
-    return true;
-  });
+  // Si se escribe un ID de curso exacto, mostrar solo ese curso (ignora los
+  // demás filtros: un ID es único y no tiene sentido esconderlo por período).
+  let filtrados, porIdExacto = false;
+  const idExacto = /^\d+$/.test(q) ? _ccCursos.filter(c => String(c.id) === q) : [];
+  if (idExacto.length) {
+    filtrados = idExacto;
+    porIdExacto = true;
+  } else {
+    filtrados = _ccCursos.filter(c => {
+      if (per && (c.term?.name || '') !== per) return false;
+      if (sub && (c.account_name || '') !== sub) return false;
+      if (q) {
+        const heno = `${c.id} ${c.name || ''} ${c.sis_course_id || ''} ${c.course_code || ''}`.toLowerCase();
+        if (!heno.includes(q)) return false;
+      }
+      return true;
+    });
+  }
   _canvasCursos = filtrados;
 
   const tabla = document.getElementById('canvas-cursos-tabla');
@@ -5037,7 +5046,7 @@ function ccFiltrar() {
     <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
       <div style="background:#0d1b2e;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
         <span style="color:#fff;font-weight:700;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;">Cursos Canvas</span>
-        <span style="color:#5c7a9e;font-size:.8rem;">${filtrados.length} de ${_ccCursos.length} cursos</span>
+        <span style="color:#5c7a9e;font-size:.8rem;">${porIdExacto ? `ID exacto ${_esc(q)}` : `${filtrados.length} de ${_ccCursos.length} cursos`}</span>
       </div>
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:.86rem;">
