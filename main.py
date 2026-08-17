@@ -1957,13 +1957,87 @@ async def ficha_alumno(cedula: str, _: dict = Depends(_require_admin_or_academic
     """Ficha 360: datos, avance de carrera, historial, qué puede cursar,
     materias que traban el avance y actividad en Canvas — todo junto."""
     import academic_service as _ac
+    import db as _db
+    import sync_service
+    await sync_service.init_db()
+
     ficha = await _ac.ficha_alumno(cedula)
-    try:
-        canvas = await alumno_canvas_por_cedula(cedula, _)
-        ficha["canvas"] = canvas.get("cursos", [])
-    except Exception as exc:
-        logger.warning("Canvas no disponible para ficha de %s: %s", cedula, exc)
-        ficha["canvas"] = []
+
+    # ── Cuentas: ¿existe en Canvas? ¿y en 365? ──
+    cuenta_canvas = await _db.fetchrow(
+        "SELECT * FROM sync_alumnos WHERE sis_user_id = ? OR login_id = ? LIMIT 1", cedula, cedula)
+    correo = (cuenta_canvas or {}).get("email") or (cuenta_canvas or {}).get("login_id") or ""
+    cuenta_365 = None
+    if correo:
+        cuenta_365 = await _db.fetchrow(
+            "SELECT * FROM sync_usuarios_365 WHERE LOWER(upn) = LOWER(?) OR LOWER(email) = LOWER(?) LIMIT 1",
+            correo, correo)
+    ficha["cuentas"] = {
+        "canvas": {
+            "existe": bool(cuenta_canvas),
+            "user_id": (cuenta_canvas or {}).get("canvas_user_id"),
+            "login": (cuenta_canvas or {}).get("login_id") or "",
+            "email": correo,
+        },
+        "m365": {
+            "existe": bool(cuenta_365),
+            "activo": (cuenta_365 or {}).get("activo"),
+            "upn": (cuenta_365 or {}).get("upn") or "",
+            "equipos": ((cuenta_365 or {}).get("equipos") or "").split(", ") if (cuenta_365 or {}).get("equipos") else [],
+        },
+    }
+
+    # ── Matriculaciones reales en Canvas, con estado del curso ──
+    cursos_canvas = []
+    if cuenta_canvas:
+        uid = cuenta_canvas["canvas_user_id"]
+        cursos_canvas = await _db.fetch("""
+            SELECT c.canvas_course_id, c.nombre, c.semestre, c.estado AS estado_curso,
+                   m.estado AS estado_matricula,
+                   cal.nota_actual, cal.nota_final,
+                   (SELECT COUNT(*) FROM sync_asistencias a
+                     WHERE a.canvas_course_id=c.canvas_course_id AND a.canvas_user_id=? AND a.estado='present') AS presentes,
+                   (SELECT COUNT(*) FROM sync_asistencias a
+                     WHERE a.canvas_course_id=c.canvas_course_id AND a.canvas_user_id=?) AS total_clases
+            FROM sync_matriculaciones m
+            JOIN sync_cursos c ON c.canvas_course_id = m.canvas_course_id
+            LEFT JOIN sync_calificaciones cal
+                   ON cal.canvas_course_id=m.canvas_course_id AND cal.canvas_user_id=m.canvas_user_id
+            WHERE m.canvas_user_id = ?
+            ORDER BY c.semestre DESC, c.nombre
+        """, uid, uid, uid)
+    ficha["canvas"] = cursos_canvas
+
+    # ── Reclamo típico: "me falta un curso".
+    #    Compara lo que el alumno está cursando según el historial contra lo que
+    #    realmente tiene matriculado en Canvas.
+    def _clave(s: str) -> str:
+        import unicodedata as _u
+        s = _u.normalize("NFKD", (s or "").lower())
+        return "".join(ch for ch in s if ch.isalnum())
+
+    en_canvas = {_clave(c["nombre"]) for c in cursos_canvas}
+    cursando = [m["materia"] for m in ficha.get("materias", []) if m.get("estado") == "cursando"]
+    faltantes = [mat for mat in cursando
+                 if not any(_clave(mat) and _clave(mat) in k or k in _clave(mat) for k in en_canvas)]
+    ficha["faltantes_en_canvas"] = faltantes
+
+    # ── Diagnóstico accionable para soporte ──
+    diag = []
+    if not cuenta_canvas:
+        diag.append({"nivel": "error", "texto": "No tiene usuario en Canvas. Hay que crearlo y matricularlo."})
+    if correo and not cuenta_365:
+        diag.append({"nivel": "warn", "texto": f"No aparece cuenta de Microsoft 365 para {correo}."})
+    elif cuenta_365 and cuenta_365.get("activo") is False:
+        diag.append({"nivel": "error", "texto": "La cuenta de Microsoft 365 está deshabilitada."})
+    for f in faltantes:
+        diag.append({"nivel": "error", "texto": f"Está cursando «{f}» pero no figura matriculado en Canvas."})
+    for c in cursos_canvas:
+        if (c.get("estado_matricula") or "") not in ("active", "completed", ""):
+            diag.append({"nivel": "warn", "texto": f"Matrícula en «{c['nombre']}» está en estado «{c['estado_matricula']}»."})
+        if (c.get("estado_curso") or "") == "unpublished":
+            diag.append({"nivel": "warn", "texto": f"El curso «{c['nombre']}» está sin publicar: el alumno no lo ve."})
+    ficha["diagnostico"] = diag
     return ficha
 
 

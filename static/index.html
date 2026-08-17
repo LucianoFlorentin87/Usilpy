@@ -4526,44 +4526,78 @@ async function abrirFicha(cedula) {
       alertas.push(`Asistencia por debajo del 70% en: <strong>${_esc(bajaAsist.map(c=>c.nombre).join(', '))}</strong>`);
     }
 
+    // Diagnóstico: lo primero que necesita ver quien atiende un reclamo
+    const nivelEstilo = {
+      error: 'background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;',
+      warn:  'background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;',
+    };
+    const diag = (f.diagnostico || []);
+    const bloqueDiag = diag.length
+      ? diag.map(d => `<div style="${nivelEstilo[d.nivel]||nivelEstilo.warn}border-radius:8px;padding:9px 13px;font-size:.84rem;margin-bottom:6px;">${_esc(d.texto)}</div>`).join('')
+      : '<div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;border-radius:8px;padding:9px 13px;font-size:.84rem;">Sin inconsistencias detectadas: cuentas y matrículas en orden.</div>';
+
+    // Estado de cuentas (Canvas / Microsoft 365)
+    const c = f.cuentas || {canvas:{}, m365:{}};
+    const chip = (ok, txt) => `<span style="display:inline-flex;align-items:center;gap:5px;background:${ok?'#dcfce7':'#fee2e2'};color:${ok?'#15803d':'#b91c1c'};border-radius:99px;padding:3px 11px;font-size:.76rem;font-weight:600;">${ok?'✓':'✗'} ${txt}</span>`;
+    const bloqueCuentas = `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        ${chip(c.canvas.existe, 'Canvas')}
+        ${chip(c.m365.existe && c.m365.activo !== false, 'Microsoft 365')}
+        <span style="font-size:.8rem;color:var(--text-muted);">
+          ${c.canvas.user_id ? 'ID Canvas <strong>'+parseInt(c.canvas.user_id)+'</strong> · ' : ''}
+          ${_esc(c.canvas.email || c.m365.upn || 'sin correo registrado')}
+        </span>
+      </div>
+      ${c.m365.equipos?.length ? `<div style="font-size:.8rem;color:var(--text-muted);margin-top:7px;">Equipos Teams: ${_esc(c.m365.equipos.join(', '))}</div>` : ''}`;
+
+    // Matrículas reales en Canvas, con estado de curso y de matrícula
+    const badge = (txt, ok) => `<span style="font-size:.72rem;padding:2px 8px;border-radius:99px;background:${ok?'#dcfce7':'#fef3c7'};color:${ok?'#15803d':'#92400e'};">${_esc(txt)}</span>`;
     const canvasTabla = (f.canvas||[]).length ? `
       <div class="tabla-scroll" style="overflow:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+      <table style="width:100%;border-collapse:collapse;font-size:.83rem;">
         <thead><tr style="background:var(--surface);">
-          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Materia</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Curso</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">ID</th>
           <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Período</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Matrícula</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Curso</th>
           <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Nota</th>
-          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Asistencia</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Asist.</th>
         </tr></thead>
-        <tbody>${f.canvas.map((c,i)=>{
-          const p = c.total_clases>0 ? Math.round(c.presentes/c.total_clases*100) : null;
+        <tbody>${f.canvas.map((cu,i)=>{
+          const p = cu.total_clases>0 ? Math.round(cu.presentes/cu.total_clases*100) : null;
           const col = p===null ? 'var(--text-muted)' : (p>=70 ? '#16a34a' : '#dc2626');
           return `<tr style="background:${i%2?'var(--bg)':'var(--surface)'};">
-            <td style="padding:7px 10px;">${_esc(c.nombre||'')}</td>
-            <td style="padding:7px 10px;color:var(--text-muted);">${_esc(c.semestre||'—')}</td>
-            <td style="padding:7px 10px;text-align:center;font-weight:600;">${c.nota_final ?? c.nota_actual ?? '—'}</td>
+            <td style="padding:7px 10px;">${_esc(cu.nombre||'')}</td>
+            <td style="padding:7px 10px;color:var(--text-muted);">${parseInt(cu.canvas_course_id)||'—'}</td>
+            <td style="padding:7px 10px;color:var(--text-muted);">${_esc(cu.semestre||'—')}</td>
+            <td style="padding:7px 10px;text-align:center;">${badge(cu.estado_matricula||'—', (cu.estado_matricula||'')==='active')}</td>
+            <td style="padding:7px 10px;text-align:center;">${badge(cu.estado_curso||'—', (cu.estado_curso||'')==='available')}</td>
+            <td style="padding:7px 10px;text-align:center;font-weight:600;">${cu.nota_final ?? cu.nota_actual ?? '—'}</td>
             <td style="padding:7px 10px;text-align:center;color:${col};font-weight:600;">${p===null?'—':p+'%'}</td>
           </tr>`;}).join('')}
         </tbody></table></div>`
-      : '<p style="color:var(--text-muted);font-size:.84rem;">Sin cursos sincronizados de Canvas.</p>';
+      : '<p style="color:var(--text-muted);font-size:.84rem;">Sin matrículas sincronizadas en Canvas.</p>';
 
     body.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;">
-        ${tarjeta(r.avance_pct + '%', 'Avance', 'var(--accent)')}
-        ${tarjeta(r.promedio ?? '—', 'Promedio')}
-        ${tarjeta(r.aprobada, 'Aprobadas', '#16a34a')}
-        ${tarjeta(r.reprobada, 'Reprobadas', '#dc2626')}
-        ${tarjeta(r.cursando, 'Cursando', '#2563eb')}
-        ${tarjeta(r.puede_inscribir, 'Puede cursar')}
-        ${tarjeta(r.bloqueada, 'Bloqueadas', '#b45309')}
-      </div>
-      ${barra}
-      ${alertas.length ? seccion('Atención', alertas.map(a=>
+      ${seccion('Diagnóstico', bloqueDiag)}
+      ${seccion('Cuentas', bloqueCuentas)}
+      ${seccion('Matrículas en Canvas', canvasTabla)}
+      ${seccion('Avance académico', `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:10px;">
+          ${tarjeta(r.avance_pct + '%', 'Avance', 'var(--accent)')}
+          ${tarjeta(r.promedio ?? '—', 'Promedio')}
+          ${tarjeta(r.aprobada, 'Aprobadas', '#16a34a')}
+          ${tarjeta(r.reprobada, 'Reprobadas', '#dc2626')}
+          ${tarjeta(r.cursando, 'Cursando', '#2563eb')}
+          ${tarjeta(r.puede_inscribir, 'Puede cursar')}
+          ${tarjeta(r.bloqueada, 'Bloqueadas', '#b45309')}
+        </div>${barra}`)}
+      ${alertas.length ? seccion('Riesgo académico', alertas.map(a=>
         `<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:10px 14px;font-size:.84rem;margin-bottom:6px;">${a}</div>`).join('')) : ''}
       ${seccion('Situación por materia', ['puede_inscribir','reprobada','bloqueada','cursando','aprobada']
         .map(e => listaMaterias(e, {aprobada:'#16a34a',reprobada:'#dc2626',cursando:'#2563eb',
               puede_inscribir:'#15803d',bloqueada:'#b45309'}[e])).join(''))}
-      ${seccion('Actividad en Canvas', canvasTabla)}
     `;
   } catch(e) {
     body.innerHTML = `<p style="color:var(--error);">${_esc(e.message)}</p>`;
@@ -4573,8 +4607,18 @@ async function abrirFicha(cedula) {
 function fichaExportar() {
   if (!_fichaActual) return;
   const f = _fichaActual;
-  const headers = ['Materia','Estado','Falta aprobar'];
-  const rows = f.materias.map(m => [m.materia, m.estado, (m.faltantes||[]).join(', ')]);
+  const headers = ['Sección','Detalle','Estado','Observación'];
+  const rows = [];
+  (f.diagnostico||[]).forEach(d => rows.push(['Diagnóstico', d.texto, d.nivel, '']));
+  const c = f.cuentas || {canvas:{}, m365:{}};
+  rows.push(['Cuenta', 'Canvas', c.canvas.existe ? 'existe' : 'NO existe', c.canvas.email || '']);
+  rows.push(['Cuenta', 'Microsoft 365', c.m365.existe ? (c.m365.activo === false ? 'deshabilitada' : 'activa') : 'NO existe', c.m365.upn || '']);
+  (f.canvas||[]).forEach(cu => rows.push([
+    'Matrícula Canvas', `${cu.nombre} (ID ${cu.canvas_course_id})`,
+    `matrícula: ${cu.estado_matricula||'—'} / curso: ${cu.estado_curso||'—'}`,
+    cu.semestre || '']));
+  (f.materias||[]).forEach(m => rows.push([
+    'Materia', m.materia, m.estado, (m.faltantes||[]).join(', ')]));
   _descargarCSV(`ficha_${f.cedula}.csv`, headers, rows);
 }
 
