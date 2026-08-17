@@ -10,32 +10,32 @@
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
         :root {
-      --bg: #f4f6fa;
-      --sidebar-bg: #14181f;
-      --accent: #1d4ed8;
-      --accent-dark: #1e40af;
-      --accent-light: rgba(29, 78, 216, 0.1);
+      --bg: #f7f8fa;
+      --sidebar-bg: #16181d;
+      --accent: #2563eb;
+      --accent-dark: #1d4ed8;
+      --accent-light: rgba(37, 99, 235, 0.08);
       --surface: #ffffff;
-      --border: #e2e8f0;
-      --text: #1e293b;
-      --text-muted: #64748b;
-      --card-shadow: 0 8px 24px -12px rgba(15,23,42,.12), 0 2px 6px -2px rgba(15,23,42,.06);
+      --border: #e8eaee;
+      --text: #14171c;
+      --text-muted: #6b7280;
+      --card-shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
       --success-bg: #f0fdf4; --success: #166534; --success-border: #bbf7d0;
       --warn-bg: #fffbeb;   --warn: #b45309;   --warn-border: #fde68a;
       --error-bg: #fef2f2;  --error: #b91c1c;  --error-border: #fecaca;
       --skip-bg: #f1f5f9;   --skip: #475569;   --skip-border: #cbd5e1;
     }
     html[data-theme="dark"] {
-      --bg: #0b0f17;
-      --sidebar-bg: #0a0d13;
+      --bg: #0d0f13;
+      --sidebar-bg: #0a0c0f;
       --accent: #3b82f6;
       --accent-dark: #2563eb;
-      --accent-light: rgba(59, 130, 246, 0.15);
-      --surface: #151b26;
-      --border: #26303f;
-      --text: #e2e8f0;
-      --text-muted: #8b98ab;
-      --card-shadow: 0 8px 24px -12px rgba(0,0,0,.5);
+      --accent-light: rgba(59, 130, 246, 0.12);
+      --surface: #16191f;
+      --border: #242830;
+      --text: #e6e8ec;
+      --text-muted: #8b919c;
+      --card-shadow: 0 1px 3px rgba(0,0,0,.4);
       --success-bg: #052e16; --success: #6ee7a0; --success-border: #14532d;
       --warn-bg: #2a2005;   --warn: #fcd34d;   --warn-border: #713f12;
       --error-bg: #2c0b0e;  --error: #fca5a5;  --error-border: #7f1d1d;
@@ -55,10 +55,10 @@
     .sidebar-brand-name { font-size: .95rem; font-weight: 800; color: #fff; }
     .sidebar-brand-sub  { font-size: .66rem; font-weight: 500; color: #5c7a9e; text-transform: uppercase; letter-spacing: .07em; }
     .sidebar-nav { flex: 1; padding: 14px 12px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #1e2d42 transparent; }
-    .nav-section-label { font-size: .64rem; font-weight: 700; color: #3d5a80; text-transform: uppercase; letter-spacing: .12em; padding: 10px 10px 5px; margin-top: 6px; }
-    .nav-item { display: flex; align-items: center; gap: 11px; padding: 10px 12px; cursor: pointer; color: #8fb3d9; font-size: .875rem; font-weight: 500; border-radius: 10px; transition: all .15s; }
-    .nav-item:hover { background: rgba(255, 255, 255, 0.08); color: #e2eaf4; }
-    .nav-item.active { background: #2563eb; color: #fff; font-weight: 700; box-shadow: 0 4px 14px rgba(37,99,235,.4); }
+    .nav-section-label { font-size: .63rem; font-weight: 600; color: #5c6472; text-transform: uppercase; letter-spacing: .11em; padding: 14px 12px 6px; margin-top: 2px; }
+    .nav-item { display: flex; align-items: center; gap: 11px; padding: 9px 12px; cursor: pointer; color: #9aa3b2; font-size: .86rem; font-weight: 500; border-radius: 8px; transition: background .12s, color .12s; }
+    .nav-item:hover { background: rgba(255,255,255,.06); color: #e8ebf0; }
+    .nav-item.active { background: rgba(255,255,255,.10); color: #fff; font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
     .nav-item .nav-icon { width: 20px; text-align: center; font-size: 1rem; flex-shrink: 0; }
     .nav-badge { margin-left: auto; background: #ef4444; color: #fff; border-radius: 99px; padding: 1px 7px; font-size: .7rem; font-weight: 700; }
     /* Legacy hidden */
@@ -77,17 +77,31 @@
     .dash-accion { cursor: pointer; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 12px; text-align: center; font-size: .82rem; font-weight: 600; color: var(--text); transition: box-shadow .15s, transform .15s; display:flex; flex-direction:column; gap:8px; align-items:center; }
     .dash-accion:hover { box-shadow: 0 6px 16px -6px rgba(15,23,42,.2); transform: translateY(-2px); }
 
+    /* Tablas: fila resaltada al pasar el mouse y encabezado fijo */
+    table tbody tr { transition: background .1s; }
+    table tbody tr:hover { background: var(--accent-light) !important; }
+    .tabla-scroll { max-height: 65vh; overflow: auto; }
+    .tabla-scroll thead th { position: sticky; top: 0; z-index: 2; }
+    /* Scrollbars discretas */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(120,130,145,.35); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(120,130,145,.55); background-clip: content-box; }
+    html { scroll-behavior: smooth; }
+    /* Foco visible para navegación con teclado */
+    .btn:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
     .panel { display: none; }
     .panel.active { display: block; }
 
     /* ── Cards ── */
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; margin-bottom: 18px; box-shadow: var(--card-shadow); }
-    .card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: var(--card-shadow); }
+    .card h3 { font-size: .95rem; font-weight: 600; margin-bottom: 16px; color: var(--text); letter-spacing: -.01em; }
 
     /* ── Buttons ── */
-    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 12px; border: 1.5px solid transparent; cursor: pointer; font-size: 0.84rem; font-weight: 600; transition: all .15s; letter-spacing: .01em; font-family: 'Poppins', 'Outfit', sans-serif; }
-    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 4px 14px -4px rgba(29,78,216,.5); }
-    .btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); transform: translateY(-1px); }
+    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 8px; border: 1.5px solid transparent; cursor: pointer; font-size: 0.84rem; font-weight: 600; transition: all .15s; letter-spacing: .01em; font-family: 'Poppins', 'Outfit', sans-serif; }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
     .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
     .btn-secondary:hover { background: var(--bg); border-color: #94a3b8; }
     .btn-success { background: #059669; color: #fff; border-color: #059669; box-shadow: 0 2px 8px rgba(5,150,105,.2); }
@@ -102,8 +116,8 @@
     .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
     label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); letter-spacing: .02em; }
-    input, select, textarea { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 0.85rem; outline: none; transition: border-color .15s; font-family: 'Poppins', 'Outfit', sans-serif; background: var(--surface); color: var(--text); }
-    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    input, select, textarea { padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; outline: none; transition: border-color .15s; font-family: 'Poppins', 'Outfit', sans-serif; background: var(--surface); color: var(--text); }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 
     /* ── Tables ── */
     .table-wrap { overflow-x: auto; border-radius: 12px; border: 1.5px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
@@ -330,58 +344,53 @@
   <!-- Nav -->
   <div class="sidebar-nav">
 
-    <div class="nav-section-label" id="nav-section-reportes">Navegación</div>
-
+    <div class="nav-section-label" id="nav-section-inicio">Inicio</div>
     <div class="nav-item active" id="nav-dashboard" data-panel="dashboard" onclick="showPanel('dashboard', this)">
       <span class="nav-icon">📊</span> Dashboard
     </div>
-    <div class="nav-item" id="nav-auditoria" data-panel="auditoria" onclick="showPanel('auditoria', this)">
-      <span class="nav-icon">📋</span> Auditoría
+
+    <div class="nav-section-label" id="nav-section-consultas" style="display:none;">Consultas</div>
+    <div class="nav-item" id="nav-buscar-alumno" data-panel="panel-buscar-alumno" onclick="showPanel('panel-buscar-alumno', this)" style="display:none;">
+      <span class="nav-icon">🔍</span> Consultar alumno
+    </div>
+    <div class="nav-item" id="nav-canvas-cursos" data-panel="panel-canvas-cursos" onclick="showPanel('panel-canvas-cursos', this)" style="display:none;">
+      <span class="nav-icon">🎓</span> Cursos
+    </div>
+    <div class="nav-item" id="nav-alumnos" data-panel="sync-alumnos" onclick="showPanel('sync-alumnos', this)" style="display:none;">
+      <span class="nav-icon">👨‍🎓</span> Alumnos
+    </div>
+    <div class="nav-item" id="nav-canvas-asistencia" data-panel="panel-canvas-asistencia" onclick="showPanel('panel-canvas-asistencia', this)" style="display:none;">
+      <span class="nav-icon">🗓️</span> Reporte de asistencia
     </div>
 
-    <div class="nav-section-label" id="nav-section-gestion" style="display:none;">Gestión masiva</div>
+    <div class="nav-section-label" id="nav-section-gestion" style="display:none;">Gestión</div>
+    <div class="nav-item" id="nav-portal" data-panel="portal-academico" onclick="showPanel('portal-academico', this)" style="display:none;">
+      <span class="nav-icon">✏️</span> Carga de inscripciones
+    </div>
     <div class="nav-item" id="nav-crear-cursos" data-panel="crear-cursos" onclick="showPanel('crear-cursos', this)" style="display:none;">
       <span class="nav-icon">🏫</span> Crear cursos y equipos
     </div>
     <div class="nav-item" id="nav-matriculacion" data-panel="matriculacion-masiva" onclick="showPanel('matriculacion-masiva', this)" style="display:none;">
       <span class="nav-icon">👥</span> Matricular alumnos
     </div>
-
-    <div class="nav-section-label" id="nav-section-portal" style="display:none;">Portal académico</div>
-    <div class="nav-item" id="nav-portal" data-panel="portal-academico" onclick="showPanel('portal-academico', this)" style="display:none;">
-      <span class="nav-icon">✏️</span> Carga de inscripciones
+    <div class="nav-item" id="nav-pending" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)" style="display:none;">
+      <span class="nav-icon">⏳</span> Inscripciones pendientes
     </div>
 
-    <div class="nav-section-label" id="nav-section-sync" style="display:none;">Base de datos</div>
+    <div class="nav-section-label" id="nav-section-datos" style="display:none;">Datos</div>
+    <div class="nav-item" id="nav-historial" data-panel="panel-historial" onclick="showPanel('panel-historial', this)" style="display:none;">
+      <span class="nav-icon">📚</span> Historial y mallas
+    </div>
     <div class="nav-item" id="nav-sync" data-panel="sync-panel" onclick="showPanel('sync-panel', this)" style="display:none;">
       <span class="nav-icon">🔄</span> Sincronizar Canvas
-    </div>
-    <div class="nav-item" id="nav-alumnos" data-panel="sync-alumnos" onclick="showPanel('sync-alumnos', this)" style="display:none;">
-      <span class="nav-icon">🎓</span> Alumnos
-    </div>
-
-    <div class="nav-section-label" id="nav-section-academico" style="display:none;">Académico GND</div>
-    <div class="nav-item" id="nav-historial" data-panel="panel-historial" onclick="showPanel('panel-historial', this)" style="display:none;">
-      <span class="nav-icon">📚</span> Historial de notas
-    </div>
-    <div class="nav-item" id="nav-buscar-alumno" data-panel="panel-buscar-alumno" onclick="showPanel('panel-buscar-alumno', this)" style="display:none;">
-      <span class="nav-icon">🔍</span> Consultar alumno
-    </div>
-
-    <div class="nav-section-label" id="nav-section-canvas" style="display:none;">Canvas LMS</div>
-    <div class="nav-item" id="nav-canvas-cursos" data-panel="panel-canvas-cursos" onclick="showPanel('panel-canvas-cursos', this)" style="display:none;">
-      <span class="nav-icon">🎓</span> Cursos
-    </div>
-    <div class="nav-item" id="nav-canvas-asistencia" data-panel="panel-canvas-asistencia" onclick="showPanel('panel-canvas-asistencia', this)" style="display:none;">
-      <span class="nav-icon">🗓️</span> Reporte de asistencia
     </div>
 
     <div class="nav-section-label" id="nav-section-admin" style="display:none;">Administración</div>
     <div class="nav-item" id="nav-users" data-panel="system-users" onclick="showPanel('system-users', this)" style="display:none;">
       <span class="nav-icon">👤</span> Usuarios del sistema
     </div>
-    <div class="nav-item" id="nav-pending" data-panel="pending-enrollments" onclick="showPanel('pending-enrollments', this)" style="display:none;">
-      <span class="nav-icon">⏳</span> Inscripciones pendientes
+    <div class="nav-item" id="nav-auditoria" data-panel="auditoria" onclick="showPanel('auditoria', this)" style="display:none;">
+      <span class="nav-icon">📋</span> Auditoría
     </div>
     <div class="nav-item" id="nav-cron" data-panel="cron-config" onclick="showPanel('cron-config', this)" style="display:none;">
       <span class="nav-icon">⏰</span> Configurar cron
@@ -694,15 +703,13 @@
     <div class="panel active" id="panel-dashboard">
 
       <!-- Kit de matriculación -->
-      <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#1e3a5f 0%,#2d6cdf 100%);border:none;">
+      <div class="card" style="margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div>
-            <div style="color:#fff;font-size:1rem;font-weight:700;">📦 Kit de Matriculación 2026-2</div>
-            <div style="color:#bfdbfe;font-size:.82rem;margin-top:3px;">Excel completo con períodos, cursos, usuarios e inscripciones listo para completar — GND · CPEL</div>
+            <div style="font-weight:600;">Kit de matriculación 2026-2</div>
+            <div style="color:var(--text-muted);font-size:.83rem;margin-top:2px;">Excel con períodos, cursos, usuarios e inscripciones — GND · CPEL</div>
           </div>
-          <button class="btn" onclick="downloadKit()" style="background:#fff;color:#1e3a5f;font-weight:700;white-space:nowrap;">
-            ⬇ Descargar kit 2026-2
-          </button>
+          <button class="btn btn-secondary" onclick="downloadKit()" style="white-space:nowrap;">Descargar kit</button>
         </div>
       </div>
 
@@ -728,16 +735,16 @@
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
             <div onclick="showPanel('portal-academico', document.querySelector('[data-panel=portal-academico]'))" class="dash-accion">
-              <div style="font-size:1.5rem;color:#0d9488;">✏️</div><div>Cargar inscripción</div>
+              <div style="font-size:1.4rem;opacity:.85;">✏️</div><div>Cargar inscripción</div>
             </div>
             <div onclick="showPanel('sync-panel', document.querySelector('[data-panel=sync-panel]'))" class="dash-accion">
-              <div style="font-size:1.5rem;color:#0d9488;">🔄</div><div>Sincronizar BD</div>
+              <div style="font-size:1.4rem;opacity:.85;">🔄</div><div>Sincronizar BD</div>
             </div>
             <div onclick="showPanel('panel-canvas-asistencia', document.querySelector('[data-panel=panel-canvas-asistencia]'))" class="dash-accion">
-              <div style="font-size:1.5rem;color:#0d9488;">🗓️</div><div>Reporte asistencia</div>
+              <div style="font-size:1.4rem;opacity:.85;">🗓️</div><div>Reporte asistencia</div>
             </div>
             <div onclick="showPanel('panel-buscar-alumno', document.querySelector('[data-panel=panel-buscar-alumno]'))" class="dash-accion">
-              <div style="font-size:1.5rem;color:#0d9488;">🔍</div><div>Consultar alumno</div>
+              <div style="font-size:1.4rem;opacity:.85;">🔍</div><div>Consultar alumno</div>
             </div>
           </div>
         </div>
@@ -1297,7 +1304,7 @@
           </div>
           <div style="flex:1;min-width:220px;">
             <label style="font-size:.8rem;">Buscar <span style="color:var(--text-muted);font-weight:400;">(ID, nombre o SIS)</span></label>
-            <input id="cc-buscar" type="text" oninput="ccFiltrar()" placeholder="Ej: 1806 o guarani"
+            <input id="cc-buscar" type="text" oninput="ccFiltrar()" onkeydown="if(event.key==='Escape'){this.value='';ccFiltrar();}" placeholder="Ej: 1806 o guarani"
                    style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
           </div>
           <button class="btn btn-primary" onclick="cargarCursosCanvas(true)">↻ Actualizar desde Canvas</button>
@@ -1342,7 +1349,7 @@
           </div>
           <div style="min-width:200px;">
             <label style="font-size:.82rem;">Buscar curso</label>
-            <input type="text" id="asis-curso-buscar" oninput="asisFiltrarCursos()" placeholder="Ej: guarani" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
+            <input type="text" id="asis-curso-buscar" oninput="asisFiltrarCursos()" onkeydown="if(event.key==='Escape'){this.value='';asisFiltrarCursos();}" placeholder="Ej: guarani" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
           </div>
           <div style="flex:1;min-width:280px;">
             <label style="font-size:.82rem;">Curso <span id="asis-curso-count" style="color:#94a3b8;font-weight:400;"></span></label>
@@ -1905,31 +1912,33 @@ function showApp(user) {
 }
 
 function _applyRoleVisibility(role) {
-  const reportes = ['nav-section-reportes','nav-dashboard','nav-auditoria'];
-  const gestion  = ['nav-section-gestion','nav-crear-cursos','nav-matriculacion'];
-  const portal   = ['nav-section-portal','nav-portal'];
-  const sync     = ['nav-section-sync','nav-sync','nav-alumnos'];
-  const admin    = ['nav-section-admin','nav-users','nav-pending','nav-cron'];
-  const academicoAdmin = ['nav-section-academico','nav-historial','nav-buscar-alumno'];
-  const academicoUser  = ['nav-section-academico','nav-buscar-alumno'];
-  const canvas         = ['nav-section-canvas','nav-canvas-cursos','nav-canvas-asistencia'];
-  const all      = [...reportes,...gestion,...portal,...sync,...admin,...academicoAdmin,...canvas];
+  // Agrupado por FUNCIÓN (qué hace el usuario), no por origen de los datos.
+  const inicio    = ['nav-section-inicio', 'nav-dashboard'];
+  const consultas = ['nav-section-consultas', 'nav-buscar-alumno', 'nav-canvas-cursos',
+                     'nav-alumnos', 'nav-canvas-asistencia'];
+  const gestion   = ['nav-section-gestion', 'nav-portal', 'nav-crear-cursos',
+                     'nav-matriculacion', 'nav-pending'];
+  const datos     = ['nav-section-datos', 'nav-historial', 'nav-sync'];
+  const admin     = ['nav-section-admin', 'nav-users', 'nav-auditoria', 'nav-cron'];
+  const todo = [...inicio, ...consultas, ...gestion, ...datos, ...admin];
 
-  function show(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = ''; }); }
-  function hide(ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
+  const show = ids => ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
+  const hide = ids => ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
 
-  hide(all);
+  hide(todo);
   const footerLinks = document.getElementById('footer-links');
   if (footerLinks) footerLinks.style.display = role === 'admin' ? 'flex' : 'none';
+
   if (role === 'admin') {
-    show([...reportes,...gestion,...portal,...sync,...admin,...academicoAdmin,...canvas]);
+    show(todo);
   } else if (role === 'academico') {
-    show([...portal,...academicoUser, 'nav-section-canvas','nav-canvas-asistencia']);
+    show(['nav-section-consultas', 'nav-buscar-alumno', 'nav-canvas-asistencia',
+          'nav-section-gestion', 'nav-portal']);
   } else {
-    // viewer: solo el dashboard de KPIs (la auditoría es exclusiva de admin)
-    show(['nav-section-reportes','nav-dashboard']);
+    show(inicio);  // viewer: solo el dashboard
   }
 }
+
 
 function showLogin(msg) {
   clearToken();
@@ -2011,14 +2020,14 @@ _aplicarTema(localStorage.getItem('tema') || 'light');
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 const panelTitles = {
-  'dashboard':        ['Dashboard',                 'Matriculación'],
+  'dashboard':        ['Dashboard',                 'Inicio'],
   'parseo-planilla':  ['Parsear planilla académica','Limpieza de datos'],
-  'portal-academico': ['Portal de carga',           'Académico'],
+  'portal-academico': ['Carga de inscripciones',     'Gestión'],
   'matriculacion':    ['Matriculación',             'Automática'],
-  'auditoria':      ['Auditoría',         'Log de operaciones'],
+  'auditoria':      ['Auditoría',         'Administración'],
   'bulk':           ['Carga Masiva',      'Excel / CSV'],
   'system-users':       ['Usuarios del sistema', 'Administración'],
-  'pending-enrollments':['Inscripciones pendientes', 'Administración'],
+  'pending-enrollments':['Inscripciones pendientes', 'Gestión'],
   'course-aliases':     ['Aliases de materias',   'Fuzzy matching'],
   'canvas-terms':   ['Períodos',          'Canvas LMS'],
   'canvas-courses': ['Cursos Canvas',     'Canvas LMS'],
@@ -2027,15 +2036,15 @@ const panelTitles = {
   'azure-users':    ['Usuarios Azure AD', 'Azure AD'],
   'azure-groups':   ['Grupos Azure AD',   'Azure AD'],
   'teams':          ['Equipos Teams',     'Microsoft Teams'],
-  'crear-cursos':        ['Crear cursos y equipos', 'Gestión masiva'],
-  'matriculacion-masiva':['Matriculación masiva',   'Gestión masiva'],
+  'crear-cursos':        ['Crear cursos y equipos', 'Gestión'],
+  'matriculacion-masiva':['Matricular alumnos',     'Gestión'],
   'cron-config':         ['Configurar cron',        'Administración'],
-  'sync-panel':          ['Sincronización Canvas',  'Base de datos'],
-  'sync-alumnos':        ['Alumnos',                'Base de datos'],
-  'panel-historial':      ['Historial de notas',  'Académico GND'],
-  'panel-buscar-alumno':  ['Consultar alumno',     'Académico GND'],
-  'panel-canvas-cursos':  ['Cursos',               'Canvas LMS'],
-  'panel-canvas-asistencia': ['Reporte de asistencia', 'Canvas LMS'],
+  'sync-panel':          ['Sincronizar Canvas',     'Datos'],
+  'sync-alumnos':        ['Alumnos',                'Consultas'],
+  'panel-historial':      ['Historial y mallas',   'Datos'],
+  'panel-buscar-alumno':  ['Consultar alumno',     'Consultas'],
+  'panel-canvas-cursos':  ['Cursos',               'Consultas'],
+  'panel-canvas-asistencia': ['Reporte de asistencia', 'Consultas'],
 };
 
 function showPanel(id, el) {
@@ -2158,13 +2167,13 @@ async function loadDashboardPlataformas() {
     const enlace = (icono, txt, panel) => `<a onclick="showPanel('${panel}', document.querySelector('[data-panel=${panel}]'))" style="cursor:pointer;color:var(--accent);font-size:.8rem;font-weight:600;text-decoration:none;">${icono} ${txt}</a>`;
 
     document.getElementById('dash-plataformas').innerHTML =
-      tarjeta('linear-gradient(135deg,#0a4f8f,#1273c4)', `<svg width="52" height="52" viewBox="0 0 48 48" fill="#fff"><circle cx="24" cy="6" r="3.4"/><circle cx="24" cy="42" r="3.4"/><circle cx="6" cy="24" r="3.4"/><circle cx="42" cy="24" r="3.4"/><circle cx="11.3" cy="11.3" r="3.1"/><circle cx="36.7" cy="36.7" r="3.1"/><circle cx="11.3" cy="36.7" r="3.1"/><circle cx="36.7" cy="11.3" r="3.1"/><circle cx="24" cy="24" r="5.2"/></svg>`, 'Canvas LMS', 'Universidad San Ignacio de Loyola',
+      tarjeta('#1e3a5f', `<svg width="52" height="52" viewBox="0 0 48 48" fill="#fff"><circle cx="24" cy="6" r="3.4"/><circle cx="24" cy="42" r="3.4"/><circle cx="6" cy="24" r="3.4"/><circle cx="42" cy="24" r="3.4"/><circle cx="11.3" cy="11.3" r="3.1"/><circle cx="36.7" cy="36.7" r="3.1"/><circle cx="11.3" cy="36.7" r="3.1"/><circle cx="36.7" cy="11.3" r="3.1"/><circle cx="24" cy="24" r="5.2"/></svg>`, 'Canvas LMS', 'Universidad San Ignacio de Loyola',
         stat(d.canvas.cursos, 'Cursos') + stat(d.canvas.alumnos, 'Alumnos') + stat(d.canvas.matriculas, 'Matrículas'),
         enlace('📖','Cursos','panel-canvas-cursos') + enlace('🗓️','Asistencias','panel-canvas-asistencia')) +
-      tarjeta('linear-gradient(135deg,#4c3d99,#6455b8)', `<svg width="52" height="52" viewBox="0 0 48 48" fill="#fff"><circle cx="35" cy="12" r="5"/><rect x="4" y="16" width="24" height="24" rx="4"/><text x="16" y="34" text-anchor="middle" font-size="17" font-weight="bold" fill="#6455b8" font-family="Arial">T</text><path d="M30 20h12a2 2 0 0 1 2 2v10a8 8 0 0 1-8 8h-2V20z" opacity=".8"/></svg>`, 'Microsoft Teams', 'Azure Active Directory',
+      tarjeta('#4c3d99', `<svg width="52" height="52" viewBox="0 0 48 48" fill="#fff"><circle cx="35" cy="12" r="5"/><rect x="4" y="16" width="24" height="24" rx="4"/><text x="16" y="34" text-anchor="middle" font-size="17" font-weight="bold" fill="#6455b8" font-family="Arial">T</text><path d="M30 20h12a2 2 0 0 1 2 2v10a8 8 0 0 1-8 8h-2V20z" opacity=".8"/></svg>`, 'Microsoft Teams', 'Azure Active Directory',
         stat(d.m365.usuarios, 'Usuarios Azure AD') + stat(d.m365.activos, 'Activos') + stat(d.m365.con_teams, 'Con Teams'),
         enlace('👥','Sincronizar','sync-panel')) +
-      tarjeta('linear-gradient(135deg,#d35f13,#e8790f)', `<svg width="52" height="52" viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3"><ellipse cx="24" cy="10" rx="16" ry="6"/><path d="M8 10v14c0 3.3 7.2 6 16 6s16-2.7 16-6V10"/><path d="M8 24v14c0 3.3 7.2 6 16 6s16-2.7 16-6V24"/></svg>`, 'Base de datos', 'Sincronización y herramientas',
+      tarjeta('#8a4a12', `<svg width="52" height="52" viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3"><ellipse cx="24" cy="10" rx="16" ry="6"/><path d="M8 10v14c0 3.3 7.2 6 16 6s16-2.7 16-6V10"/><path d="M8 24v14c0 3.3 7.2 6 16 6s16-2.7 16-6V24"/></svg>`, 'Base de datos', 'Sincronización y herramientas',
         `<div style="font-size:.82rem;color:var(--text);line-height:1.8;">
            <div>Última sync: <strong>${_esc(ult)}</strong></div>
            <div>Próxima automática: <strong>${_esc(px)}</strong></div>
@@ -4624,9 +4633,9 @@ async function cargarSyncEstado() {
       {label:'Usuarios 365', valor: t.total_usuarios_365||0, icon:'👥'},
     ];
     document.getElementById('sync-totales').innerHTML = cards.map(c =>
-      `<div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:10px;padding:14px;text-align:center;">
+      `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">
         <div style="font-size:1.5rem;">${c.icon}</div>
-        <div style="font-size:1.4rem;font-weight:700;color:#0369a1;">${c.valor.toLocaleString()}</div>
+        <div style="font-size:1.4rem;font-weight:700;color:var(--text);">${c.valor.toLocaleString()}</div>
         <div style="font-size:.78rem;color:#64748b;">${c.label}</div>
       </div>`
     ).join('');
@@ -5067,9 +5076,9 @@ function ccFiltrar() {
         <span style="color:#fff;font-weight:700;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;">Cursos Canvas</span>
         <span style="color:#5c7a9e;font-size:.8rem;">${porIdExacto ? `ID exacto ${_esc(q)}` : `${filtrados.length} de ${_ccCursos.length} cursos`}</span>
       </div>
-      <div style="overflow-x:auto;">
+      <div class="tabla-scroll" style="overflow:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:.86rem;">
-        <thead><tr style="background:var(--bg);">
+        <thead><tr style="background:var(--surface);">
           <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">#</th>
           <th style="padding:10px 12px;text-align:left;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">ID Canvas</th>
           <th style="padding:10px 12px;text-align:left;border-bottom:2px solid var(--border);font-size:.75rem;text-transform:uppercase;">Nombre del curso</th>
