@@ -1278,10 +1278,10 @@
     <div id="panel-panel-buscar-alumno" class="panel">
       <div class="card">
         <h3 style="margin-bottom:4px;">Alumnos</h3>
-        <p style="color:#64748b;margin-bottom:20px;">Buscá por cédula o nombre para ver su historial académico, qué puede cursar y su actividad en Canvas.</p>
+        <p style="color:var(--text-muted);margin-bottom:20px;">Buscá por cédula, nombre o correo para ver su historial académico, qué puede cursar y su actividad en Canvas.</p>
 
         <div style="display:flex;gap:10px;max-width:560px;margin-bottom:20px;">
-          <input type="text" id="buscar-alumno-input" placeholder="Cédula o nombre..." style="flex:1;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:.95rem;">
+          <input type="text" id="buscar-alumno-input" placeholder="Cédula, nombre o correo…" style="flex:1;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:.95rem;">
           <button class="btn btn-primary" onclick="buscarAlumno()">Buscar</button>
         </div>
 
@@ -3202,6 +3202,16 @@ function portalCarreraChange() {
   portalCargarMaterias();
 }
 
+function _logMinimizar() {
+  const log = document.getElementById('portal-error-log');
+  const btn = document.getElementById('log-min-btn');
+  const minimizado = log.style.display === 'none';
+  log.style.display = minimizado ? '' : 'none';
+  btn.textContent = minimizado ? '—' : '▢';
+  btn.title = minimizado ? 'Minimizar' : 'Restaurar';
+  localStorage.setItem('logMinimizado', minimizado ? '0' : '1');
+}
+
 function _portalLog(msg, tipo = 'info') {
   const log = document.getElementById('portal-error-log');
   const card = document.getElementById('portal-log-card');
@@ -3241,6 +3251,11 @@ function _portalLog(msg, tipo = 'info') {
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
   card.style.display = '';
+  if (localStorage.getItem('logMinimizado') === '1') {
+    log.style.display = 'none';
+    const b = document.getElementById('log-min-btn');
+    if (b) { b.textContent = '▢'; b.title = 'Restaurar'; }
+  }
 }
 
 async function portalBuscar() {
@@ -4688,14 +4703,24 @@ async function buscarAlumno() {
   });
   const data = await r.json();
   if (!r.ok || !data.length) { res.innerHTML = '<p style="color:#64748b;">Sin resultados.</p>'; return; }
+  const origen = a => {
+    const p = (t, c) => `<span style="font-size:.7rem;padding:2px 8px;border-radius:99px;background:${c};color:#fff;">${t}</span>`;
+    return (a.en_historial ? p('Historial', '#475569') : '') + ' ' + (a.en_canvas ? p('Canvas', '#2563eb') : '');
+  };
   res.innerHTML = data.map(a => `
     <div onclick="seleccionarAlumno('${a.cedula}','${(a.nombre||'').replace(/'/g,"\\'")}','${a.carrera||''}')"
-         style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
-      <div><strong>${_esc(a.nombre || a.cedula)}</strong> <span style="color:#64748b;font-size:.85rem;">CI: ${a.cedula}</span></div>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:.82rem;color:var(--text-muted);">${_esc(a.carrera || '')} · ${_esc(a.programa || '')}</span>
+         style="padding:11px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="min-width:0;">
+        <strong>${_esc(a.nombre || a.cedula || a.email)}</strong>
+        <div style="color:var(--text-muted);font-size:.81rem;margin-top:2px;">
+          ${a.cedula ? 'CI ' + _esc(a.cedula) : 'sin cédula'}${a.email ? ' · ' + _esc(a.email) : ''}
+          ${a.carrera ? ' · ' + _esc(a.carrera) : ''}${a.programa ? ' · ' + _esc(a.programa) : ''}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${origen(a)}
         <button class="btn btn-secondary" style="padding:3px 10px;font-size:.76rem;"
-          onclick="event.stopPropagation();abrirFicha('${a.cedula}')">Ficha 360</button>
+          onclick="event.stopPropagation();abrirFicha('${a.cedula || a.email}')">Ver ficha</button>
       </div>
     </div>`).join('');
 }
@@ -5649,6 +5674,7 @@ async function asisExportarExcel() {
     </div>
     <div style="display:flex;gap:4px;">
       <button class="log-btn" title="Limpiar" onclick="document.getElementById('portal-error-log').innerHTML=''">🗑</button>
+      <button class="log-btn" id="log-min-btn" title="Minimizar" onclick="_logMinimizar()">—</button>
       <button class="log-btn" title="Cerrar" onclick="document.getElementById('portal-log-card').style.display='none'">✕</button>
     </div>
   </div>

@@ -963,18 +963,63 @@ async def reparar_nombres_historial() -> dict:
 
 
 async def buscar_alumno(q: str) -> list[dict]:
-    """Busca alumnos por cédula o nombre, un resultado por alumno."""
+    """Busca alumnos por cédula, nombre o correo en todas las fuentes.
+
+    Une el historial académico (planillas) con el directorio sincronizado de
+    Canvas, para que aparezcan también los alumnos que todavía no tienen
+    historial cargado. Cada resultado indica de dónde salió.
+    """
     like = f"%{q}%"
-    return await db.fetch(
-        """SELECT cedula, MAX(nombre) as nombre, MAX(carrera) as carrera, MAX(programa) as programa
-           FROM historial_academico
-           WHERE (cedula ILIKE ? OR nombre ILIKE ?)
-             AND cedula ~ '^[0-9]+$'
-           GROUP BY cedula
-           ORDER BY MAX(nombre)
-           LIMIT 20""",
-        like, like,
-    )
+
+    por_cedula: dict[str, dict] = {}
+
+    # 1) Historial académico (planillas)
+    try:
+        filas = await db.fetch(
+            """SELECT cedula, MAX(nombre) AS nombre, MAX(carrera) AS carrera,
+                      MAX(programa) AS programa
+               FROM historial_academico
+               WHERE (cedula ILIKE ? OR nombre ILIKE ?)
+                 AND cedula ~ '^[0-9]+$'
+               GROUP BY cedula
+               ORDER BY MAX(nombre)
+               LIMIT 40""",
+            like, like,
+        )
+        for r in filas:
+            por_cedula[r["cedula"]] = {**r, "email": "", "en_historial": True, "en_canvas": False}
+    except Exception as exc:
+        logger.warning("Búsqueda en historial falló: %s", exc)
+
+    # 2) Directorio sincronizado de Canvas (incluye correo)
+    try:
+        filas = await db.fetch(
+            """SELECT sis_user_id AS cedula, nombre, email, login_id
+               FROM sync_alumnos
+               WHERE sis_user_id ILIKE ? OR nombre ILIKE ?
+                  OR email ILIKE ? OR login_id ILIKE ?
+               ORDER BY nombre
+               LIMIT 40""",
+            like, like, like, like,
+        )
+        for r in filas:
+            ced = (r["cedula"] or "").strip()
+            correo = r["email"] or r["login_id"] or ""
+            if ced and ced in por_cedula:
+                por_cedula[ced]["en_canvas"] = True
+                por_cedula[ced]["email"] = por_cedula[ced]["email"] or correo
+            else:
+                clave = ced or correo or r["nombre"]
+                por_cedula.setdefault(clave, {
+                    "cedula": ced, "nombre": r["nombre"], "carrera": None,
+                    "programa": None, "email": correo,
+                    "en_historial": False, "en_canvas": True,
+                })
+    except Exception as exc:
+        logger.warning("Búsqueda en directorio Canvas falló: %s", exc)
+
+    resultados = sorted(por_cedula.values(), key=lambda a: (a.get("nombre") or "").upper())
+    return resultados[:30]
 
 
 async def ficha_alumno(cedula: str) -> dict:
@@ -988,6 +1033,20 @@ async def ficha_alumno(cedula: str) -> dict:
            FROM historial_academico WHERE cedula = ?""",
         cedula,
     ) or {}
+
+    # Si todavía no tiene historial cargado, al menos mostramos su identidad
+    # desde el directorio sincronizado de Canvas.
+    if not datos.get("nombre"):
+        try:
+            desde_canvas = await db.fetchrow(
+                """SELECT nombre FROM sync_alumnos
+                   WHERE sis_user_id = ? OR login_id = ? OR email = ? LIMIT 1""",
+                cedula, cedula, cedula,
+            )
+            if desde_canvas:
+                datos = {**datos, "nombre": desde_canvas["nombre"]}
+        except Exception as exc:
+            logger.warning("No se pudo completar datos desde Canvas: %s", exc)
 
     materias = estado.get("materias", [])
     cuenta = {"aprobada": 0, "reprobada": 0, "cursando": 0, "bloqueada": 0, "puede_inscribir": 0}
