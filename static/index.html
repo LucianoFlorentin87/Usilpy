@@ -91,6 +91,16 @@
     /* Foco visible para navegación con teclado */
     .btn:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+    /* Encabezados de panel: mismo tamaño, peso y separación en todas las pantallas */
+    .card-title { font-size: 1.05rem; font-weight: 600; letter-spacing: -.015em; margin-bottom: 4px; color: var(--text); }
+    .card > p:first-of-type { color: var(--text-muted); font-size: .86rem; line-height: 1.5; margin-bottom: 18px; }
+    .card h3 + p { color: var(--text-muted); font-size: .85rem; margin-top: 2px; }
+    /* Contenido: ancho de lectura cómodo y aire uniforme */
+    #content { padding: 24px 28px 40px; }
+    .panel > .card:last-child { margin-bottom: 0; }
+    /* Etiquetas de formulario homogéneas */
+    label { font-size: .82rem; font-weight: 500; color: var(--text-muted); display: inline-block; margin-bottom: 5px; }
+
     .panel { display: none; }
     .panel.active { display: block; }
 
@@ -617,7 +627,7 @@
       <!-- Mis inscripciones -->
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-          <h3 style="margin:0;">📋 Mis inscripciones</h3>
+          <h3 style="margin:0;">Mis inscripciones</h3>
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="text" id="envios-semestre-filter" placeholder="Filtrar por período" style="max-width:140px;padding:5px 8px;font-size:.8rem;" oninput="portalCargarMisEnvios()" />
             <button class="btn btn-secondary" style="font-size:.75rem;padding:5px 10px;" onclick="portalCargarMisEnvios()">🔄 Actualizar</button>
@@ -703,34 +713,13 @@
     <!-- ══════════ PANEL: DASHBOARD ══════════ -->
     <div class="panel active" id="panel-dashboard">
 
-      <!-- Kit de matriculación -->
-      <div class="card" style="margin-bottom:16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-          <div>
-            <div style="font-weight:600;">Kit de matriculación 2026-2</div>
-            <div style="color:var(--text-muted);font-size:.83rem;margin-top:2px;">Excel con períodos, cursos, usuarios e inscripciones — GND · CPEL</div>
-          </div>
-          <button class="btn btn-secondary" onclick="downloadKit()" style="white-space:nowrap;">Descargar kit</button>
-        </div>
-      </div>
-
-      <!-- Estado de plataformas -->
+            <!-- Estado de plataformas -->
       <div id="dash-plataformas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px;"></div>
-
-      <!-- Cuentas huérfanas -->
-      <div class="card" id="dash-huerfanas-card" style="display:none;margin-bottom:16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <h3 style="margin:0;">⚠️ Cuentas huérfanas</h3>
-          <span style="font-size:.78rem;color:#64748b;">Detectadas cruzando la BD sincronizada de Canvas y 365</span>
-        </div>
-        <div id="dash-huerfanas" style="margin-top:10px;"></div>
-      </div>
 
       <!-- Acciones rápidas + Estado del sistema -->
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:16px;align-items:stretch;">
         <div class="card" style="margin-bottom:0;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-            <span style="font-size:1.05rem;">⚡</span>
             <h3 style="margin:0;">Acciones rápidas</h3>
             <span style="font-size:.78rem;color:var(--text-muted);">Tareas frecuentes de un clic</span>
           </div>
@@ -751,11 +740,31 @@
         </div>
         <div class="card" style="margin-bottom:0;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-            <span>📈</span><h3 style="margin:0;">Estado del sistema</h3>
+            <h3 style="margin:0;">Estado del sistema</h3>
           </div>
           <div id="dash-estado-sistema" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start;">
             <span style="color:var(--text-muted);font-size:.82rem;">Cargando…</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Cuentas huérfanas -->
+      <div class="card" id="dash-huerfanas-card" style="display:none;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">Cuentas huérfanas</h3>
+          <span style="font-size:.78rem;color:#64748b;">Detectadas cruzando la BD sincronizada de Canvas y 365</span>
+        </div>
+        <div id="dash-huerfanas" style="margin-top:10px;"></div>
+      </div>
+
+      <!-- Kit de matriculación -->
+      <div class="card" style="margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-weight:600;">Kit de matriculación 2026-2</div>
+            <div style="color:var(--text-muted);font-size:.83rem;margin-top:2px;">Excel con períodos, cursos, usuarios e inscripciones para completar</div>
+          </div>
+          <button class="btn btn-secondary" onclick="downloadKit()" style="white-space:nowrap;">Descargar kit</button>
         </div>
       </div>
 
@@ -1170,7 +1179,7 @@
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
           <span style="font-size:2rem;">🗄️</span>
           <div>
-            <h3 style="margin:0;">Base de datos — Sincronización Canvas</h3>
+            <h3 style="margin:0;">Sincronizar Canvas</h3>
             <p style="margin:4px 0 0;color:#6b7280;font-size:.88rem;">Sincroniza cursos, alumnos, matriculaciones, calificaciones y asistencias desde Canvas hacia la base de datos local.</p>
           </div>
         </div>
@@ -1232,11 +1241,11 @@
     <!-- ══════════ PANEL: HISTORIAL NOTAS ══════════ -->
     <div id="panel-panel-historial" class="panel">
       <div class="card">
-        <h3 style="margin-bottom:4px;">📚 Historial de notas — GND</h3>
+        <h3 style="margin-bottom:4px;">Historial y mallas</h3>
         <p style="color:#64748b;margin-bottom:20px;">Importá el Excel de calificaciones para cargar el historial en la base de datos.</p>
 
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;max-width:560px;">
-          <label style="font-weight:600;display:block;margin-bottom:8px;">Archivo Excel de calificaciones GND</label>
+          <label style="font-weight:600;display:block;margin-bottom:8px;">Archivo Excel de calificaciones</label>
           <input type="file" id="historial-file" accept=".xlsx,.xls" style="margin-bottom:14px;width:100%;">
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="btn btn-primary" onclick="importarHistorial()">⬆ Importar historial</button>
@@ -1255,7 +1264,7 @@
     <!-- ══════════ PANEL: CONSULTAR ALUMNO ══════════ -->
     <div id="panel-panel-buscar-alumno" class="panel">
       <div class="card">
-        <h3 style="margin-bottom:4px;">🔍 Consultar alumno</h3>
+        <h3 style="margin-bottom:4px;">Consultar alumno</h3>
         <p style="color:#64748b;margin-bottom:20px;">Buscá un alumno por cédula o nombre y mirá su historial académico completo.</p>
 
         <div style="display:flex;gap:10px;max-width:560px;margin-bottom:20px;">
@@ -1285,7 +1294,7 @@
     <!-- ══════════ PANEL: CANVAS CURSOS ══════════ -->
     <div id="panel-panel-canvas-cursos" class="panel">
       <div class="card">
-        <h2 class="card-title">🎓 Cursos Canvas</h2>
+        <h2 class="card-title">Cursos</h2>
         <p style="color:#64748b;font-size:.9rem;margin-bottom:16px;">
           Buscá por ID, nombre o SIS, filtrá por período y subcuenta, y hacé clic en un curso para ver sus matriculados.
         </p>
@@ -1335,7 +1344,7 @@
     <!-- ══════════ PANEL: REPORTE DE ASISTENCIA ══════════ -->
     <div id="panel-panel-canvas-asistencia" class="panel">
       <div class="card">
-        <h2 class="card-title">🗓️ Reporte de asistencia (Roll Call)</h2>
+        <h2 class="card-title">Reporte de asistencia</h2>
         <p style="color:#64748b;font-size:.9rem;margin-bottom:20px;">
           Porcentaje de asistencia de cada alumno de un curso, calculado desde el Attendance (Roll Call) de Canvas,
           e indicación de si alcanza el mínimo requerido para habilitar examen.
@@ -4321,7 +4330,7 @@ async function descargarPlantillaMatricular() {
   document.body.removeChild(a);
 }
 
-// ── Académico GND ─────────────────────────────────────────────────────────────
+// ── Académico ────────────────────────────────────────────────────────────────
 
 async function _importarConPolling(endpoint, file, label) {
   const st = document.getElementById('historial-status');
