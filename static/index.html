@@ -1345,20 +1345,6 @@
         <div id="canvas-cursos-tabla" style="margin-top:12px;"></div>
       </div>
 
-      <!-- Detalle 360 del curso seleccionado -->
-      <div class="card" id="cc-detalle-card" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
-          <div>
-            <h3 style="margin:0;" id="cc-det-nombre">—</h3>
-            <div id="cc-det-info" style="font-size:.83rem;color:var(--text-muted);margin-top:4px;"></div>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary" onclick="ccExportarAlumnos()">⬇ Exportar matriculados</button>
-            <button class="btn btn-secondary" onclick="document.getElementById('cc-detalle-card').style.display='none'">✕ Cerrar</button>
-          </div>
-        </div>
-        <div id="cc-det-alumnos" style="margin-top:14px;"></div>
-      </div>
     </div>
 
     <!-- ══════════ PANEL: REPORTE DE ASISTENCIA ══════════ -->
@@ -4510,6 +4496,13 @@ let _fichaActual = null;
 
 // ── Ficha 360 del alumno ──────────────────────────────────────────────────────
 function cerrarFicha() { document.getElementById('ficha-overlay').style.display = 'none'; }
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  ['ficha-overlay', 'curso-overlay'].forEach(id => {
+    const ov = document.getElementById(id);
+    if (ov && ov.style.display !== 'none') ov.style.display = 'none';
+  });
+});
 
 async function abrirFicha(cedula) {
   const ov = document.getElementById('ficha-overlay');
@@ -5400,59 +5393,95 @@ function ccFiltrar() {
     </div>`;
 }
 
+function cerrarFichaCurso() { document.getElementById('curso-overlay').style.display = 'none'; }
+
 async function ccVerCurso(courseId) {
-  const card = document.getElementById('cc-detalle-card');
-  const cont = document.getElementById('cc-det-alumnos');
-  card.style.display = '';
-  card.scrollIntoView({behavior:'smooth', block:'nearest'});
-  document.getElementById('cc-det-nombre').textContent = 'Cargando…';
-  document.getElementById('cc-det-info').textContent = '';
-  cont.innerHTML = '<p style="color:var(--text-muted);">⏳ Consultando matriculados en Canvas…</p>';
+  const ov = document.getElementById('curso-overlay');
+  const body = document.getElementById('curso-ficha-body');
+  ov.style.display = '';
+  document.getElementById('curso-ficha-nombre').textContent = 'Cargando…';
+  document.getElementById('curso-ficha-sub').textContent = '';
+  body.innerHTML = '<p style="color:var(--text-muted);">Consultando el curso en Canvas…</p>';
   try {
     const d = await apiFetch(`/api/canvas/curso/${courseId}/detalle`);
     _ccDetalle = d;
-    document.getElementById('cc-det-nombre').textContent = d.nombre || `Curso ${courseId}`;
-    const docentes = (d.docentes || []).filter(Boolean).join(', ') || '—';
-    document.getElementById('cc-det-info').innerHTML =
-      (d.aviso ? `<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.82rem;">${_esc(d.aviso)}</div>` : '') +
-      `ID <strong>${parseInt(d.id)}</strong> · Período <strong>${_esc(d.periodo||'—')}</strong> · ` +
-      `Subcuenta <strong>${_esc(d.subcuenta||'—')}</strong> · Estado <strong>${_esc(_estadoES(d.estado))}</strong><br>` +
-      `Docentes: ${_esc(docentes)} · SIS: ${_esc(d.sis_course_id||'—')}`;
+    document.getElementById('curso-ficha-nombre').textContent = d.nombre || `Curso ${courseId}`;
+    document.getElementById('curso-ficha-sub').textContent =
+      `ID ${d.id}${d.sis_course_id ? ' · SIS ' + d.sis_course_id : ''}${d.periodo ? ' · ' + d.periodo : ''}`;
 
-    if (!d.alumnos.length) {
-      cont.innerHTML = '<p style="color:var(--text-muted);padding:10px 0;">Este curso no tiene alumnos matriculados.</p>';
-      return;
-    }
-    const nota = v => (v === null || v === undefined) ? '—' : `${v}`;
-    cont.innerHTML = `
-      <div style="margin-bottom:8px;font-size:.85rem;color:var(--text-muted);">${d.alumnos.length} alumno${d.alumnos.length!==1?'s':''} matriculado${d.alumnos.length!==1?'s':''}</div>
-      <div style="overflow-x:auto;">
+    const seccion = (t, c) => `<div style="margin-bottom:22px;">
+      <div style="font-size:.72rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+                  color:var(--text-muted);margin-bottom:9px;">${t}</div>${c}</div>`;
+    const aviso = (txt, nivel) => {
+      const e = nivel === 'error' ? 'background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;'
+              : nivel === 'ok'    ? 'background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;'
+              :                     'background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;';
+      return `<div style="${e}border-radius:8px;padding:9px 13px;font-size:.84rem;margin-bottom:6px;">${_esc(txt)}</div>`;
+    };
+
+    // Diagnóstico: lo que necesita ver quien atiende un reclamo sobre el curso
+    const al = d.alumnos || [];
+    const pend = al.filter(a => (a.estado||'') !== 'active');
+    const diag = [];
+    if (d.aviso) diag.push(aviso(d.aviso, 'warn'));
+    if ((d.estado||'') === 'unpublished' || (d.estado||'') === 'claimed')
+      diag.push(aviso('El curso está sin publicar: los alumnos no lo ven en Canvas.', 'error'));
+    if (!d.docentes?.length)
+      diag.push(aviso('El curso no tiene docente asignado.', 'warn'));
+    if (!al.length)
+      diag.push(aviso('El curso no tiene alumnos matriculados.', 'warn'));
+    if (pend.length)
+      diag.push(aviso(`${pend.length} matrícula${pend.length!==1?'s':''} sin activar (invitación pendiente).`, 'warn'));
+    if (!diag.length) diag.push(aviso('Sin inconsistencias detectadas: el curso está publicado y con alumnos activos.', 'ok'));
+
+    const dato = (etq, val) => `<div><div style="font-size:.74rem;color:var(--text-muted);">${etq}</div>
+        <div style="font-weight:600;margin-top:2px;">${_esc(val || '—')}</div></div>`;
+    const generales = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;">
+        ${dato('ID Canvas', String(d.id))}
+        ${dato('Período', d.periodo)}
+        ${dato('Subcuenta', d.subcuenta)}
+        ${dato('Estado', _estadoES(d.estado))}
+        ${dato('SIS', d.sis_course_id)}
+        ${dato('Matriculados', String(al.length))}
+      </div>
+      ${d.docentes?.length ? `<div style="margin-top:12px;font-size:.85rem;">
+        <span style="color:var(--text-muted);">Docentes:</span> ${_esc(d.docentes.filter(Boolean).join(', '))}</div>` : ''}`;
+
+    const nota = v => (v === null || v === undefined) ? '—' : v;
+    const tablaAlumnos = al.length ? `
+      <div class="tabla-scroll" style="overflow:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
-        <thead><tr style="background:#1e3a5f;color:#fff;">
-          <th style="padding:8px 12px;text-align:right;width:44px;">#</th>
-          <th style="padding:8px 12px;text-align:left;">Alumno</th>
-          <th style="padding:8px 12px;text-align:left;">Cédula</th>
-          <th style="padding:8px 12px;text-align:left;">Usuario / correo</th>
-          <th style="padding:8px 12px;text-align:center;">Estado</th>
-          <th style="padding:8px 12px;text-align:center;">Nota actual</th>
-          <th style="padding:8px 12px;text-align:center;">Nota final</th>
+        <thead><tr style="background:var(--surface);">
+          <th style="padding:8px 10px;text-align:right;width:42px;border-bottom:2px solid var(--border);">#</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Alumno</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Cédula</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Correo</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Matrícula</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Nota actual</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);">Nota final</th>
         </tr></thead>
-        <tbody>${d.alumnos.map((a,i)=>`
-          <tr style="background:${i%2?'var(--bg)':'var(--surface)'};">
-            <td style="padding:7px 12px;text-align:right;color:var(--text-muted);">${i+1}</td>
-            <td style="padding:7px 12px;">${_esc(a.nombre)}</td>
-            <td style="padding:7px 12px;">${_esc(a.cedula||'—')}</td>
-            <td style="padding:7px 12px;">${_esc(a.email||'—')}</td>
-            <td style="padding:7px 12px;text-align:center;">${_esc(_estadoES(a.estado))}</td>
-            <td style="padding:7px 12px;text-align:center;font-weight:600;">${nota(a.nota_actual)}</td>
-            <td style="padding:7px 12px;text-align:center;font-weight:600;">${nota(a.nota_final)}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-      </div>`;
-    _portalLog(`Curso ${d.nombre}: ${d.alumnos.length} matriculados`, 'info');
+        <tbody>${al.map((a,i)=>{
+          const activa = (a.estado||'') === 'active';
+          return `<tr style="background:${i%2?'var(--bg)':'var(--surface)'};">
+            <td style="padding:7px 10px;text-align:right;color:var(--text-muted);">${i+1}</td>
+            <td style="padding:7px 10px;">${_esc(a.nombre)}</td>
+            <td style="padding:7px 10px;">${_esc(a.cedula||'—')}</td>
+            <td style="padding:7px 10px;color:var(--text-muted);">${_esc(a.email||'—')}</td>
+            <td style="padding:7px 10px;text-align:center;">
+              <span style="font-size:.72rem;padding:2px 8px;border-radius:99px;
+                background:${activa?'#dcfce7':'#fef3c7'};color:${activa?'#15803d':'#92400e'};">${_esc(_estadoES(a.estado))}</span></td>
+            <td style="padding:7px 10px;text-align:center;">${nota(a.nota_actual)}</td>
+            <td style="padding:7px 10px;text-align:center;font-weight:600;">${nota(a.nota_final)}</td>
+          </tr>`;}).join('')}
+        </tbody></table></div>`
+      : '<p style="color:var(--text-muted);font-size:.85rem;">Este curso no tiene alumnos matriculados.</p>';
+
+    body.innerHTML = seccion('Diagnóstico', diag.join('')) +
+                     seccion('Datos del curso', generales) +
+                     seccion(`Matriculados (${al.length})`, tablaAlumnos);
+    _portalLog(`Curso ${d.nombre}: ${al.length} matriculados`, 'info');
   } catch(e) {
-    cont.innerHTML = `<p style="color:var(--error);">❌ ${_esc(e.message)}</p>`;
+    body.innerHTML = `<p style="color:var(--error);">${_esc(e.message)}</p>`;
     _portalLog(`Error al abrir el curso: ${e.message}`, 'error');
   }
 }
@@ -5652,6 +5681,26 @@ async function asisExportarExcel() {
 </script>
 
 <!-- Ficha 360 del alumno -->
+<div id="curso-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,12,16,.55);z-index:9998;
+     backdrop-filter:blur(2px);" onclick="if(event.target===this)cerrarFichaCurso()">
+  <div style="position:absolute;inset:3% 50% 3% 50%;transform:translateX(-50%);width:min(1100px,94vw);
+       background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+       display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;
+         justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div>
+        <div id="curso-ficha-nombre" style="font-size:1.15rem;font-weight:600;">—</div>
+        <div id="curso-ficha-sub" style="font-size:.84rem;color:var(--text-muted);margin-top:3px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="ccExportarAlumnos()">Exportar</button>
+        <button class="btn btn-secondary" onclick="cerrarFichaCurso()">Cerrar</button>
+      </div>
+    </div>
+    <div id="curso-ficha-body" style="padding:20px 24px;overflow-y:auto;flex:1;"></div>
+  </div>
+</div>
+
 <div id="ficha-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,12,16,.55);z-index:9998;
      backdrop-filter:blur(2px);" onclick="if(event.target===this)cerrarFicha()">
   <div style="position:absolute;inset:3% 50% 3% 50%;transform:translateX(-50%);width:min(1100px,94vw);
