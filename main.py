@@ -1568,6 +1568,22 @@ async def dashboard_plataformas(_: dict = Depends(_require_admin)):
         ORDER BY u.nombre LIMIT 100
     """)
 
+    total_huerfanas_canvas = await _db.fetchval("""
+        SELECT COUNT(*) FROM sync_alumnos a
+        WHERE NOT EXISTS (
+            SELECT 1 FROM sync_usuarios_365 u
+            WHERE LOWER(u.upn) = LOWER(COALESCE(a.email, a.login_id))
+               OR LOWER(u.email) = LOWER(COALESCE(a.email, a.login_id)))
+    """) or 0
+    total_huerfanas_365 = await _db.fetchval("""
+        SELECT COUNT(*) FROM sync_usuarios_365 u
+        WHERE u.activo IS TRUE
+          AND NOT EXISTS (
+            SELECT 1 FROM sync_alumnos a
+            WHERE LOWER(COALESCE(a.email, a.login_id)) = LOWER(u.upn)
+               OR LOWER(COALESCE(a.email, a.login_id)) = LOWER(u.email))
+    """) or 0
+
     from scheduler import get_next_sync
     return {
         "canvas": {
@@ -1583,6 +1599,8 @@ async def dashboard_plataformas(_: dict = Depends(_require_admin)):
         "huerfanas": {
             "solo_canvas": [dict(r) for r in huerfanas_canvas],
             "solo_365": [dict(r) for r in huerfanas_365],
+            "total_canvas": total_huerfanas_canvas,
+            "total_365": total_huerfanas_365,
         },
     }
 

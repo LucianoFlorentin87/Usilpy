@@ -2244,18 +2244,18 @@ async function loadDashboardPlataformas() {
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
           <details style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;">
             <summary style="cursor:pointer;font-size:.85rem;font-weight:600;color:#9a3412;">
-              En Canvas sin cuenta 365 — ${hc.length}${hc.length===100?'+':''}
+              En Canvas sin cuenta 365 — ${(d.huerfanas?.total_canvas ?? hc.length).toLocaleString()}
             </summary>
             <ul style="margin:8px 0 0 16px;font-size:.8rem;max-height:200px;overflow-y:auto;">${renderLista(hc)}</ul>
           </details>
           <details style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;">
             <summary style="cursor:pointer;font-size:.85rem;font-weight:600;color:#1e40af;">
-              En 365 (activos) sin cuenta Canvas — ${h365.length}${h365.length===100?'+':''}
+              En 365 (activos) sin cuenta Canvas — ${(d.huerfanas?.total_365 ?? h365.length).toLocaleString()}
             </summary>
             <ul style="margin:8px 0 0 16px;font-size:.8rem;max-height:200px;overflow-y:auto;">${renderLista(h365)}</ul>
           </details>
         </div>
-        <p style="font-size:.75rem;color:#94a3b8;margin:8px 0 0;">Nota: los usuarios de 365 incluyen personal administrativo y docentes; no todos deberían tener cuenta Canvas.</p>`;
+        <p style="font-size:.75rem;color:var(--text-muted);margin:8px 0 0;">Se listan los primeros 100 de cada grupo. Los usuarios de 365 incluyen personal administrativo y docentes: no todos deberían tener cuenta Canvas.</p>`;
     } else {
       card.style.display = 'none';
     }
