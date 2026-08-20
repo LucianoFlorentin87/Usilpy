@@ -7,11 +7,12 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from fastapi import FastAPI
 
 import audit_service
@@ -64,6 +65,48 @@ async def _sync_job() -> None:
         logger.info("Sync 365 completado — %s", stats365)
     except Exception as exc:
         logger.exception("Error en sync diario de 365: %s", exc)
+
+
+async def _programar_sync_si_vencida(horas: int = 20) -> None:
+    """Recupera la sincronización cuando la tarea nocturna no llegó a correr.
+
+    En hospedajes que apagan la instancia por inactividad, el horario programado
+    puede pasar con el proceso dormido y la sincronización no ejecutarse nunca.
+    Al arrancar comprobamos la antigüedad de los datos y, si están vencidos,
+    programamos la sincronización unos minutos más tarde — el tiempo suficiente
+    para no competir con la primera pantalla que abre el usuario.
+    """
+    import db as _db
+    try:
+        ultima = await _db.fetchval("SELECT MAX(completado_en) FROM sync_log")
+    except Exception as exc:
+        logger.warning("No se pudo consultar la última sincronización: %s", exc)
+        return
+
+    ahora = datetime.now(timezone.utc)
+    if ultima is not None:
+        if ultima.tzinfo is None:
+            ultima = ultima.replace(tzinfo=timezone.utc)
+        antiguedad = ahora - ultima
+        if antiguedad < timedelta(hours=horas):
+            logger.info("Datos al día (última sincronización hace %.1f h)",
+                        antiguedad.total_seconds() / 3600)
+            return
+        logger.info("Datos vencidos: última sincronización hace %.1f h", 
+                    antiguedad.total_seconds() / 3600)
+    else:
+        logger.info("Sin sincronizaciones previas registradas")
+
+    cuando = ahora + timedelta(minutes=3)
+    scheduler.add_job(
+        _sync_job,
+        trigger=DateTrigger(run_date=cuando),
+        id="sync_recuperacion",
+        replace_existing=True,
+        max_instances=1,
+    )
+    logger.info("Sincronización de recuperación programada para %s UTC",
+                cuando.strftime("%H:%M:%S"))
 
 
 def _parse_hora(valor: str, defecto: tuple[int, int]) -> tuple[int, int]:
@@ -186,6 +229,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     _setup_jobs()
     scheduler.start()
     logger.info("Scheduler iniciado")
+
+    # Si la tarea nocturna no llegó a correr (instancia dormida), recuperarla
+    try:
+        await _programar_sync_si_vencida()
+    except Exception as exc:
+        logger.warning("No se pudo programar la sincronización de recuperación: %s", exc)
 
     yield
 
