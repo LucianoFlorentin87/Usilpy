@@ -214,6 +214,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         # Seed initial admin from .env if no users exist yet
         if settings.admin_password_hash:
             await user_service.seed_admin(settings.admin_username, settings.admin_password_hash)
+        # Tablas del módulo académico (historial y mallas)
+        import academic_service
+        await academic_service.init_db()
+        # Tablas de sincronización con Canvas y 365
+        import sync_service as _sync
+        await _sync.init_db()
         # Cerrar el acceso anónimo por la API REST de Supabase
         try:
             await _enable_rls()

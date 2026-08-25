@@ -4556,6 +4556,10 @@ async function abrirFicha(cedula) {
     };
 
     const alertas = [];
+    if (f.irregulares?.length) {
+      f.irregulares.forEach(irr => alertas.push(
+        `Está cursando <strong>${_esc(irr.materia)}</strong> sin haber aprobado su correlativa: <strong>${_esc(irr.falta.join(', '))}</strong>`));
+    }
     if (f.bloqueantes?.length) {
       const unicas = [...new Set(f.bloqueantes.map(b => b.reprobada))];
       alertas.push(`Tiene ${unicas.length} materia${unicas.length!==1?'s':''} reprobada${unicas.length!==1?'s':''} que traba${unicas.length!==1?'n':''} el avance: <strong>${_esc(unicas.join(', '))}</strong>`);

@@ -2463,6 +2463,10 @@ async def ficha_alumno(cedula: str, _: dict = Depends(_require_admin_or_academic
         diag.append({"nivel": "error", "texto": "La cuenta de Microsoft 365 está deshabilitada."})
     for f in faltantes:
         diag.append({"nivel": "error", "texto": f"Está cursando «{f}» pero no figura matriculado en Canvas."})
+    for irr in ficha.get("irregulares", []):
+        diag.append({"nivel": "warn",
+                     "texto": f"Está cursando «{irr['materia']}» sin tener aprobada su correlativa: "
+                              f"{', '.join(irr['falta'])}."})
     for c in cursos_canvas:
         if (c.get("estado_matricula") or "") not in ("active", "completed", ""):
             diag.append({"nivel": "warn", "texto": f"Matrícula en «{c['nombre']}» está en estado «{c['estado_matricula']}»."})

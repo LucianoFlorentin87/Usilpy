@@ -59,6 +59,20 @@ def _parse_db_url(url: str) -> dict:
     }
 
 
+def _modo_ssl(url: str, host: str):
+    """Decide si exigir SSL en la conexión.
+
+    Los servicios administrados (Supabase, Render) lo requieren, pero un
+    PostgreSQL local — el caso del servidor propio de la universidad o de una
+    prueba en la máquina — no lo tiene habilitado y rechazaría la conexión.
+    """
+    if "sslmode=disable" in url:
+        return False
+    if "sslmode=require" in url:
+        return "require"
+    return False if host in {"localhost", "127.0.0.1", "::1"} else "require"
+
+
 async def init_pool(retries: int = 4, delay: float = 2.0) -> None:
     """Crea el pool de conexiones. Reintenta con backoff porque el pooler de
     Supabase a veces responde 'Tenant or user not found' de forma transitoria."""
@@ -82,7 +96,8 @@ async def init_pool(retries: int = 4, delay: float = 2.0) -> None:
     for intento in range(1, retries + 1):
         try:
             _pool = await asyncpg.create_pool(**kwargs, min_size=1, max_size=10,
-                                              ssl="require", statement_cache_size=0)
+                                              ssl=_modo_ssl(url, kwargs["host"]),
+                                              statement_cache_size=0)
             if intento > 1:
                 logger.info("DB conectada en el intento %d", intento)
             return

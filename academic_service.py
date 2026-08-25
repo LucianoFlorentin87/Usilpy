@@ -97,6 +97,56 @@ def _norm_carrera_cpel(raw: str) -> str:
     return raw.strip()
 
 
+
+# ---------------------------------------------------------------------------
+# Esquema propio del módulo académico
+# ---------------------------------------------------------------------------
+# Estas dos tablas guardan lo que llega de las planillas. Sin ellas, todo el
+# módulo académico falla en una instalación nueva.
+
+_DDL_ACADEMICO = """
+CREATE TABLE IF NOT EXISTS historial_academico (
+    id              BIGSERIAL PRIMARY KEY,
+    cedula          TEXT NOT NULL,
+    nombre          TEXT,
+    carrera         TEXT,
+    programa        TEXT,
+    codigo_materia  TEXT NOT NULL DEFAULT '',
+    materia         TEXT,
+    ciclo           INT,
+    nota            TEXT,
+    nota_num        NUMERIC(6,2),
+    aprobado        BOOLEAN,
+    periodo         TEXT NOT NULL DEFAULT '',
+    docente         TEXT,
+    creado_en       TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (cedula, codigo_materia, periodo)
+);
+CREATE INDEX IF NOT EXISTS idx_historial_cedula   ON historial_academico (cedula);
+CREATE INDEX IF NOT EXISTS idx_historial_carrera  ON historial_academico (programa, carrera);
+
+CREATE TABLE IF NOT EXISTS correlativas (
+    id              BIGSERIAL PRIMARY KEY,
+    programa        TEXT,
+    carrera         TEXT,
+    semestre        INT,
+    codigo_materia  TEXT,
+    materia         TEXT,
+    prerequisito    TEXT,
+    UNIQUE (programa, carrera, materia, prerequisito)
+);
+CREATE INDEX IF NOT EXISTS idx_correlativas_carrera ON correlativas (programa, carrera);
+"""
+
+
+async def init_db() -> None:
+    """Crea las tablas del módulo académico si no existen."""
+    for stmt in _DDL_ACADEMICO.strip().split(";"):
+        stmt = stmt.strip()
+        if stmt:
+            await db.execute(stmt)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -795,6 +845,7 @@ async def estado_inscripcion(cedula: str) -> dict:
                 prereq_map[key].append(p)
 
     materias = []
+    irregulares: list[dict] = []
     seen = set()
     for m in malla:
         nombre = _norm(m["materia"])
@@ -804,12 +855,19 @@ async def estado_inscripcion(cedula: str) -> dict:
         seen.add(key)
         prereqs = prereq_map.get(key, [])
 
+        # Correlativas que el alumno todavía no aprobó, sea cual sea su estado
+        sin_aprobar = [p for p in prereqs if _norm(p).lower() not in aprobadas]
+
         if key in aprobadas:
             estado = "aprobada"
             faltantes = []
         elif key in en_curso:
             estado = "cursando"
             faltantes = []
+            # Está cursando sin tener aprobada la correlativa: es una
+            # irregularidad que académico necesita ver, no un bloqueo.
+            if sin_aprobar:
+                irregulares.append({"materia": nombre, "falta": sin_aprobar})
         else:
             faltantes = [p for p in prereqs if _norm(p).lower() not in aprobadas]
             if faltantes:
@@ -827,7 +885,8 @@ async def estado_inscripcion(cedula: str) -> dict:
             "faltantes": faltantes,
         })
 
-    return {"cedula": cedula, "carrera": carrera, "programa": programa, "materias": materias}
+    return {"cedula": cedula, "carrera": carrera, "programa": programa,
+            "materias": materias, "irregulares": irregulares}
 
 
 import re as _re
@@ -1083,4 +1142,5 @@ async def ficha_alumno(cedula: str) -> dict:
         "materias": materias,
         "historial": historial,
         "bloqueantes": bloqueantes,
+        "irregulares": estado.get("irregulares", []),
     }
