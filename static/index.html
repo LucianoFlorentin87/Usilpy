@@ -1417,9 +1417,14 @@
               <option value="usuario_sistema">Usuario del sistema</option>
             </select>
           </div>
-          <div style="flex:1;min-width:240px;">
-            <label id="el-label">Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del curso en Canvas)</span></label>
-            <input id="el-id" type="text" placeholder="Ej: 1806" style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;">
+          <div style="flex:1;min-width:280px;">
+            <label id="el-label">Buscá y elegí <span id="el-contador" style="color:var(--text-muted);font-weight:400;"></span></label>
+            <input id="el-id" type="text" list="el-opciones" autocomplete="off"
+                   placeholder="Escribí para buscar por nombre o ID…"
+                   oninput="elSeleccion()"
+                   style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;">
+            <datalist id="el-opciones"></datalist>
+            <div id="el-elegido" style="font-size:.8rem;color:var(--text-muted);margin-top:5px;"></div>
           </div>
           <button class="btn btn-secondary" onclick="elPreview()">Ver qué se afecta</button>
         </div>
@@ -2143,6 +2148,7 @@ function showPanel(id, el) {
   if (id === 'sync-alumnos') syncBuscarAlumnos();
   if (id === 'panel-canvas-asistencia') asisInit();
   if (id === 'panel-canvas-cursos') ccInit();
+  if (id === 'eliminar') elLimpiar();
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -4516,27 +4522,84 @@ async function repararNombres() {
 
 // ── Eliminar recursos ────────────────────────────────────────────────────────
 let _elPrevio = null;
+let _elLista = [];      // [{id, etiqueta}] del tipo elegido
 
-const _EL_ETIQUETAS = {
-  curso:            'Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del curso en Canvas)</span>',
-  periodo:          'Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del período en Canvas)</span>',
-  equipo:           'Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del grupo en Microsoft 365)</span>',
-  usuario_sistema:  'Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del usuario del sistema)</span>',
+const _EL_CONFIG = {
+  curso: {
+    label: 'Buscá el curso',
+    placeholder: 'Nombre o ID del curso…',
+    cargar: async () => (await apiFetch('/api/canvas/all-courses'))
+      .map(c => ({ id: String(c.id),
+                   etiqueta: `${c.name}${c.term?.name ? ' · ' + c.term.name : ''} · ID ${c.id}` })),
+  },
+  periodo: {
+    label: 'Buscá el período',
+    placeholder: 'Nombre del período…',
+    cargar: async () => (await apiFetch('/api/canvas/terms'))
+      .map(t => ({ id: String(t.id), etiqueta: `${t.name} · ID ${t.id}` })),
+  },
+  equipo: {
+    label: 'Buscá el equipo de Teams',
+    placeholder: 'Nombre del equipo…',
+    cargar: async () => (await apiFetch('/api/teams'))
+      .map(t => ({ id: String(t.id), etiqueta: `${t.displayName || t.nombre || t.id}` })),
+  },
+  usuario_sistema: {
+    label: 'Buscá el usuario del sistema',
+    placeholder: 'Usuario, nombre o correo…',
+    cargar: async () => (await apiFetch('/api/users'))
+      .map(u => ({ id: String(u.id),
+                   etiqueta: `${u.username} · ${u.full_name || u.email || ''} · ${u.role}` })),
+  },
 };
 
-function elLimpiar() {
-  _elPrevio = null;
+async function elLimpiar() {
+  _elPrevio = null; _elLista = [];
   document.getElementById('el-preview').innerHTML = '';
   document.getElementById('el-id').value = '';
-  const t = document.getElementById('el-tipo').value;
-  document.getElementById('el-label').innerHTML = _EL_ETIQUETAS[t] || 'Identificador';
+  document.getElementById('el-elegido').textContent = '';
+  document.getElementById('el-opciones').innerHTML = '';
+
+  const tipo = document.getElementById('el-tipo').value;
+  const cfg = _EL_CONFIG[tipo];
+  document.getElementById('el-label').innerHTML =
+    `${cfg.label} <span id="el-contador" style="color:var(--text-muted);font-weight:400;">cargando…</span>`;
+  document.getElementById('el-id').placeholder = cfg.placeholder;
+
+  try {
+    _elLista = await cfg.cargar();
+    document.getElementById('el-opciones').innerHTML =
+      _elLista.map(o => `<option value="${_esc(o.etiqueta)}"></option>`).join('');
+    const c = document.getElementById('el-contador');
+    if (c) c.textContent = `(${_elLista.length} disponibles)`;
+  } catch (e) {
+    const c = document.getElementById('el-contador');
+    if (c) c.textContent = '(no se pudo cargar la lista — podés escribir el ID a mano)';
+  }
+}
+
+/** Resuelve el ID a partir de lo escrito: la etiqueta elegida o un ID directo. */
+function _elResolverId() {
+  const v = document.getElementById('el-id').value.trim();
+  if (!v) return '';
+  const exacto = _elLista.find(o => o.etiqueta === v);
+  if (exacto) return exacto.id;
+  const porId = _elLista.find(o => o.id === v);
+  if (porId) return porId.id;
+  return v;   // permite pegar un ID que no esté en la lista
+}
+
+function elSeleccion() {
+  const id = _elResolverId();
+  const o = _elLista.find(x => x.id === id);
+  document.getElementById('el-elegido').textContent = o ? `Seleccionado · ID ${id}` : '';
 }
 
 async function elPreview() {
   const tipo = document.getElementById('el-tipo').value;
-  const id = document.getElementById('el-id').value.trim();
+  const id = _elResolverId();
   const cont = document.getElementById('el-preview');
-  if (!id) { alert('Ingresá el identificador del recurso'); return; }
+  if (!id) { alert('Buscá y elegí el recurso que querés eliminar'); return; }
   cont.innerHTML = '<p style="color:var(--text-muted);">Consultando…</p>';
   try {
     const p = await apiFetch(`/api/eliminar/preview?tipo=${encodeURIComponent(tipo)}&id=${encodeURIComponent(id)}`);
@@ -4596,6 +4659,8 @@ async function elEliminar() {
       </div>`;
     _elPrevio = null;
     document.getElementById('el-id').value = '';
+    document.getElementById('el-elegido').textContent = '';
+    await elLimpiar();          // refrescar la lista sin el recurso borrado
     _portalLog(`Eliminado: ${r.nombre}`, 'success');
   } catch(e) {
     cont.innerHTML += `<p style="color:var(--error);margin-top:10px;">${_esc(e.message)}</p>`;
