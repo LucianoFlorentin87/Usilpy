@@ -855,6 +855,26 @@ async def _registrar_borrado(usuario: dict, tipo: str, ident: str, nombre: str, 
 @app.get("/api/eliminar/preview")
 async def eliminar_preview(tipo: str, id: str, _: dict = Depends(_require_admin)):
     """Qué se va a afectar si se borra este recurso. No borra nada."""
+    try:
+        return await _armar_preview(tipo, id, _)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # Canvas o Microsoft no respondieron: decirlo con claridad, no un 500 pelado
+        plataforma = ("Canvas" if tipo in ("curso", "periodo", "usuario_canvas")
+                      else "Microsoft 365" if tipo in ("equipo", "usuario_365") else "el servicio")
+        logger.error("Preview de borrado (%s/%s) falló: %s", tipo, id, exc)
+        raise HTTPException(
+            status_code=502,
+            detail=f"No se pudo consultar {plataforma}: {str(exc)[:180]}")
+
+
+async def _armar_preview(tipo: str, id: str, _: dict):
+    if tipo in ("curso", "periodo") and not str(id).isdigit():
+        raise HTTPException(
+            status_code=400,
+            detail="Elegí un curso o período de la lista: el identificador debe ser numérico.")
+
     if tipo == "curso":
         try:
             d = await detalle_curso(int(id), _)
@@ -894,6 +914,44 @@ async def eliminar_preview(tipo: str, id: str, _: dict = Depends(_require_admin)
             "reversible": True,
         }
 
+    if tipo == "usuario_canvas":
+        u = await canvas_service.find_user_by_sis_id(id)
+        if not u:
+            async with httpx.AsyncClient(timeout=30) as c:
+                r = await c.get(f"{canvas_service._base()}/api/v1/users/{id}",
+                                headers=canvas_service._headers())
+                u = r.json() if r.status_code == 200 else None
+        if not u:
+            raise HTTPException(status_code=404, detail="Usuario de Canvas no encontrado")
+        n = await canvas_service.contar_matriculas_usuario(u["id"])
+        return {
+            "tipo": "usuario_canvas", "id": str(u["id"]), "nombre": u.get("name", ""),
+            "impacto": [
+                f"Pierde el acceso a Canvas y a sus {n if n >= 0 else ''} materia(s) matriculada(s)".replace("  ", " "),
+                "Se pierden sus entregas y calificaciones en Canvas",
+                "No afecta su cuenta de Microsoft 365 ni su historial en este sistema",
+            ],
+            "reversible": False,
+        }
+
+    if tipo == "usuario_365":
+        u = await graph_service.get_user_by_upn(id)
+        if not u:
+            raise HTTPException(status_code=404, detail="Usuario de Microsoft 365 no encontrado")
+        grupos = await graph_service.get_user_groups(u["id"])
+        equipos = [g["nombre"] for g in grupos if g.get("es_team")]
+        return {
+            "tipo": "usuario_365", "id": u["id"],
+            "nombre": u.get("userPrincipalName") or u.get("displayName", ""),
+            "impacto": [
+                "Pierde el correo institucional y el acceso a Microsoft 365",
+                f"Sale de {len(equipos)} equipo(s) de Teams" + (f": {', '.join(equipos[:5])}" if equipos else ""),
+                "Microsoft la conserva 30 días en la papelera antes de borrarla definitivamente",
+                "No afecta su cuenta de Canvas",
+            ],
+            "reversible": True,
+        }
+
     if tipo == "usuario_sistema":
         u = await user_service.get_user_by_id(id)
         if not u:
@@ -915,7 +973,7 @@ async def eliminar_recurso(payload: dict, current: dict = Depends(_require_admin
     if not tipo or not ident:
         raise HTTPException(status_code=400, detail="Faltan el tipo y el identificador del recurso.")
 
-    previo = await eliminar_preview(tipo, ident, current)
+    previo = await eliminar_preview(tipo, ident, current)  # valida y trae el impacto
     esperado = (previo.get("nombre") or "").strip()
     if previo.get("bloqueado"):
         raise HTTPException(status_code=409, detail=previo["impacto"][0])
@@ -936,6 +994,20 @@ async def eliminar_recurso(payload: dict, current: dict = Depends(_require_admin
             await canvas_service.delete_term(ident)
         elif tipo == "equipo":
             await graph_service.delete_team(ident)
+        elif tipo == "usuario_canvas":
+            await canvas_service.delete_user(ident)
+            try:
+                import db as _db
+                await _db.execute("DELETE FROM sync_alumnos WHERE canvas_user_id = ?", int(ident))
+            except Exception:
+                pass
+        elif tipo == "usuario_365":
+            await graph_service.delete_user_365(ident)
+            try:
+                import db as _db
+                await _db.execute("DELETE FROM sync_usuarios_365 WHERE azure_id = ?", ident)
+            except Exception:
+                pass
         elif tipo == "usuario_sistema":
             if ident == current.get("sub"):
                 raise HTTPException(status_code=400, detail="No podés eliminar tu propio usuario.")

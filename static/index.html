@@ -1402,7 +1402,9 @@
         <div style="background:var(--error-bg);border:1px solid var(--error-border);border-radius:8px;padding:12px 15px;margin-bottom:20px;">
           <div style="font-weight:600;color:var(--error);margin-bottom:4px;">Estas acciones afectan Canvas y Microsoft 365 de verdad</div>
           <div style="font-size:.86rem;color:var(--text);">
-            No se borra nada de esta base local: se borra en la plataforma de origen.
+            Los cursos, períodos, equipos y cuentas se borran <strong>en Canvas y en
+            Microsoft 365</strong>, no solo en este sistema. La única excepción es
+            «Usuario del panel de gestión», que solo quita el acceso a esta herramienta.
             Cada eliminación queda registrada en Auditoría con tu usuario.
           </div>
         </div>
@@ -1411,10 +1413,18 @@
           <div style="min-width:200px;">
             <label>Qué querés eliminar</label>
             <select id="el-tipo" onchange="elLimpiar()" style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;">
-              <option value="curso">Curso de Canvas</option>
-              <option value="periodo">Período de Canvas</option>
-              <option value="equipo">Equipo de Teams</option>
-              <option value="usuario_sistema">Usuario del sistema</option>
+              <optgroup label="Canvas">
+                <option value="curso">Curso</option>
+                <option value="periodo">Período</option>
+                <option value="usuario_canvas">Cuenta de un alumno o docente</option>
+              </optgroup>
+              <optgroup label="Microsoft 365">
+                <option value="equipo">Equipo de Teams</option>
+                <option value="usuario_365">Cuenta institucional</option>
+              </optgroup>
+              <optgroup label="Este sistema">
+                <option value="usuario_sistema">Usuario del panel de gestión</option>
+              </optgroup>
             </select>
           </div>
           <div style="flex:1;min-width:280px;">
@@ -4544,8 +4554,20 @@ const _EL_CONFIG = {
     cargar: async () => (await apiFetch('/api/teams'))
       .map(t => ({ id: String(t.id), etiqueta: `${t.displayName || t.nombre || t.id}` })),
   },
+  usuario_canvas: {
+    label: 'Buscá la cuenta de Canvas',
+    placeholder: 'Cédula del alumno o docente…',
+    cargar: async () => (await apiFetch('/api/sync/alumnos?limit=500'))
+      .map(a => ({ id: String(a.sis_user_id || a.canvas_user_id),
+                   etiqueta: `${a.nombre} · CI ${a.sis_user_id || '—'} · ${a.email || ''}` })),
+  },
+  usuario_365: {
+    label: 'Buscá la cuenta de Microsoft 365',
+    placeholder: 'Correo institucional…',
+    cargar: async () => [],   // se escribe el correo directamente
+  },
   usuario_sistema: {
-    label: 'Buscá el usuario del sistema',
+    label: 'Buscá el usuario del panel',
     placeholder: 'Usuario, nombre o correo…',
     cargar: async () => (await apiFetch('/api/users'))
       .map(u => ({ id: String(u.id),

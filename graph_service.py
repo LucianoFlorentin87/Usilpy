@@ -158,6 +158,21 @@ async def create_user(display_name: str, mail_nickname: str, upn: str, password:
 
 
 
+
+async def delete_user_365(user_id: str) -> bool:
+    """Elimina una cuenta de Microsoft 365.
+
+    Microsoft la conserva 30 días en la papelera del directorio antes de
+    borrarla de forma definitiva; en ese plazo puede restaurarse.
+    """
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.delete(f"{GRAPH_BASE}/users/{user_id}", headers=_headers())
+        if resp.status_code in (204, 200):
+            return True
+        _verificar(resp, f"borrado del usuario {user_id}")
+        return False
+
+
 async def delete_team(group_id: str) -> bool:
     """Borra un equipo/grupo de Microsoft 365.
 

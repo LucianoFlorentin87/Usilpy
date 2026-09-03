@@ -249,6 +249,30 @@ async def undelete_course(course_id: int | str) -> bool:
 
 
 
+
+async def delete_user(user_id: int | str) -> dict:
+    """Elimina la cuenta de un usuario de la cuenta raíz de Canvas."""
+    acct = await _account_id()
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.delete(
+            f"{_base()}/api/v1/accounts/{acct}/users/{user_id}",
+            headers=_headers(),
+        )
+        _verificar(resp, f"borrado del usuario {user_id}")
+        return resp.json()
+
+
+async def contar_matriculas_usuario(user_id: int | str) -> int:
+    """Cuántas materias tiene matriculadas — para avisar antes de borrarlo."""
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.get(
+            f"{_base()}/api/v1/users/{user_id}/enrollments",
+            headers=_headers(),
+            params={"per_page": 100, "state[]": ["active", "invited", "completed"]},
+        )
+        return len(resp.json()) if resp.status_code == 200 else -1
+
+
 async def delete_course(course_id: int | str) -> dict:
     """Borra un curso en Canvas.
 
