@@ -399,6 +399,9 @@
     <div class="nav-item" id="nav-auditoria" data-panel="auditoria" onclick="showPanel('auditoria', this)" style="display:none;">
       <span class="nav-icon">📋</span> Auditoría
     </div>
+    <div class="nav-item" id="nav-eliminar" data-panel="eliminar" onclick="showPanel('eliminar', this)" style="display:none;">
+      <span class="nav-icon">🗑️</span> Eliminar recursos
+    </div>
     <div class="nav-item" id="nav-cron" data-panel="cron-config" onclick="showPanel('cron-config', this)" style="display:none;">
       <span class="nav-icon">⏰</span> Configurar cron
     </div>
@@ -1388,6 +1391,42 @@
 
     </div>
 
+
+    <!-- ══════════ PANEL: ELIMINAR RECURSOS ══════════ -->
+    <div id="panel-eliminar" class="panel">
+      <div class="card">
+        <h2 class="card-title">Eliminar recursos</h2>
+        <p>Borrá cursos, períodos, equipos de Teams o usuarios del sistema. Antes de
+           confirmar vas a ver exactamente a quiénes afecta.</p>
+
+        <div style="background:var(--error-bg);border:1px solid var(--error-border);border-radius:8px;padding:12px 15px;margin-bottom:20px;">
+          <div style="font-weight:600;color:var(--error);margin-bottom:4px;">Estas acciones afectan Canvas y Microsoft 365 de verdad</div>
+          <div style="font-size:.86rem;color:var(--text);">
+            No se borra nada de esta base local: se borra en la plataforma de origen.
+            Cada eliminación queda registrada en Auditoría con tu usuario.
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+          <div style="min-width:200px;">
+            <label>Qué querés eliminar</label>
+            <select id="el-tipo" onchange="elLimpiar()" style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;">
+              <option value="curso">Curso de Canvas</option>
+              <option value="periodo">Período de Canvas</option>
+              <option value="equipo">Equipo de Teams</option>
+              <option value="usuario_sistema">Usuario del sistema</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:240px;">
+            <label id="el-label">Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del curso en Canvas)</span></label>
+            <input id="el-id" type="text" placeholder="Ej: 1806" style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;">
+          </div>
+          <button class="btn btn-secondary" onclick="elPreview()">Ver qué se afecta</button>
+        </div>
+
+        <div id="el-preview" style="margin-top:18px;"></div>
+      </div>
+    </div>
     <!-- ══════════ PANEL: CRON CONFIG ══════════ -->
     <div id="panel-cron-config" class="panel">
       <div class="card">
@@ -1950,7 +1989,7 @@ function _applyRoleVisibility(role) {
   const gestion   = ['nav-section-gestion', 'nav-portal', 'nav-crear-cursos',
                      'nav-matriculacion', 'nav-pending'];
   const datos     = ['nav-section-datos', 'nav-historial', 'nav-sync'];
-  const admin     = ['nav-section-admin', 'nav-users', 'nav-auditoria', 'nav-cron'];
+  const admin     = ['nav-section-admin', 'nav-users', 'nav-auditoria', 'nav-eliminar', 'nav-cron'];
   const todo = [...inicio, ...consultas, ...gestion, ...datos, ...admin];
 
   const show = ids => ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
@@ -2080,6 +2119,7 @@ const panelTitles = {
   'crear-cursos':        ['Crear cursos y equipos', 'Gestión'],
   'matriculacion-masiva':['Matricular alumnos',     'Gestión'],
   'cron-config':         ['Configurar cron',        'Administración'],
+  'eliminar':            ['Eliminar recursos',      'Administración'],
   'sync-panel':          ['Sincronizar Canvas',     'Datos'],
   'sync-alumnos':        ['Alumnos',                'Consultas'],
   'panel-historial':      ['Historial y mallas',   'Datos'],
@@ -4471,6 +4511,95 @@ async function repararNombres() {
   } catch(e) {
     statusEl.innerHTML = `<p style="color:var(--error)">❌ ${e.message}</p>`;
     _portalLog(`Error al sincronizar nombres: ${e.message}`, 'error');
+  }
+}
+
+// ── Eliminar recursos ────────────────────────────────────────────────────────
+let _elPrevio = null;
+
+const _EL_ETIQUETAS = {
+  curso:            'Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del curso en Canvas)</span>',
+  periodo:          'Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del período en Canvas)</span>',
+  equipo:           'Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del grupo en Microsoft 365)</span>',
+  usuario_sistema:  'Identificador <span style="color:var(--text-muted);font-weight:400;">(ID del usuario del sistema)</span>',
+};
+
+function elLimpiar() {
+  _elPrevio = null;
+  document.getElementById('el-preview').innerHTML = '';
+  document.getElementById('el-id').value = '';
+  const t = document.getElementById('el-tipo').value;
+  document.getElementById('el-label').innerHTML = _EL_ETIQUETAS[t] || 'Identificador';
+}
+
+async function elPreview() {
+  const tipo = document.getElementById('el-tipo').value;
+  const id = document.getElementById('el-id').value.trim();
+  const cont = document.getElementById('el-preview');
+  if (!id) { alert('Ingresá el identificador del recurso'); return; }
+  cont.innerHTML = '<p style="color:var(--text-muted);">Consultando…</p>';
+  try {
+    const p = await apiFetch(`/api/eliminar/preview?tipo=${encodeURIComponent(tipo)}&id=${encodeURIComponent(id)}`);
+    _elPrevio = p;
+    const bloqueado = !!p.bloqueado;
+    cont.innerHTML = `
+      <div style="border:1px solid ${bloqueado ? 'var(--warn-border)' : 'var(--error-border)'};
+                  background:${bloqueado ? 'var(--warn-bg)' : 'var(--error-bg)'};
+                  border-radius:10px;padding:16px 18px;">
+        <div style="font-size:.72rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+                    color:${bloqueado ? 'var(--warn)' : 'var(--error)'};margin-bottom:8px;">
+          ${bloqueado ? 'No se puede eliminar' : 'Se va a eliminar'}
+        </div>
+        <div style="font-size:1.05rem;font-weight:600;margin-bottom:2px;">${_esc(p.nombre || p.id)}</div>
+        <div style="font-size:.83rem;color:var(--text-muted);margin-bottom:12px;">
+          ${p.periodo ? _esc(p.periodo) + ' · ' : ''}ID ${_esc(String(p.id))}
+        </div>
+        <ul style="margin:0 0 12px;padding-left:1.1rem;font-size:.88rem;">
+          ${(p.impacto || []).map(i => `<li>${_esc(i)}</li>`).join('')}
+        </ul>
+        <div style="font-size:.83rem;color:var(--text-muted);margin-bottom:${bloqueado ? '0' : '14px'};">
+          ${p.reversible ? 'Esta acción se puede revertir desde la plataforma de origen.'
+                         : 'Esta acción no se puede deshacer.'}
+        </div>
+        ${bloqueado ? '' : `
+          <div style="border-top:1px solid var(--border);padding-top:14px;">
+            <label>Para confirmar, escribí el nombre exacto: <strong>${_esc(p.nombre)}</strong></label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
+              <input id="el-confirm" type="text" placeholder="${_esc(p.nombre)}"
+                     style="flex:1;min-width:220px;padding:9px;border:1px solid var(--border);border-radius:8px;">
+              <button class="btn" onclick="elEliminar()"
+                      style="background:#dc2626;border-color:#dc2626;color:#fff;">Eliminar definitivamente</button>
+            </div>
+          </div>`}
+      </div>`;
+  } catch(e) {
+    cont.innerHTML = `<p style="color:var(--error);">${_esc(e.message)}</p>`;
+  }
+}
+
+async function elEliminar() {
+  if (!_elPrevio) return;
+  const confirmacion = document.getElementById('el-confirm').value.trim();
+  const cont = document.getElementById('el-preview');
+  _portalLog(`Eliminando ${_elPrevio.tipo}: ${_elPrevio.nombre}…`, 'warn');
+  try {
+    const r = await apiFetch('/api/eliminar', {
+      method: 'POST',
+      body: JSON.stringify({ tipo: _elPrevio.tipo, id: String(_elPrevio.id), confirmacion }),
+    });
+    cont.innerHTML = `
+      <div style="border:1px solid var(--success-border);background:var(--success-bg);
+                  border-radius:10px;padding:14px 18px;color:var(--success);">
+        <strong>Eliminado:</strong> ${_esc(r.nombre)} (ID ${_esc(String(r.id))}).
+        ${r.reversible ? 'Se puede restaurar desde la plataforma de origen.' : ''}
+        <div style="font-size:.82rem;margin-top:4px;">Quedó registrado en Auditoría.</div>
+      </div>`;
+    _elPrevio = null;
+    document.getElementById('el-id').value = '';
+    _portalLog(`Eliminado: ${r.nombre}`, 'success');
+  } catch(e) {
+    cont.innerHTML += `<p style="color:var(--error);margin-top:10px;">${_esc(e.message)}</p>`;
+    _portalLog(`Error al eliminar: ${e.message}`, 'error');
   }
 }
 

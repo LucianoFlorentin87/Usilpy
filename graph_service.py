@@ -157,6 +157,36 @@ async def create_user(display_name: str, mail_nickname: str, upn: str, password:
         return resp.json()
 
 
+
+async def delete_team(group_id: str) -> bool:
+    """Borra un equipo/grupo de Microsoft 365.
+
+    Microsoft lo manda a la papelera del directorio, donde queda recuperable
+    durante 30 días antes de eliminarse definitivamente.
+    """
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.delete(f"{GRAPH_BASE}/groups/{group_id}", headers=_headers())
+        if resp.status_code in (204, 200):
+            return True
+        _verificar(resp, f"borrado del equipo {group_id}")
+        return False
+
+
+async def contar_miembros(group_id: str) -> int:
+    """Cuántos miembros tiene el equipo — para avisar antes de borrarlo."""
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.get(
+            f"{GRAPH_BASE}/groups/{group_id}/members/$count",
+            headers={**_headers(), "ConsistencyLevel": "eventual"},
+        )
+        if resp.status_code != 200:
+            return -1
+        try:
+            return int(resp.text)
+        except ValueError:
+            return -1
+
+
 # ── Groups ────────────────────────────────────────────────────────────────────
 
 async def create_group(display_name: str, description: str = "") -> dict:

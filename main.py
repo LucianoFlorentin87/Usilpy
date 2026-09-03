@@ -828,6 +828,130 @@ async def reporte_asistencia_excel(course_id: int, umbral: float = 70, curso: st
     )
 
 
+# ---------------------------------------------------------------------------
+# Eliminación de recursos (Canvas, Teams y datos locales)
+# ---------------------------------------------------------------------------
+# Toda operación de este bloque es destructiva. El flujo obligatorio es:
+#   1. Consultar el impacto con /api/eliminar/preview
+#   2. Confirmar enviando el nombre exacto del recurso
+#   3. Queda registrado en la auditoría
+
+async def _registrar_borrado(usuario: dict, tipo: str, ident: str, nombre: str, detalle: str) -> None:
+    import uuid as _u
+    try:
+        await audit_service.log_action(
+            ejecucion_id=str(_u.uuid4())[:8],
+            cedula=usuario.get("username", ""),
+            nombre=usuario.get("name", ""),
+            accion=f"ELIMINAR {tipo.upper()}",
+            plataforma=tipo,
+            curso=f"{nombre} (id={ident})",
+            detalle=detalle,
+        )
+    except Exception as exc:
+        logger.warning("No se pudo registrar el borrado en auditoría: %s", exc)
+
+
+@app.get("/api/eliminar/preview")
+async def eliminar_preview(tipo: str, id: str, _: dict = Depends(_require_admin)):
+    """Qué se va a afectar si se borra este recurso. No borra nada."""
+    if tipo == "curso":
+        try:
+            d = await detalle_curso(int(id), _)
+        except HTTPException as exc:
+            raise exc
+        return {
+            "tipo": "curso", "id": id, "nombre": d["nombre"],
+            "periodo": d["periodo"], "estado": d["estado"],
+            "impacto": [
+                f"{d['total_alumnos']} alumno(s) matriculado(s) perderán el acceso",
+                "Las notas y entregas del curso dejan de estar disponibles",
+                "Canvas conserva el curso borrado: puede restaurarse",
+            ],
+            "reversible": True,
+        }
+
+    if tipo == "periodo":
+        terms = await canvas_service.get_terms()
+        t = next((x for x in terms if str(x.get("id")) == str(id)), None)
+        if not t:
+            raise HTTPException(status_code=404, detail="Período no encontrado")
+        n = await canvas_service.contar_cursos_del_periodo(id)
+        impacto = ([f"El período tiene {n} curso(s) asociado(s): Canvas NO permite borrarlo hasta moverlos o borrarlos"]
+                   if n > 0 else ["El período no tiene cursos asociados"])
+        return {"tipo": "periodo", "id": id, "nombre": t.get("name", ""),
+                "impacto": impacto, "reversible": False, "bloqueado": n > 0}
+
+    if tipo == "equipo":
+        n = await graph_service.contar_miembros(id)
+        return {
+            "tipo": "equipo", "id": id, "nombre": id,
+            "impacto": [
+                f"{n if n >= 0 else 'Los'} miembro(s) perderán acceso al equipo",
+                "Se eliminan también las conversaciones y archivos del equipo",
+                "Microsoft lo conserva 30 días en la papelera antes de borrarlo definitivamente",
+            ],
+            "reversible": True,
+        }
+
+    if tipo == "usuario_sistema":
+        u = await user_service.get_user_by_id(id)
+        if not u:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        return {"tipo": "usuario_sistema", "id": id, "nombre": u.get("username", ""),
+                "impacto": ["Pierde el acceso al sistema de gestión",
+                            "No afecta sus cuentas de Canvas ni de Microsoft 365"],
+                "reversible": False}
+
+    raise HTTPException(status_code=400, detail=f"Tipo desconocido: {tipo}")
+
+
+@app.post("/api/eliminar")
+async def eliminar_recurso(payload: dict, current: dict = Depends(_require_admin)):
+    """Borra un recurso. Exige el nombre exacto como confirmación."""
+    tipo = (payload.get("tipo") or "").strip()
+    ident = str(payload.get("id") or "").strip()
+    confirmacion = (payload.get("confirmacion") or "").strip()
+    if not tipo or not ident:
+        raise HTTPException(status_code=400, detail="Faltan el tipo y el identificador del recurso.")
+
+    previo = await eliminar_preview(tipo, ident, current)
+    esperado = (previo.get("nombre") or "").strip()
+    if previo.get("bloqueado"):
+        raise HTTPException(status_code=409, detail=previo["impacto"][0])
+    if confirmacion != esperado:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Para confirmar, escribí exactamente: {esperado}")
+
+    try:
+        if tipo == "curso":
+            await canvas_service.delete_course(int(ident))
+            try:
+                import db as _db
+                await _db.execute("DELETE FROM sync_cursos WHERE canvas_course_id = ?", int(ident))
+            except Exception:
+                pass
+        elif tipo == "periodo":
+            await canvas_service.delete_term(ident)
+        elif tipo == "equipo":
+            await graph_service.delete_team(ident)
+        elif tipo == "usuario_sistema":
+            if ident == current.get("sub"):
+                raise HTTPException(status_code=400, detail="No podés eliminar tu propio usuario.")
+            await user_service.delete_user(ident)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Error al eliminar %s %s: %s", tipo, ident, exc)
+        raise HTTPException(status_code=502, detail=str(exc)[:250])
+
+    await _registrar_borrado(current, tipo, ident, esperado,
+                             " · ".join(previo.get("impacto", [])))
+    return {"eliminado": True, "tipo": tipo, "id": ident, "nombre": esperado,
+            "reversible": previo.get("reversible", False)}
+
+
 @app.get("/api/canvas/users")
 async def list_canvas_users(_: dict = Depends(_require_admin)):
     try:

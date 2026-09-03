@@ -248,6 +248,52 @@ async def undelete_course(course_id: int | str) -> bool:
         return resp.status_code in (200, 201)
 
 
+
+async def delete_course(course_id: int | str) -> dict:
+    """Borra un curso en Canvas.
+
+    Canvas hace borrado lógico: el curso deja de verse pero conserva su SIS ID
+    y puede restaurarse con `undelete_course`.
+    """
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.delete(
+            f"{_base()}/api/v1/courses/{course_id}",
+            headers=_headers(),
+            params={"event": "delete"},
+        )
+        _verificar(resp, f"borrado del curso {course_id}")
+        return resp.json()
+
+
+async def delete_term(term_id: int | str) -> dict:
+    """Borra un período. Canvas lo rechaza si todavía tiene cursos asociados."""
+    acct = await _account_id()
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.delete(
+            f"{_base()}/api/v1/accounts/{acct}/terms/{term_id}",
+            headers=_headers(),
+        )
+        _verificar(resp, f"borrado del período {term_id}")
+        return resp.json()
+
+
+async def contar_cursos_del_periodo(term_id: int | str) -> int:
+    """Cuántos cursos cuelgan de un período — para avisar antes de borrarlo."""
+    acct = await _account_id()
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.get(
+            f"{_base()}/api/v1/accounts/{acct}/courses",
+            headers=_headers(),
+            params={"enrollment_term_id": term_id, "per_page": 1},
+        )
+        if resp.status_code != 200:
+            return -1
+        link = resp.headers.get("Link", "")
+        import re as _re
+        m = _re.search(r"page=(\d+)&per_page=1>; rel=\"last\"", link)
+        return int(m.group(1)) if m else len(resp.json())
+
+
 async def enroll_user(course_id: str, user_id: str, role: str = "StudentEnrollment") -> dict:
     payload = {
         "enrollment": {
