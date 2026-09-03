@@ -1722,6 +1722,44 @@ async def get_dashboard(_: dict = Depends(_require_admin_or_viewer)):
 # Búsqueda de alumnos (Canvas + Azure AD)
 # ---------------------------------------------------------------------------
 
+@app.get("/api/estado-conexiones")
+async def estado_conexiones(_: dict = Depends(_require_admin_or_viewer)):
+    """Comprueba de verdad si Canvas y Microsoft 365 responden.
+
+    El panel mostraba "Canvas OK" mirando si había datos en la base, así que un
+    token vencido pasaba desapercibido hasta que algo fallaba.
+    """
+    import asyncio as _aio
+
+    async def _canvas():
+        try:
+            await canvas_service.get_terms(per_page=1)
+            return {"ok": True, "detalle": "conectado"}
+        except Exception as exc:
+            msg = str(exc)
+            if "401" in msg or "Invalid access token" in msg:
+                return {"ok": False, "detalle": "El token de Canvas venció o fue revocado"}
+            return {"ok": False, "detalle": msg[:120]}
+
+    async def _azure():
+        try:
+            await _aio.get_event_loop().run_in_executor(None, graph_service._get_token)
+            return {"ok": True, "detalle": "conectado"}
+        except Exception as exc:
+            return {"ok": False, "detalle": str(exc)[:120]}
+
+    async def _bd():
+        try:
+            import db as _db
+            await _db.fetchval("SELECT 1")
+            return {"ok": True, "detalle": "conectada"}
+        except Exception as exc:
+            return {"ok": False, "detalle": str(exc)[:120]}
+
+    canvas, azure, bd = await _aio.gather(_canvas(), _azure(), _bd())
+    return {"canvas": canvas, "m365": azure, "base_datos": bd}
+
+
 @app.get("/api/dashboard/plataformas")
 async def dashboard_plataformas(_: dict = Depends(_require_admin)):
     """Estado de plataformas (BD sincronizada) + cuentas huérfanas Canvas↔365."""

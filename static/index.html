@@ -2245,6 +2245,36 @@ async function loadDashboard() {
   loadDashboardPlataformas();  // no bloquea el resto del dashboard
 }
 
+async function cargarEstadoConexiones(ultimaSync) {
+  const el = document.getElementById('dash-estado-sistema');
+  if (!el) return;
+  const badge = (ok, txt, detalle) =>
+    `<span title="${_esc(detalle||'')}" style="display:inline-flex;align-items:center;gap:5px;
+      background:${ok ? '#16a34a' : '#dc2626'};color:#fff;font-size:.75rem;font-weight:600;
+      padding:3px 12px;border-radius:99px;">${ok ? '✓' : '✗'} ${txt}</span>`;
+  el.innerHTML = '<span style="font-size:.82rem;color:var(--text-muted);">Comprobando conexiones…</span>';
+  try {
+    const e = await apiFetch('/api/estado-conexiones');
+    const problemas = [];
+    if (!e.canvas.ok)      problemas.push(`Canvas: ${e.canvas.detalle}`);
+    if (!e.m365.ok)        problemas.push(`Microsoft 365: ${e.m365.detalle}`);
+    if (!e.base_datos.ok)  problemas.push(`Base de datos: ${e.base_datos.detalle}`);
+    el.innerHTML =
+      badge(e.canvas.ok, 'Canvas', e.canvas.detalle) +
+      badge(e.m365.ok, 'Microsoft 365', e.m365.detalle) +
+      badge(e.base_datos.ok, 'Base de datos', e.base_datos.detalle) +
+      (problemas.length
+        ? `<div style="background:var(--error-bg);border:1px solid var(--error-border);color:var(--error);
+                 border-radius:8px;padding:9px 12px;margin-top:9px;font-size:.83rem;">
+             ${problemas.map(p => _esc(p)).join('<br>')}
+           </div>`
+        : '') +
+      `<span style="font-size:.78rem;color:var(--text-muted);margin-top:6px;">Última sincronización: ${_esc(ultimaSync)}</span>`;
+  } catch (err) {
+    el.innerHTML = `<span style="font-size:.82rem;color:var(--error);">No se pudo comprobar el estado: ${_esc(err.message)}</span>`;
+  }
+}
+
 async function loadDashboardPlataformas() {
   try {
     const d = await apiFetch('/api/dashboard/plataformas');
@@ -2277,16 +2307,8 @@ async function loadDashboardPlataformas() {
          </div>`,
         enlace('🔄','Sincronizar','sync-panel') + enlace('📋','Historial','panel-historial') + enlace('🛡️','Auditoría','auditoria'));
 
-    // Estado del sistema
-    const badge = (ok, txt) => `<span style="display:inline-flex;align-items:center;gap:5px;background:${ok?'#16a34a':'#dc2626'};color:#fff;font-size:.75rem;font-weight:600;padding:3px 12px;border-radius:99px;">${ok?'✓':'✗'} ${txt}</span>`;
-    const estadoEl = document.getElementById('dash-estado-sistema');
-    if (estadoEl) {
-      estadoEl.innerHTML =
-        badge((d.canvas.alumnos||0) > 0 || (d.canvas.cursos||0) > 0, 'Canvas') +
-        badge((d.m365.usuarios||0) > 0, 'Azure AD') +
-        badge(!!d.ultima_sync || (d.canvas.alumnos||0) > 0, 'Base de datos') +
-        `<span style="font-size:.78rem;color:var(--text-muted);margin-top:4px;">Última sync: ${_esc(ult)}</span>`;
-    }
+    // Estado del sistema — se completa con la comprobación real de conexiones
+    cargarEstadoConexiones(ult);
 
     // Huérfanas
     const hc = d.huerfanas?.solo_canvas || [];
