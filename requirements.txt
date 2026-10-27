@@ -16,3 +16,5 @@ rapidfuzz>=3.6.0
 PyJWT>=2.8.0
 python-multipart>=0.0.18
 passlib[bcrypt]==1.7.4
+# CA bundle patched for the eMudhra certificate compromise (Render advisory).
+certifi>=2026.10.19
